@@ -364,7 +364,10 @@ Strategies, tried in order once both codes are known to be quoted:
 
 The direction rule above lives in one function, `directionalRate`, which both
 the direct and the cross strategy use — the cross one twice, once per leg — so
-"buy going out, sell coming back" has a single definition. A rate that is not
+"buy going out, sell coming back" has a single definition. When the snapshot
+holds the pair in both orientations, which Monobank's never does, the one quoted
+in the asked-for direction wins: picking one is what makes the answer
+independent of the order the upstream listed its pairs in. A rate that is not
 positive is read as absent: the upstream payload is validated positive at its
 boundary, but a cached snapshot outlives a deploy and is only checked for
 shape, and a zero would otherwise divide. `IdentityStrategy` is first in the
@@ -437,7 +440,11 @@ float.
   wait out the same sum — for a stale copy that was already in Redis when the
   first one arrived. The budget sits inside the breaker so an expiry counts as
   an upstream failure rather than passing through unnoticed.
-- **Throttling** via `@nestjs/throttler` on all routes.
+- **Throttling** via `@nestjs/throttler` on every route but the liveness
+  probe, which is exempt, and `/health`, which carries a generous limit of its
+  own (§3). The buckets live in the throttler's default in-process storage, so
+  the documented `THROTTLE_LIMIT` is per replica and a restart empties them —
+  correct for the single instance this deploys as.
 - **Single-flight** cache refresh (see §4) so a burst of misses produces one
   upstream call.
 - **Shutdown order.** `RedisConnection` and `MongoConnection` tear down in
@@ -470,10 +477,13 @@ Concrete: `UnsupportedCurrencyError`, `RateNotAvailableError`,
 - Anything else → `500 INTERNAL_ERROR`, generic message, full stack logged.
 
 Logging uses `nestjs-pino`: JSON in production, `pino-pretty` in development,
-one log line per request carrying exactly `requestId`, method, path, client
+one log line per request carrying exactly the request id, method, path, client
 address, status and duration. Those fields are produced by custom
-`serializers.req` / `serializers.res`; no header is ever written, so a
-credential cannot reach the log by being forgotten in a denylist. Services use
+`serializers.req` / `serializers.res`, which emit `req.id`, `req.method`,
+`req.url` and `req.remoteAddress` and `res.statusCode`; pino-http adds the id
+again as a top-level `reqId` and the duration as `responseTime`. No header is
+ever written, so a credential cannot reach the log by being forgotten in a
+denylist. Services use
 the injected `PinoLogger` with a context.
 
 The line is levelled by outcome: `error` for a 5xx or a thrown error, `warn` for
@@ -577,7 +587,7 @@ apps/api
 │   │   ├── swagger/             OpenAPI document, ApiErrorResponses decorator
 │   │   ├── resilience/          retry, CircuitBreaker, CircuitOpenError
 │   │   ├── money/               the Money constructor, roundHalfUp and the decimal scales §3 publishes (big.js)
-│   │   └── utils/               constant-time compare, withTimeout
+│   │   └── utils/               constant-time compare, withTimeout, TimeoutError, upperSnakeCase
 │   ├── infrastructure/
 │   │   ├── redis/               REDIS_CLIENT (ioredis) and the RedisConnection lifecycle
 │   │   └── mongo/               MongooseModule.forRootAsync, the connect options
@@ -619,7 +629,8 @@ apps/api
 │       │   ├── history.service.ts
 │       │   ├── history.controller.ts  GET /history
 │       │   └── history.module.ts
-│       └── health/              controller, HealthIndicatorPort + Redis / Mongo / Monobank indicators
+│       └── health/              controller, HealthExceptionFilter, HEALTH_INDICATORS,
+│                             HealthIndicatorPort + Redis / Mongo / Monobank indicators
 └── test
     ├── e2e/                     supertest suites over the real HTTP surface
     │   ├── env/                 per-suite environment, imported before AppModule
@@ -646,7 +657,9 @@ down, which is what the Mongo module is built for:
   command from queueing or from spending the driver's default 30 seconds;
 - the repository checks the connection state before issuing one at all, because
   even a fast failure costs the server-selection budget. A skipped record warns
-  once per outage rather than once per conversion;
+  once per outage rather than once per conversion. `withTimeout` stops waiting
+  but cannot cancel the work, so a write that timed out may still land: a
+  conversion reported as not recorded can appear in `/history` a moment later;
 - `MongoConnection` logs the state on change and retries an initial connection
   that never opened. The driver restores a connection it has opened before but
   not one that failed first, so without the retry the history would stay down
