@@ -1,13 +1,17 @@
 import {
   Inject,
   Injectable,
-  OnModuleDestroy,
+  OnApplicationShutdown,
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, ConnectionStates } from 'mongoose';
 import { PinoLogger } from 'nestjs-pino';
+import {
+  createOutageReporter,
+  OutageReporter,
+} from '../../common/logging/outage-reporter';
 import type { TypedConfigService } from '../../config/typed-config.service';
 import { buildMongoConnectOptions } from './mongo-connect.options';
 
@@ -19,11 +23,14 @@ import { buildMongoConnectOptions } from './mongo-connect.options';
 const RECONNECT_DELAY_MS = 5000;
 
 @Injectable()
-export class MongoConnection implements OnModuleInit, OnModuleDestroy {
+export class MongoConnection implements OnModuleInit, OnApplicationShutdown {
   private retryTimer: NodeJS.Timeout | undefined;
   private established = false;
-  private outageReported = false;
   private stopping = false;
+  // No `restored` message: what to say about a connection coming back depends
+  // on whether it had ever been up, which this class knows and the reporter
+  // does not.
+  private readonly outage: OutageReporter;
 
   constructor(
     @InjectConnection() private readonly connection: Connection,
@@ -31,6 +38,11 @@ export class MongoConnection implements OnModuleInit, OnModuleDestroy {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(MongoConnection.name);
+    this.outage = createOutageReporter(this.logger, {
+      down: 'MongoDB is unavailable, the conversion history is degraded',
+      stillDown:
+        'MongoDB is still unreachable, the conversion history stays degraded',
+    });
   }
 
   onModuleInit(): void {
@@ -63,7 +75,23 @@ export class MongoConnection implements OnModuleInit, OnModuleDestroy {
   // Closing emits the same disconnect an outage does, and a shutdown is not an
   // outage: the flag is what keeps the last line of the process from being a
   // warning about a database nothing is going to ask for again.
-  async onModuleDestroy(): Promise<void> {
+  //
+  // A shutdown hook rather than a destroy hook, for the same reason the Redis
+  // one is: Nest closes the HTTP listener in `dispose()`, between the two, so
+  // closing here leaves the requests still in flight with a store to write to.
+  //
+  // `MongooseCoreModule` closes this same connection in a shutdown hook of its
+  // own, so the close below is deliberately one of two — and the order is what
+  // makes it the useful one. Nest calls `onApplicationShutdown` from the root
+  // outwards (`callShutdownHook` reverses the distance order it initialises
+  // in), and the core module is imported by this one, so this hook runs first:
+  // it sets `stopping` and cancels the retry timer while the connection is
+  // still open, and the disconnect the core module's close then emits arrives
+  // at a listener that knows a shutdown is in progress. Without it the last
+  // line of the process would be a warning about a database nothing is going
+  // to ask for again. Closing an already-closed connection resolves, so
+  // whichever of the two runs second costs nothing.
+  async onApplicationShutdown(): Promise<void> {
     this.stopping = true;
     clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
@@ -75,14 +103,14 @@ export class MongoConnection implements OnModuleInit, OnModuleDestroy {
     clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
 
-    if (this.established) {
-      this.logger.info('MongoDB connection restored');
-    } else {
-      this.logger.info('MongoDB connection established');
-    }
+    this.outage.clear();
+    this.logger.info(
+      this.established
+        ? 'MongoDB connection restored'
+        : 'MongoDB connection established',
+    );
 
     this.established = true;
-    this.outageReported = false;
   }
 
   private reportDown(error?: Error): void {
@@ -90,19 +118,7 @@ export class MongoConnection implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    if (this.outageReported) {
-      this.logger.debug(
-        { err: error },
-        'MongoDB is still unreachable, the conversion history stays degraded',
-      );
-    } else {
-      this.outageReported = true;
-      this.logger.warn(
-        { err: error },
-        'MongoDB is unavailable, the conversion history is degraded',
-      );
-    }
-
+    this.outage.report(error);
     this.scheduleRetry();
   }
 

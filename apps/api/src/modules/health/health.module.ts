@@ -3,20 +3,11 @@ import { TerminusModule } from '@nestjs/terminus';
 import { RedisModule } from '../../infrastructure/redis/redis.module';
 import { RatesModule } from '../rates/rates.module';
 import { HealthController } from './health.controller';
-import type { HealthIndicatorPort } from './health-indicator.port';
 import { HEALTH_INDICATORS } from './health-indicators.token';
+import type { HealthIndicatorPort } from './health-indicator.port';
 import { MongoHealthIndicator } from './mongo-health.indicator';
 import { MonobankHealthIndicator } from './monobank-health.indicator';
 import { RedisHealthIndicator } from './redis-health.indicator';
-
-// The token is exactly what is injected into it, so registering an indicator
-// is adding it here and nowhere else: the controller runs whatever the list
-// holds and has no reason to change.
-function collectIndicators(
-  ...indicators: HealthIndicatorPort[]
-): HealthIndicatorPort[] {
-  return indicators;
-}
 
 @Module({
   // RatesModule for the breaker the provider trips, not for the provider: the
@@ -32,13 +23,18 @@ function collectIndicators(
     MongoHealthIndicator,
     MonobankHealthIndicator,
     {
+      // The token is exactly what is injected into it, so registering an
+      // indicator is adding it to this list and nowhere else: the controller
+      // runs whatever the token holds and has no reason to change.
       provide: HEALTH_INDICATORS,
       inject: [
         RedisHealthIndicator,
         MongoHealthIndicator,
         MonobankHealthIndicator,
       ],
-      useFactory: collectIndicators,
+      useFactory: (
+        ...indicators: HealthIndicatorPort[]
+      ): HealthIndicatorPort[] => indicators,
     },
   ],
 })

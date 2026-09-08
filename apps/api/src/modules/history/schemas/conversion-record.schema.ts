@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Schema as MongooseSchema } from 'mongoose';
-import { CONVERSION_STRATEGY_NAMES } from '../../conversion/strategies/conversion-strategy-name';
-import type { ConversionStrategyName } from '../../conversion/strategies/conversion-strategy-name';
+import { CONVERSION_STRATEGY_NAMES } from '../../../common/conversion/conversion-strategy-name';
+import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
 import { RATES_SOURCES } from '../../rates/domain/rates-source';
 import type { RatesSource } from '../../rates/domain/rates-source';
 

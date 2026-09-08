@@ -4,6 +4,7 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../../common/logging/__tests__/fake-pino-logger';
+import { CachedSnapshot } from '../../domain/cache-outcome';
 import { RatesSnapshot } from '../../domain/rates-snapshot';
 import { RatesService } from '../rates.service';
 
@@ -27,6 +28,16 @@ interface ProviderDouble {
   fetchRates: jest.Mock;
 }
 
+// The two ways the cache answers with no snapshot, which the service reports
+// differently: an expiry costs an upstream call, an outage costs one and is
+// reported to the client.
+const miss = (): CachedSnapshot => ({ snapshot: null, degraded: false });
+const unreachable = (): CachedSnapshot => ({ snapshot: null, degraded: true });
+const hit = (snapshot: RatesSnapshot): CachedSnapshot => ({
+  snapshot,
+  degraded: false,
+});
+
 interface RepositoryDouble {
   getFresh: jest.Mock;
   getStale: jest.Mock;
@@ -43,9 +54,9 @@ describe('RatesService', () => {
   beforeEach(() => {
     provider = { fetchRates: jest.fn().mockResolvedValue(FRESH) };
     repository = {
-      getFresh: jest.fn().mockResolvedValue(null),
-      getStale: jest.fn().mockResolvedValue(null),
-      save: jest.fn().mockResolvedValue(undefined),
+      getFresh: jest.fn().mockResolvedValue(miss()),
+      getStale: jest.fn().mockResolvedValue(miss()),
+      save: jest.fn().mockResolvedValue({ degraded: false }),
       clear: jest.fn().mockResolvedValue(undefined),
     };
     logger = createFakePinoLogger();
@@ -54,11 +65,12 @@ describe('RatesService', () => {
 
   describe('on a cache hit', () => {
     it('answers from the cache without reaching the upstream', async () => {
-      repository.getFresh.mockResolvedValue(FRESH);
+      repository.getFresh.mockResolvedValue(hit(FRESH));
 
       await expect(service.getSnapshot()).resolves.toStrictEqual({
         snapshot: FRESH,
         source: 'cache',
+        cacheDegraded: false,
       });
 
       expect(provider.fetchRates).not.toHaveBeenCalled();
@@ -70,6 +82,7 @@ describe('RatesService', () => {
       await expect(service.getSnapshot()).resolves.toStrictEqual({
         snapshot: FRESH,
         source: 'provider',
+        cacheDegraded: false,
       });
 
       expect(repository.save).toHaveBeenCalledWith(FRESH);
@@ -115,11 +128,12 @@ describe('RatesService', () => {
     });
 
     it('falls back to the stale copy and warns', async () => {
-      repository.getStale.mockResolvedValue(STALE);
+      repository.getStale.mockResolvedValue(hit(STALE));
 
       await expect(service.getSnapshot()).resolves.toStrictEqual({
         snapshot: STALE,
         source: 'stale-cache',
+        cacheDegraded: false,
       });
 
       expect(logger.warn).toHaveBeenCalled();
@@ -153,10 +167,56 @@ describe('RatesService', () => {
 
     it('falls back to the stale copy when the circuit is open', async () => {
       provider.fetchRates.mockRejectedValue(new CircuitOpenError());
-      repository.getStale.mockResolvedValue(STALE);
+      repository.getStale.mockResolvedValue(hit(STALE));
 
       await expect(service.getSnapshot()).resolves.toMatchObject({
         source: 'stale-cache',
+      });
+    });
+  });
+
+  // The client is told what a request cost it, which until now was only in the
+  // log: a cache that could not be reached means the answer was not cached and
+  // the next request pays the upstream again.
+  describe('when the cache cannot be reached', () => {
+    it('reports the read that could not be served', async () => {
+      repository.getFresh.mockResolvedValue(unreachable());
+
+      await expect(service.getSnapshot()).resolves.toStrictEqual({
+        snapshot: FRESH,
+        source: 'provider',
+        cacheDegraded: true,
+      });
+    });
+
+    it('reports the write that could not be stored', async () => {
+      repository.save.mockResolvedValue({ degraded: true });
+
+      await expect(service.getSnapshot()).resolves.toMatchObject({
+        source: 'provider',
+        cacheDegraded: true,
+      });
+    });
+
+    it('reports a fallback read that could not be served either', async () => {
+      provider.fetchRates.mockRejectedValue(new Error('upstream down'));
+      repository.getFresh.mockResolvedValue(unreachable());
+      repository.getStale.mockResolvedValue({
+        snapshot: STALE,
+        degraded: false,
+      });
+
+      await expect(service.getSnapshot()).resolves.toMatchObject({
+        source: 'stale-cache',
+        cacheDegraded: true,
+      });
+    });
+
+    // An expiry is not an outage: the request pays an upstream call for it and
+    // that is what a cache TTL is for.
+    it('says nothing about a key that had simply expired', async () => {
+      await expect(service.getSnapshot()).resolves.toMatchObject({
+        cacheDegraded: false,
       });
     });
   });

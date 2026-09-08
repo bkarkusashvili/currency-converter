@@ -77,7 +77,7 @@ describe('MongoConnection', () => {
 
         expect(logger.warn).toHaveBeenCalledTimes(1);
         expect(logger.warn).toHaveBeenCalledWith(
-          expect.anything(),
+          { err: undefined },
           'MongoDB is unavailable, the conversion history is degraded',
         );
         // The reason every failed attempt carries stays readable without
@@ -102,8 +102,11 @@ describe('MongoConnection', () => {
 
       const { logger } = createConnection(connection);
 
+      // A state read carries no failure to attach: the error this outage
+      // produced was dropped by mongoose before anything was listening, and
+      // pino leaves an undefined `err` out of the line it writes.
       expect(logger.warn).toHaveBeenCalledWith(
-        expect.anything(),
+        { err: undefined },
         'MongoDB is unavailable, the conversion history is degraded',
       );
     });
@@ -214,12 +217,24 @@ describe('MongoConnection', () => {
   });
 
   describe('shutdown', () => {
+    // Nest closes the HTTP listener between the destroy hooks and the shutdown
+    // hooks, so a teardown declared as the first one takes the history store
+    // away from the conversions that are still being answered.
+    it('tears down after the listener rather than before it', () => {
+      const { lifecycle } = createConnection(new FakeMongoConnection());
+
+      expect(
+        (lifecycle as { onModuleDestroy?: unknown }).onModuleDestroy,
+      ).toBeUndefined();
+      expect(typeof lifecycle.onApplicationShutdown).toBe('function');
+    });
+
     it('closes the connection', async () => {
       const connection = new FakeMongoConnection();
       const { lifecycle } = createConnection(connection);
 
       connection.settle();
-      await lifecycle.onModuleDestroy();
+      await lifecycle.onApplicationShutdown();
 
       expect(connection.closeCalls).toBe(1);
     });
@@ -230,7 +245,7 @@ describe('MongoConnection', () => {
       const { lifecycle, logger } = createConnection(connection);
 
       connection.settle();
-      await lifecycle.onModuleDestroy();
+      await lifecycle.onApplicationShutdown();
 
       expect(logger.warn).not.toHaveBeenCalled();
     });
@@ -243,7 +258,7 @@ describe('MongoConnection', () => {
         const { lifecycle } = createConnection(connection);
 
         connection.settle();
-        await lifecycle.onModuleDestroy();
+        await lifecycle.onApplicationShutdown();
         jest.advanceTimersByTime(PAST_ANY_RETRY_MS);
 
         expect(connection.openCalls).toBe(0);

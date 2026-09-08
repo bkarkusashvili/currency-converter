@@ -10,17 +10,20 @@ import {
   HealthCheckResult,
   HealthCheckService,
 } from '@nestjs/terminus';
-import { SkipThrottle } from '@nestjs/throttler';
+import { seconds, SkipThrottle, Throttle } from '@nestjs/throttler';
 import { HealthExceptionFilter } from './health-exception.filter';
 import type { HealthIndicatorPort } from './health-indicator.port';
 import { HEALTH_INDICATORS } from './health-indicators.token';
 
+// The dependency report is not exempt, only generous: it runs a Redis PING and
+// a Mongo ping per request, so an unauthenticated route with no limit at all is
+// an amplifier pointed at both. Well above any monitoring poll rate and still a
+// bound.
+export const HEALTH_REPORT_LIMIT = 60;
+const REPORT_WINDOW_SECONDS = 60;
+
 @ApiTags('health')
 @Controller('health')
-// A liveness probe runs far more often than a client and shares the caller's
-// bucket, so under the global limit the 61st probe of a minute would answer 429
-// and an orchestrator would restart a perfectly healthy process.
-@SkipThrottle()
 @UseFilters(HealthExceptionFilter)
 export class HealthController {
   constructor(
@@ -31,6 +34,12 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @Throttle({
+    default: {
+      limit: HEALTH_REPORT_LIMIT,
+      ttl: seconds(REPORT_WINDOW_SECONDS),
+    },
+  })
   @ApiOperation({
     summary: 'Report whether the service and its dependencies are healthy',
   })
@@ -58,8 +67,14 @@ export class HealthController {
   // It runs through Terminus rather than returning a literal so the two routes
   // answer in the same shape, and so a future indicator that genuinely belongs
   // to liveness is one entry away.
+  // The exemption belongs to this route alone: a liveness probe runs far more
+  // often than a client and shares the caller's bucket, so under the global
+  // limit the 61st probe of a minute would answer 429 and an orchestrator would
+  // restart a perfectly healthy process. It runs no indicator, so nothing but
+  // the process itself is being spent.
   @Get('live')
   @HealthCheck()
+  @SkipThrottle()
   @ApiOperation({
     summary: 'Report whether the process is up, regardless of its dependencies',
     description:

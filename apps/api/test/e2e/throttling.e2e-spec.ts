@@ -6,14 +6,15 @@ import { Controller, Get, INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
+import { HEALTH_REPORT_LIMIT } from '../../src/modules/health/health.controller';
 import { createE2eApp } from './create-e2e-app';
-import { overrideRedis } from './override-redis';
 
 const THROTTLE_LIMIT = 2;
 const REQUEST_ID_HEADER = 'x-request-id';
 
-// /health is the only route the app serves and it is deliberately exempt from
-// throttling, so the buckets need a route of their own to be observable.
+// The buckets need a route of their own to be observable: the two health routes
+// carry limits of their own, and every other route the app serves needs a
+// dependency stubbed before it answers at all.
 @Controller('probe')
 class ProbeController {
   @Get()
@@ -29,10 +30,10 @@ describe('throttling (e2e)', () => {
   // A fresh app per test, because the throttler's buckets are state that
   // outlives a single request.
   beforeEach(async () => {
-    app = await createE2eApp(
-      { imports: [AppModule], controllers: [ProbeController] },
-      { customise: overrideRedis },
-    );
+    app = await createE2eApp({
+      imports: [AppModule],
+      controllers: [ProbeController],
+    });
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;
@@ -80,9 +81,23 @@ describe('throttling (e2e)', () => {
     await probe('198.51.100.4').expect(200);
   });
 
+  // The probe is the one route with no limit: it runs no indicator, and an
+  // orchestrator polling it far faster than a client must not be answered 429
+  // into a restart of a healthy process.
   it('does not throttle the liveness probe', async () => {
-    for (let attempt = 0; attempt < THROTTLE_LIMIT + 2; attempt += 1) {
+    for (let attempt = 0; attempt < HEALTH_REPORT_LIMIT + 2; attempt += 1) {
+      await request(server).get('/health/live').expect(200);
+    }
+  });
+
+  // The dependency report is generous rather than exempt: it issues a Redis
+  // PING and a Mongo ping per request, so unlimited it is an amplifier anyone
+  // can point at both.
+  it('gives the dependency report a limit of its own', async () => {
+    for (let attempt = 0; attempt < HEALTH_REPORT_LIMIT; attempt += 1) {
       await request(server).get('/health').expect(200);
     }
+
+    await request(server).get('/health').expect(429);
   });
 });

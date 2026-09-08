@@ -1,4 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ResponseWarningDto } from '../../../common/warnings/response-warning.dto';
 import { RATES_SOURCES } from '../domain/rates-source';
 import type { RatesSource } from '../domain/rates-source';
 import { ExchangeRateDto } from './exchange-rate.dto';
@@ -41,4 +42,21 @@ export class RatesSnapshotResponseDto {
     ],
   })
   rates!: ExchangeRateDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'What degraded while this request was answered. Absent when nothing ' +
+      'did: the request succeeded either way, and this is what the client ' +
+      'should know about how the answer was produced.',
+    type: [ResponseWarningDto],
+    example: [
+      {
+        code: 'CACHE_UNAVAILABLE',
+        message:
+          'The rates cache could not be reached during this request, so it ' +
+          'was not used; `source` says where the rates came from.',
+      },
+    ],
+  })
+  warnings?: ResponseWarningDto[];
 }

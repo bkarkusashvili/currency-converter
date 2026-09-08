@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type Big from 'big.js';
+import { CurrencyCode } from '../../../common/currency/currency-code';
 import { RateNotAvailableError } from '../../../common/errors/rate-not-available.error';
 import { UnsupportedCurrencyError } from '../../../common/errors/unsupported-currency.error';
-import { CurrencyCode } from '../../rates/domain/currency-code';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
 import { ConversionStrategy } from './conversion-strategy';
 import { CONVERSION_STRATEGIES } from './conversion-strategies.token';
@@ -30,6 +31,14 @@ function requireQuoted(
   }
 }
 
+// A priced pair: which strategy answered, and the rate it answered with. The
+// two travel together because they are one answer — the strategy is how the
+// rate was arrived at, which is what §3 publishes beside it.
+export interface PricedPair {
+  strategy: ConversionStrategy;
+  rate: Big;
+}
+
 // The strategies arrive as an ordered list through the token, so which ways of
 // pricing exist and which is preferred are both the module's declaration and
 // neither is a branch here. Adding one is adding it there.
@@ -52,18 +61,18 @@ export class ConversionStrategyResolver {
     from: CurrencyCode,
     to: CurrencyCode,
     rates: readonly ExchangeRate[],
-  ): ConversionStrategy {
+  ): PricedPair {
     requireQuoted(rates, from);
     requireQuoted(rates, to);
 
-    const strategy = this.strategies.find((candidate) =>
-      candidate.supports(from, to, rates),
-    );
+    for (const strategy of this.strategies) {
+      const rate = strategy.price(from, to, rates);
 
-    if (strategy === undefined) {
-      throw new RateNotAvailableError(from, to);
+      if (rate !== undefined) {
+        return { strategy, rate };
+      }
     }
 
-    return strategy;
+    throw new RateNotAvailableError(from, to);
   }
 }

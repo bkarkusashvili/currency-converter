@@ -4,6 +4,10 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, ConnectionStates, Model, Types } from 'mongoose';
 import { PinoLogger } from 'nestjs-pino';
 import { HistoryUnavailableError } from '../../../common/errors/history-unavailable.error';
+import {
+  createOutageReporter,
+  OutageReporter,
+} from '../../../common/logging/outage-reporter';
 import { TimeoutError } from '../../../common/utils/timeout.error';
 import { withTimeout } from '../../../common/utils/with-timeout';
 import type { TypedConfigService } from '../../../config/typed-config.service';
@@ -22,7 +26,14 @@ type StoredConversionRecord = ConversionRecordDocument & {
 
 @Injectable()
 export class MongoHistoryRepository implements HistoryRepository {
-  private dropReported = false;
+  // Once per outage, not once per conversion: a burst of traffic while Mongo is
+  // down would otherwise write a warning per request and bury the one line that
+  // says what is wrong. The repeats say nothing at all, for the same reason.
+  //
+  // What closes the outage is a record that was actually stored, not a
+  // connection that happens to be up: reading /history is not evidence a
+  // conversion would be recorded, so only the write path clears this.
+  private readonly outage: OutageReporter;
 
   constructor(
     @InjectModel(CONVERSION_RECORD_MODEL)
@@ -32,6 +43,10 @@ export class MongoHistoryRepository implements HistoryRepository {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(MongoHistoryRepository.name);
+    this.outage = createOutageReporter(this.logger, {
+      down: 'MongoDB is not connected, conversions are answered but not recorded',
+      restored: 'MongoDB is reachable again, conversions are being recorded',
+    });
   }
 
   // The guard is the whole point of the write path: with buffering disabled the
@@ -45,18 +60,18 @@ export class MongoHistoryRepository implements HistoryRepository {
   // server that answers slowly is never disconnected at all. Past the deadline
   // this is the same outage as a connection that is down, reported the same
   // once-per-outage way rather than once per conversion.
-  async record(entry: NewConversionRecord): Promise<void> {
+  async record(entry: NewConversionRecord): Promise<boolean> {
     if (!this.isConnected()) {
-      this.reportDroppedRecords();
+      this.outage.report();
 
-      return;
+      return false;
     }
 
     try {
       await withTimeout(this.model.create(entry), this.operationTimeoutMs());
     } catch (error) {
       if (error instanceof TimeoutError) {
-        this.reportDroppedRecords();
+        this.outage.report();
       } else {
         this.logger.warn(
           { err: error },
@@ -64,10 +79,15 @@ export class MongoHistoryRepository implements HistoryRepository {
         );
       }
 
-      return;
+      return false;
     }
 
-    this.reportRecordsResumed();
+    this.outage.clear();
+
+    // A deadline that expired stops the wait without cancelling the write, so
+    // `false` means "not recorded as far as this request could tell" rather
+    // than "certainly not stored": a dropped record can still land afterwards.
+    return true;
   }
 
   // The read has the opposite contract: /history has nothing to answer with, so
@@ -117,35 +137,6 @@ export class MongoHistoryRepository implements HistoryRepository {
 
   private isConnected(): boolean {
     return this.connection.readyState === ConnectionStates.connected;
-  }
-
-  // Once per outage, not once per conversion: a burst of traffic while Mongo is
-  // down would otherwise write a warning per request and bury the one line that
-  // says what is wrong.
-  private reportDroppedRecords(): void {
-    if (this.dropReported) {
-      return;
-    }
-
-    this.dropReported = true;
-    this.logger.warn(
-      'MongoDB is not connected, conversions are answered but not recorded',
-    );
-  }
-
-  // The other half of that pair, and it belongs to the write path: what closes
-  // the outage is a record that was actually stored, not a connection that
-  // happens to be up. Reading /history is not evidence a conversion would be
-  // recorded, and answering one used to log a sentence about writes.
-  private reportRecordsResumed(): void {
-    if (!this.dropReported) {
-      return;
-    }
-
-    this.dropReported = false;
-    this.logger.info(
-      'MongoDB is reachable again, conversions are being recorded',
-    );
   }
 
   private toRecord(document: StoredConversionRecord): ConversionRecord {

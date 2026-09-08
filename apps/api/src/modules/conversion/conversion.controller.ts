@@ -1,6 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiErrorResponses } from '../../common/swagger/api-error-responses.decorator';
+import { collectWarnings } from '../../common/warnings/collect-warnings';
 import { ConversionService } from './conversion.service';
 import { ConvertRequestDto } from './dto/convert-request.dto';
 import { ConvertResponseDto } from './dto/convert-response.dto';
@@ -25,7 +26,8 @@ export class ConversionController {
     description:
       'The converted amount, the effective rate, and the provenance of the ' +
       'rates it used. A `source` of `stale-cache` is a degraded answer ' +
-      'priced from the fallback copy, not a fresh one.',
+      'priced from the fallback copy, not a fresh one; a `warnings` entry ' +
+      'says what could not be reached while the conversion was answered.',
     type: ConvertResponseDto,
   })
   @ApiErrorResponses(
@@ -35,7 +37,18 @@ export class ConversionController {
     HttpStatus.SERVICE_UNAVAILABLE,
     HttpStatus.INTERNAL_SERVER_ERROR,
   )
-  convert(@Body() request: ConvertRequestDto): Promise<ConvertResponseDto> {
-    return this.conversion.convert(request);
+  async convert(
+    @Body() request: ConvertRequestDto,
+  ): Promise<ConvertResponseDto> {
+    const { result, cacheDegraded, recorded } =
+      await this.conversion.convert(request);
+    const warnings = collectWarnings({
+      CACHE_UNAVAILABLE: cacheDegraded,
+      HISTORY_NOT_RECORDED: !recorded,
+    });
+
+    // Spread rather than assigned undefined: an answer nothing degraded is
+    // exactly the one this route has always given, down to the absent key.
+    return warnings === undefined ? result : { ...result, warnings };
   }
 }

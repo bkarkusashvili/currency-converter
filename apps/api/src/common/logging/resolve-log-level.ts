@@ -1,8 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
-
-// The unversioned probe routes. Kept local so the logger does not depend on the
-// HTTP wiring; configureHttp excludes the same paths from the api prefix.
-const PROBE_PATHS: readonly string[] = ['/health', '/health/live'];
+import { PROBE_PATHS } from '../http/paths';
 
 // Narrower than pino's LevelWithSilent, which is what pino-http asks for; every
 // member here is one of its levels.

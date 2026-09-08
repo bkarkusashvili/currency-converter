@@ -170,6 +170,21 @@ describe('history (e2e)', () => {
 
       expect(response.body).toMatchObject({ result: 4435, rate: 44.35 });
     });
+
+    // The conversion is the answer and the record is a side effect of it, but a
+    // client that reads /history back has to know this one will not be there.
+    it('says on the conversion that it was not recorded', async () => {
+      const response = await convert('USD', 'UAH', 100).expect(200);
+
+      expect(response.body).toMatchObject({
+        warnings: [
+          {
+            code: 'HISTORY_NOT_RECORDED',
+            message: expect.stringContaining('/history') as string,
+          },
+        ],
+      });
+    });
   });
 
   describe('/health', () => {

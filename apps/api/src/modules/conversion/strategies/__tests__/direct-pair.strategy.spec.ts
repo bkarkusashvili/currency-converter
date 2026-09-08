@@ -1,6 +1,5 @@
 import { RATE_DECIMALS } from '../../../../common/money/money-decimals';
 import { roundHalfUp } from '../../../../common/money/round-half-up';
-import { RateNotAvailableError } from '../../../../common/errors/rate-not-available.error';
 import { DirectPairStrategy } from '../direct-pair.strategy';
 import { RATES } from './rates.fixture';
 
@@ -8,13 +7,13 @@ describe('DirectPairStrategy', () => {
   const strategy = new DirectPairStrategy();
 
   const rateOf = (from: string, to: string): number =>
-    roundHalfUp(strategy.rate(from, to, RATES), RATE_DECIMALS);
+    roundHalfUp(strategy.price(from, to, RATES)!, RATE_DECIMALS);
 
   it('is named after the pricing it does', () => {
     expect(strategy.name).toBe('direct');
   });
 
-  describe('supports', () => {
+  describe('the pairs it takes', () => {
     it.each([
       ['USD', 'UAH'],
       ['UAH', 'USD'],
@@ -22,20 +21,20 @@ describe('DirectPairStrategy', () => {
       ['USD', 'EUR'],
       ['GBP', 'UAH'],
       ['UAH', 'PLN'],
-    ])('takes %s to %s, which the snapshot quotes', (from, to) => {
-      expect(strategy.supports(from, to, RATES)).toBe(true);
+    ])('prices %s to %s, which the snapshot quotes', (from, to) => {
+      expect(strategy.price(from, to, RATES)).toBeDefined();
     });
 
     it('leaves two currencies with no pair between them to the cross rate', () => {
-      expect(strategy.supports('GBP', 'PLN', RATES)).toBe(false);
+      expect(strategy.price('GBP', 'PLN', RATES)).toBeUndefined();
     });
 
     it('does not take a currency the snapshot never mentions', () => {
-      expect(strategy.supports('XYZ', 'UAH', RATES)).toBe(false);
+      expect(strategy.price('XYZ', 'UAH', RATES)).toBeUndefined();
     });
   });
 
-  describe('rate', () => {
+  describe('the rate it prices with', () => {
     it('multiplies by the buy rate going from base to quote', () => {
       expect(rateOf('USD', 'UAH')).toBe(44.35);
     });
@@ -58,12 +57,6 @@ describe('DirectPairStrategy', () => {
     // reason this strategy is tried first.
     it('prefers the published pair to the path through the base currency', () => {
       expect(rateOf('EUR', 'USD')).not.toBe(1.15322);
-    });
-
-    it('answers the documented 422 when it is asked for a pair it does not support', () => {
-      expect(() => strategy.rate('GBP', 'PLN', RATES)).toThrow(
-        RateNotAvailableError,
-      );
     });
   });
 });

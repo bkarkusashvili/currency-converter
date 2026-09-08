@@ -1,6 +1,6 @@
 import type Big from 'big.js';
 import { Money } from '../../../common/money/money';
-import { CurrencyCode } from '../../rates/domain/currency-code';
+import { CurrencyCode } from '../../../common/currency/currency-code';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
 import { findRate } from './find-rate';
 
