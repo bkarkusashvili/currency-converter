@@ -56,6 +56,27 @@ falling back to the server `message` for a code this client does not know.
 Field messages from `details.errors` are shown exactly as the server returned
 them; the ones naming `amount`, `from` or `to` are routed onto that input.
 
+## Offline fallback
+
+The API answers from a stale Redis copy when Monobank is down. This client does
+the same one layer out: the `rates` and `currencies` queries are persisted to
+`localStorage` through `@tanstack/react-query-persist-client`, with a seven-day
+`maxAge` and the package version as the buster, so a release that changes the
+API contract discards what the previous one wrote. Every storage call is
+guarded — a browser that blocks site data gets the plain in-memory client and
+loses only the fallback.
+
+When a conversion fails with `NETWORK_ERROR` or a 5xx, `useConvertWithFallback`
+re-prices it from the persisted snapshot with `features/converter/lib/convertOffline.ts`,
+a pure implementation of the conversion rules in `docs/architecture.md` §5 using
+`big.js`, so the number matches what the API would have answered from the same
+rates. The result card badges it `offline estimate` and says how old the rates
+are. Everything the API can answer — validation, an unsupported currency, no
+rate path, 401, 404, 429 — is shown as the API answered it, and an estimate is
+never added to the history, which is the API's record of what it converted. To
+see it: load the page once, stop the API (or set devtools' Network tab to
+Offline), and convert again.
+
 ## Runtime configuration
 
 The API URL is read at runtime, not baked into the bundle. `public/config.js`

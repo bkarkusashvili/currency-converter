@@ -562,6 +562,17 @@ still returned.
   failure, a body that does not parse and a report that fails its guard are the
   only errors, each carrying the status it arrived on, and the query does not
   retry.
+- **Two-layer fallback.** The API survives Monobank being down with the stale
+  Redis copy; the browser survives the API being down with a persisted one. The
+  `rates` and `currencies` queries are written through to `localStorage`
+  (`@tanstack/query-sync-storage-persister`, 7-day `maxAge`, busted by the
+  package version, and skipped entirely when storage is unavailable). A
+  conversion that fails with `NETWORK_ERROR` or a 5xx is re-priced from that
+  snapshot by `convertOffline` — §5 rule for rule, in `big.js` — and shown with
+  a warning-tone `offline-estimate` source badge and the age of the rates; every
+  other envelope code is left as the API answered it, and an estimate is never
+  added to the history. The currency selects fall back the same way: the API's
+  list, then the persisted copy, then the two defaults.
 - **Internationalisation.** Every user-facing string lives in
   `src/i18n/en.json`, loaded through `react-i18next`; the `CustomTypeOptions`
   augmentation type-checks keys against the JSON. Numbers and dates are
