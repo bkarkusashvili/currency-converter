@@ -40,8 +40,7 @@ export class ConversionService {
     amount,
   }: ConversionRequest): Promise<ConversionResult> {
     const { snapshot, source } = await this.rates.getSnapshot();
-    const strategy = this.resolver.resolve(from, to, snapshot.rates);
-    const rate = strategy.rate(from, to, snapshot.rates);
+    const { strategy, rate } = this.resolver.resolve(from, to, snapshot.rates);
     const result = roundHalfUp(new Money(amount).times(rate), RESULT_DECIMALS);
 
     this.logger.info(

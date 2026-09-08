@@ -17,11 +17,7 @@ import { ConversionStrategyName } from './conversion-strategy-name';
 export class IdentityStrategy implements ConversionStrategy {
   readonly name: ConversionStrategyName = 'identity';
 
-  supports(from: CurrencyCode, to: CurrencyCode): boolean {
-    return from === to;
-  }
-
-  rate(): Big {
-    return new Money(1);
+  price(from: CurrencyCode, to: CurrencyCode): Big | undefined {
+    return from === to ? new Money(1) : undefined;
   }
 }

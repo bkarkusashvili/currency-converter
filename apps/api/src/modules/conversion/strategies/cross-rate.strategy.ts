@@ -6,7 +6,6 @@ import { ExchangeRate } from '../../rates/domain/exchange-rate';
 import { ConversionStrategy } from './conversion-strategy';
 import { ConversionStrategyName } from './conversion-strategy-name';
 import { directionalRate } from './directional-rate';
-import { requireRate } from './require-rate';
 
 // Two legs through the currency every published pair has in common, which for
 // a Ukrainian bank's rates is the hryvnia: sell the source currency for it,
@@ -17,40 +16,28 @@ import { requireRate } from './require-rate';
 // Both legs come back from `directionalRate` as `Money` values and big.js
 // carries the constructor through an operation, so the product is one too and
 // the composition never touches the global precision either.
-function crossRate(
-  from: CurrencyCode,
-  to: CurrencyCode,
-  rates: readonly ExchangeRate[],
-): Big | undefined {
-  const intoBase = directionalRate(from, BASE_CURRENCY, rates);
-  const outOfBase = directionalRate(BASE_CURRENCY, to, rates);
-
-  return intoBase === undefined || outOfBase === undefined
-    ? undefined
-    : intoBase.times(outOfBase);
-}
-
 @Injectable()
 export class CrossRateStrategy implements ConversionStrategy {
   readonly name: ConversionStrategyName = 'cross';
 
   // A currency has a path to itself through the base currency, and taking it
-  // would answer 0.989 for USD to USD. Identity answers that pair, and saying
-  // so here is what keeps the chain's order a preference rather than a
+  // would answer 0.989 for USD to USD. Identity prices that pair, and declining
+  // it here is what keeps the chain's order a preference rather than a
   // correctness condition.
-  supports(
+  price(
     from: CurrencyCode,
     to: CurrencyCode,
     rates: readonly ExchangeRate[],
-  ): boolean {
-    return from !== to && crossRate(from, to, rates) !== undefined;
-  }
+  ): Big | undefined {
+    if (from === to) {
+      return undefined;
+    }
 
-  rate(
-    from: CurrencyCode,
-    to: CurrencyCode,
-    rates: readonly ExchangeRate[],
-  ): Big {
-    return requireRate(crossRate(from, to, rates), from, to);
+    const intoBase = directionalRate(from, BASE_CURRENCY, rates);
+    const outOfBase = directionalRate(BASE_CURRENCY, to, rates);
+
+    return intoBase === undefined || outOfBase === undefined
+      ? undefined
+      : intoBase.times(outOfBase);
   }
 }

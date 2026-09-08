@@ -403,10 +403,15 @@ cannot move the answer either.
 ```ts
 interface ConversionStrategy {
   readonly name: 'identity' | 'direct' | 'cross';
-  supports(from: CurrencyCode, to: CurrencyCode, rates: readonly ExchangeRate[]): boolean;
-  rate(from: CurrencyCode, to: CurrencyCode, rates: readonly ExchangeRate[]): Big;
+  price(from: CurrencyCode, to: CurrencyCode, rates: readonly ExchangeRate[]): Big | undefined;
 }
 ```
+
+One method, not a `supports` predicate and a `rate` beside it: the pair was
+priced or it was not. `ConversionStrategyResolver.resolve` returns
+`{ strategy, rate }` — the first strategy of the chain that answered and the
+rate it answered with — so nothing prices the pair twice and "the precondition
+of `rate` is `supports`" is unrepresentable rather than commented.
 
 `result` is computed from the **unrounded** rate, and `rate` is rounded to six
 decimals separately: half a unit in the sixth decimal is 29 groszy on a million
@@ -615,7 +620,7 @@ apps/api
 │       │   ├── domain/          ConversionRequest, ConversionResult
 │       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
 │       │   ├── strategies/      interface, identity, direct, cross, resolver + token,
-│       │   │                    findRate, requireRate and directionalRate, which is the
+│       │   │                    findRate and directionalRate, which is the
 │       │   │                    §5 table in one function
 │       │   ├── conversion.service.ts
 │       │   ├── conversion.controller.ts  POST /convert
