@@ -1,6 +1,7 @@
 {
   "app": {
     "title": "Currency Converter",
+    "skipToContent": "Skip to content",
     "nav": {
       "label": "Main",
       "converter": "Converter",
@@ -16,23 +17,24 @@
     "unknownTime": "—"
   },
   "converter": {
-    "eyebrow": "Monobank rates · cross rates through UAH",
+    "eyebrow": "Monobank rates",
     "heading": "Convert at a rate you can trace.",
     "intro": "Every conversion reports the strategy that produced the rate and whether it came from the cache, from Monobank, or from the last good snapshot.",
     "form": {
       "amount": "Amount",
+      "amountHint": "Numbers only, up to {{decimals}} decimal places, {{max}} maximum.",
       "from": "From",
       "to": "To",
       "swap": "Swap the two currencies",
       "submit": "Convert",
       "submitting": "Converting…",
       "currencyOption": "{{code}} — {{name}}",
-      "currenciesUnavailable": "The currency list did not load ({{message}}) — the two defaults are still available.",
+      "currenciesUnavailable": "The currency list did not load ({{message}}). The two default currencies are still available.",
       "currenciesFromCache": "The currency list did not load ({{message}}) — the copy saved in this browser is being used."
     },
     "amountErrors": {
       "empty": "Enter an amount to convert.",
-      "notANumber": "Amount must be a number, for example 250.75 or 1,250.75.",
+      "notANumber": "Enter a number, for example 250.75.",
       "notPositive": "Amount must be greater than zero.",
       "tooLarge": "Amount must be {{max}} or less."
     },
@@ -40,6 +42,7 @@
       "heading": "Result",
       "rateLead": "1 {{from}} = ",
       "rateTrail": " {{to}}",
+      "inverseRate": "1 {{from}} = {{rate}} {{to}}",
       "ratesFetched": "Rates fetched",
       "pathLabel": "Conversion path: {{path}}",
       "provenanceHeading": "Where this rate came from",
@@ -82,7 +85,7 @@
       },
       "offline-estimate": {
         "value": "offline estimate",
-        "note": "API unreachable; estimated from rates fetched"
+        "note": "The API could not be reached, so this was priced in the browser from rates fetched"
       },
       "unknown": {
         "note": "This client does not recognise the source the API reported, so it is shown exactly as it was returned."
@@ -94,7 +97,9 @@
     "history": {
       "heading": "Recent conversions",
       "limit": "Last {{count}}",
-      "empty": "No conversions yet. The last {{count}} will be listed here.",
+      "loading": "Loading recent conversions…",
+      "emptyHeading": "No conversions yet",
+      "empty": "The last {{count}} appear here, each with the rate it used and where that rate came from.",
       "unavailable": "Recent conversions are unavailable. Converting still works.",
       "rate": "1 {{from}} = {{rate}} {{to}}"
     }
@@ -104,7 +109,7 @@
     "heading": "A currency converter, built as a service.",
     "purpose": [
       "Currency Converter turns an amount in one currency into another using Monobank’s published exchange rates. It exists to show a small service built the way a production service is built: a domain that does not know what a database is, a cache that can fail without taking the request down with it, one error shape for every failure, and a client that tells you where each number came from.",
-      "The design is written down first, in docs/architecture.md, and the code lands against it one pull request at a time. The section below says which parts have merged."
+      "The design was written down first, in docs/architecture.md, and the code landed against it one pull request at a time. That document is the contract: a change to behaviour changes it in the same pull request."
     ],
     "live": {
       "heading": "Live",
@@ -116,10 +121,10 @@
     "status": {
       "title": "Where it stands",
       "items": [
-        "The API foundation — typed configuration, pino request logging, the shared error envelope, the health endpoint, its Docker image and CI — has merged.",
-        "The rates, conversion and history modules follow in subsequent pull requests, and the Docker Compose file that runs api, web, Redis and Mongo together lands with them.",
-        "This client is complete and is built against the API contract in docs/architecture.md, not against a running service. Until the conversion module merges, converting against a local API returns a 404 through the same error envelope.",
-        "Everything below describes the design the code implements as those modules land."
+        "Every module the architecture describes has merged: rates, conversion through three strategies, currencies, history, the health endpoint and this client.",
+        "The API and this client are two independent images, built by one CI workflow that runs lint, formatting, typecheck, tests with coverage thresholds, the build and the image build per app.",
+        "Both run on Railway behind the platform edge, each on its own hostname; the panel above reads the live health endpoint every 30 seconds.",
+        "Docker Compose runs the whole set — api, web, Redis and Mongo — from the repository root."
       ]
     },
     "whatWasBuilt": {
@@ -127,7 +132,7 @@
       "points": [
         {
           "term": "A NestJS API",
-          "description": "REST endpoints under /api/v1 for convert, rates, currencies and history, documented with Swagger at /docs, plus a terminus health endpoint that reports the Redis, MongoDB and Monobank indicators as those modules land — today it answers with an empty report, and this page renders whatever indicators it carries."
+          "description": "REST endpoints under /api/v1 for convert, rates, currencies and history, documented with Swagger at /docs, plus a terminus health endpoint reporting the Redis, MongoDB and Monobank indicators. A separate /health/live answers whenever the process can serve a request, so a degraded dependency never fails a deploy gate."
         },
         {
           "term": "Ports and adapters",
@@ -159,7 +164,7 @@
         },
         {
           "term": "This client",
-          "description": "React 19, Vite, TanStack Query and Tailwind v4 with a dark-aware token palette. Components depend on repository interfaces, never on HTTP; every string comes from an i18n dictionary. Vitest and Testing Library cover the repositories, the amount parser, the form, the history panel and this page."
+          "description": "React 19, Vite, TanStack Query and Tailwind v4 with a dark-aware token palette. Components depend on repository interfaces, never on HTTP; every string comes from an i18n dictionary type-checked against it. Vitest and Testing Library cover the repositories, the amount field, the form, the result card, the history panel and the offline estimate."
         }
       ]
     },
@@ -186,6 +191,10 @@
           "description": "Monobank rate-limits to one request a minute and does go down. An hour-old snapshot is more useful than a 503, as long as the response admits which one you are looking at. That is what the source badge is for."
         },
         {
+          "term": "No gateway in front",
+          "description": "nginx serves the SPA and nothing else — it proxies no API route. Each service is published by the platform edge under its own hostname, and the API restricts CORS to the web origin, which is the check a gateway would have been added to perform. One hop fewer to configure, secure and debug, and the browser talks to the API it is told about at runtime rather than to a path that happens to be rewritten."
+        },
+        {
           "term": "Fail fast on config, degrade slowly at runtime",
           "description": "Invalid environment stops the process at boot, where the mistake is cheap to notice. A dependency dying at runtime only removes the feature that needs it, and the health endpoint names it."
         },
@@ -201,7 +210,7 @@
     },
     "howToRun": {
       "title": "How to run it",
-      "intro": "Follow the README in the repository for the current instructions; it is updated as each app lands. These two are what this app supports today.",
+      "intro": "The README in the repository has the full instructions, including Docker Compose for the whole set. These two run this app on its own.",
       "readmeLabel": "README in the repository",
       "blocks": [
         {
@@ -236,7 +245,7 @@
   },
   "errors": {
     "requestId": "request {{id}}",
-    "fieldErrorsLead": "The messages below say what needs fixing.",
+    "fieldErrorsLead": "Fix the following and try again.",
     "codes": {
       "VALIDATION_ERROR": "The request did not pass validation.",
       "UNAUTHORIZED": "This request needs an admin API key.",
