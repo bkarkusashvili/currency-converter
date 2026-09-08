@@ -117,7 +117,6 @@ describe('ConverterPage', () => {
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
     const card = await screen.findByRole('region', { name: 'Result' });
-    expect(card.parentElement).toHaveAttribute('aria-live', 'polite');
     expect(card).toHaveTextContent('425.71 PLN');
     expect(card).toHaveTextContent('1 EUR = 4.257112 PLN');
     expect(within(card).getByText('cross')).toBeInTheDocument();
@@ -129,6 +128,21 @@ describe('ConverterPage', () => {
       within(card).getByText(/Monobank was unreachable, so the last good snapshot was used/i),
     ).toBeInTheDocument();
     expect(within(card).getByText(/the rate was derived through UAH/i)).toBeInTheDocument();
+  });
+
+  it('announces one sentence rather than reading the whole card out', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const announcement = await screen.findByText('100.00 EUR is 425.71 PLN');
+    expect(announcement).toHaveAttribute('aria-live', 'polite');
+    // The card is a sibling, not a child: it stays there to be read, and is
+    // not what gets read out.
+    const card = screen.getByRole('region', { name: 'Result' });
+    expect(announcement).not.toContainElement(card);
+    expect(card.closest('[aria-live]')).toBeNull();
   });
 
   it('does not throw on a strategy or source it has never heard of', async () => {
@@ -152,6 +166,20 @@ describe('ConverterPage', () => {
     expect(
       within(card).getByText(/does not recognise the strategy the API reported/i),
     ).toBeInTheDocument();
+  });
+
+  it('draws no path for identity, which converted nothing', async () => {
+    const user = userEvent.setup();
+    renderPage({
+      convert: { ...conversion, from: 'EUR', to: 'EUR', strategy: 'identity', result: 100 },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const card = await screen.findByRole('region', { name: 'Result' });
+    expect(within(card).queryByRole('list', { name: /Conversion path/ })).not.toBeInTheDocument();
+    // The provenance note still says why there is nothing to draw.
+    expect(within(card).getByText(/nothing was converted/i)).toBeInTheDocument();
   });
 
   it('routes validation messages onto the inputs they belong to', async () => {
@@ -309,7 +337,7 @@ describe('the currency list', () => {
         .map((option) => option.textContent),
     ).toEqual(['EUR — Euro', 'PLN — Zloty', 'UAH — Hryvnia', 'USD — US Dollar']);
     expect(
-      await screen.findByText(/the copy saved in this browser is being used/),
+      await screen.findByText(/The copy saved in this browser is being used/),
     ).toBeInTheDocument();
   });
 
@@ -350,6 +378,25 @@ describe('the currency list', () => {
           .map((option) => option.textContent),
       ).toEqual(['USD', 'XDR']);
     });
+  });
+});
+
+describe('while the currency list is loading', () => {
+  it('stands the selects in a status region rather than labelling nothing', () => {
+    const fake = createFakeRepositories({ convert: conversion });
+    renderWithProviders(<ConverterPage />, {
+      repositories: {
+        ...fake.repositories,
+        currencies: { list: () => new Promise<CurrenciesResponse>(() => undefined) },
+      },
+    });
+
+    const [from, to] = screen.getAllByRole('status');
+    expect(from).toHaveTextContent('Loading the currency list for From…');
+    expect(to).toHaveTextContent('Loading the currency list for To…');
+    // No control to name yet, so nothing claims to name one.
+    expect(document.querySelectorAll('label[for="from"], label[for="to"]')).toHaveLength(0);
+    expect(screen.queryByLabelText('From')).not.toBeInTheDocument();
   });
 });
 
@@ -483,7 +530,7 @@ describe('the amount field', () => {
 
     expect(screen.getByLabelText('Amount')).toHaveAttribute('inputmode', 'decimal');
     expect(document.getElementById('amount-hint')).toHaveTextContent(
-      'Numbers only, up to 2 decimal places, 1,000,000,000,000 maximum.',
+      'Numbers only, up to 13 digits and 2 decimal places.',
     );
   });
 });

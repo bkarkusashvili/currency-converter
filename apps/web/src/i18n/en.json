@@ -25,7 +25,8 @@
     "intro": "Every conversion reports the strategy that produced the rate and whether it came from the cache, from Monobank, or from the last good snapshot.",
     "form": {
       "amount": "Amount",
-      "amountHint": "Numbers only, up to {{decimals}} decimal places, {{max}} maximum.",
+      "amountHint": "Numbers only, up to {{digits}} digits and {{decimals}} decimal places.",
+      "currenciesLoading": "Loading the currency list for {{field}}…",
       "from": "From",
       "to": "To",
       "swap": "Swap the two currencies",
@@ -33,7 +34,7 @@
       "submitting": "Converting…",
       "currencyOption": "{{code}} — {{name}}",
       "currenciesUnavailable": "The currency list did not load ({{message}}). The two default currencies are still available.",
-      "currenciesFromCache": "The currency list did not load ({{message}}) — the copy saved in this browser is being used."
+      "currenciesFromCache": "The currency list did not load ({{message}}). The copy saved in this browser is being used."
     },
     "amountErrors": {
       "empty": "Enter an amount to convert.",
@@ -47,6 +48,7 @@
       "rateTrail": " {{to}}",
       "inverseRate": "1 {{from}} = {{rate}} {{to}}",
       "ratesFetched": "Rates fetched",
+      "announcement": "{{amount}} {{from}} is {{result}} {{to}}",
       "pathLabel": "Conversion path: {{path}}",
       "provenanceHeading": "Where this rate came from",
       "strategyTerm": "Strategy",
@@ -167,7 +169,7 @@
         },
         {
           "term": "This client",
-          "description": "React 19, Vite, TanStack Query and Tailwind v4 with a dark-aware token palette. Components depend on repository interfaces, never on HTTP; every string comes from an i18n dictionary type-checked against it. Vitest and Testing Library cover the repositories, the amount field, the form, the result card, the history panel and the offline estimate."
+          "description": "React 19, Vite, TanStack Query and Tailwind v4 with a dark-aware token palette. Components depend on repository interfaces, never on HTTP; every string comes from an i18n dictionary, and a key that is not in that dictionary fails the typecheck. Vitest and Testing Library cover the repositories, the amount field, the form, the result card, the history panel and the offline estimate."
         }
       ]
     },
@@ -213,8 +215,8 @@
     },
     "howToRun": {
       "title": "How to run it",
-      "intro": "The README in the repository has the full instructions, including Docker Compose for the whole set. These two run this app on its own.",
-      "readmeLabel": "README in the repository",
+      "intro": "The README in the repository has the full instructions, including Docker Compose for the whole set. These two commands run this app on its own.",
+      "readmeLabel": "Open the README",
       "blocks": [
         {
           "caption": "From source",

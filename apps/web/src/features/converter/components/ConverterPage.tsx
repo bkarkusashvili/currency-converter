@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useCurrencies } from '../../../api/hooks/useCurrencies';
 import { ApiErrorNotice } from '../../../components/ApiErrorNotice';
+import { useFormatters } from '../../../lib/useFormatters';
 import { useConvertWithFallback } from '../hooks/useConvertWithFallback';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
 import { splitServerFieldErrors } from '../lib/serverFieldErrors';
@@ -10,6 +11,7 @@ import { HistoryPanel } from './HistoryPanel';
 
 export function ConverterPage() {
   const { t } = useTranslation();
+  const formatters = useFormatters();
   const currencies = useCurrencies();
   const conversion = useConvertWithFallback();
 
@@ -43,16 +45,25 @@ export function ConverterPage() {
           />
         )}
 
-        <div aria-live="polite">
-          {conversion.outcome !== undefined && (
-            // Keyed by the answer, so a new one remounts the card and plays its
-            // entrance again instead of swapping numbers in place.
-            <ConversionResultCard
-              key={outcomeKey(conversion.outcome)}
-              result={conversion.outcome}
-            />
-          )}
+        {/* The answer, in one sentence. The card itself is outside this region:
+            announcing it whole reads every badge, both rate directions, the
+            path and two provenance notes before the number, and it stays
+            available to read at leisure below. */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {conversion.outcome !== undefined &&
+            t('converter.result.announcement', {
+              amount: formatters.money(conversion.outcome.amount),
+              from: conversion.outcome.from,
+              result: formatters.money(conversion.outcome.result),
+              to: conversion.outcome.to,
+            })}
         </div>
+
+        {conversion.outcome !== undefined && (
+          // Keyed by the answer, so a new one remounts the card and plays its
+          // entrance again instead of swapping numbers in place.
+          <ConversionResultCard key={outcomeKey(conversion.outcome)} result={conversion.outcome} />
+        )}
       </div>
 
       <HistoryPanel />

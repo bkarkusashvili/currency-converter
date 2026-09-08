@@ -58,8 +58,9 @@ export function createFormatters(locale: string): Formatters {
       let tail = '';
       for (const part of rate.formatToParts(value)) {
         if (part.type === 'fraction') {
-          lead += part.value.slice(0, SIGNIFICANT_RATE_DECIMALS);
-          tail += part.value.slice(SIGNIFICANT_RATE_DECIMALS);
+          const cut = significantThrough(part.value, value);
+          lead += part.value.slice(0, cut);
+          tail += part.value.slice(cut);
         } else if (tail === '') {
           lead += part.value;
         } else {
@@ -90,6 +91,21 @@ export function createFormatters(locale: string): Formatters {
 
     separators: separatorsOf(integer),
   };
+}
+
+/**
+ * How much of the fraction is the number the reader came for. Two decimals for
+ * a rate of one or more, but a rate below one carries no information until its
+ * leading zeros are past: dimming everything after `0.00` of `0.002255` dims
+ * the whole rate, so the count starts at the first digit that is not a zero.
+ */
+function significantThrough(fraction: string, value: number): number {
+  if (Math.abs(value) >= 1) {
+    return SIGNIFICANT_RATE_DECIMALS;
+  }
+
+  const firstSignificant = fraction.search(/[1-9]/);
+  return firstSignificant === -1 ? fraction.length : firstSignificant + SIGNIFICANT_RATE_DECIMALS;
 }
 
 /**

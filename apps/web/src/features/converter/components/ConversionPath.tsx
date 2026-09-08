@@ -17,6 +17,12 @@ export function ConversionPath({ from, to, strategy }: ConversionPathProps) {
   const { t } = useTranslation();
   const nodes = conversionPath(from, to, strategy);
 
+  // Identity converted nothing, so there is no path to draw. The provenance
+  // note below still says why.
+  if (nodes.length === 0) {
+    return null;
+  }
+
   return (
     <ol
       aria-label={t('converter.result.pathLabel', { path: nodes.join(' → ') })}

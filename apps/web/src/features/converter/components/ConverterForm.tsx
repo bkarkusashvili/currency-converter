@@ -7,8 +7,7 @@ import { useApiErrorMessage } from '../../../lib/useApiErrorMessage';
 import { useFormatters } from '../../../lib/useFormatters';
 import { useConverterForm } from '../hooks/useConverterForm';
 import { currencyOptions } from '../lib/currencyOptions';
-import { MAX_FRACTION_DIGITS } from '../lib/formatAmountInput';
-import { MAX_AMOUNT } from '../lib/parseAmount';
+import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../lib/formatAmountInput';
 import type { FormFieldErrors } from '../lib/serverFieldErrors';
 import { AmountField } from './AmountField';
 import { CurrencySelect } from './CurrencySelect';
@@ -55,9 +54,11 @@ export function ConverterForm({
       <AmountField
         id="amount"
         label={t('converter.form.amount')}
+        // The two caps the field actually enforces. What an amount may *be* is
+        // parseAmount's rule, and it says so in its own message when it has to.
         hint={t('converter.form.amountHint', {
+          digits: MAX_INTEGER_DIGITS,
           decimals: MAX_FRACTION_DIGITS,
-          max: formatters.integer(MAX_AMOUNT),
         })}
         value={form.amount}
         error={form.errors.amount}

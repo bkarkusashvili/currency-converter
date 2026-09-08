@@ -28,6 +28,15 @@ describe('number formatting', () => {
 
   it('splits a rate after two significant decimals', () => {
     expect(formatters.splitRate(4.257112)).toEqual({ lead: '4.25', tail: '7112' });
+    expect(formatters.splitRate(0.847312)).toEqual({ lead: '0.84', tail: '7312' });
+  });
+
+  it('counts a sub-1 rate from its first digit, not from the decimal point', () => {
+    // `0.00` is not a rate; dimming from there would dim the whole number.
+    expect(formatters.splitRate(0.002255)).toEqual({ lead: '0.0022', tail: '55' });
+    expect(formatters.splitRate(0.000123)).toEqual({ lead: '0.00012', tail: '3' });
+    // Nothing significant to find, so nothing is dimmed.
+    expect(formatters.splitRate(0.0001)).toEqual({ lead: '0.0001', tail: '' });
   });
 });
 

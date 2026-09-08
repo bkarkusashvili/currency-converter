@@ -38,8 +38,11 @@ describe('conversionPath', () => {
     expect(conversionPath('EUR', 'PLN', 'cross')).toEqual(['EUR', 'UAH', 'PLN']);
   });
 
-  it('draws a single node for identity and two for anything else', () => {
-    expect(conversionPath('USD', 'USD', 'identity')).toEqual(['USD']);
+  it('draws nothing for identity, which converted nothing', () => {
+    expect(conversionPath('USD', 'USD', 'identity')).toEqual([]);
+  });
+
+  it('draws the two endpoints for anything else', () => {
     expect(conversionPath('USD', 'UAH', 'direct')).toEqual(['USD', 'UAH']);
     expect(conversionPath('USD', 'UAH', 'triangular')).toEqual(['USD', 'UAH']);
   });

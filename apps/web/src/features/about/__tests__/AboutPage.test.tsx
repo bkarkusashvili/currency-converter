@@ -122,7 +122,7 @@ describe('AboutPage', () => {
   it('describes how to run the app without promising a Compose file', () => {
     renderAbout();
 
-    expect(screen.getByRole('link', { name: /README in the repository/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Open the README/i })).toHaveAttribute(
       'href',
       'https://github.com/bkarkusashvili/currency-converter#readme',
     );
