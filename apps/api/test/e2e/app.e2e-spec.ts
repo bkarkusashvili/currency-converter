@@ -3,7 +3,10 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
+import { FakeMongoConnection } from '../../src/infrastructure/mongo/__tests__/fake-mongo-connection';
+import { FakeRedisClient } from '../../src/infrastructure/redis/__tests__/fake-redis-client';
 import { createE2eApp } from './create-e2e-app';
+import { overrideMongo } from './override-mongo';
 import { overrideRedis } from './override-redis';
 
 const REQUEST_ID_HEADER = 'x-request-id';
@@ -45,6 +48,64 @@ describe('API (e2e)', () => {
 
     it('is not exposed under the api/v1 prefix', async () => {
       await request(server).get('/api/v1/health').expect(404);
+    });
+  });
+
+  // The split §3 records: /health is the dependency report and answers 503 when
+  // one is down, /health/live is what a deploy gate and a container health
+  // check probe. A store only /history needs must not fail the rollout of a
+  // process that is up and still converting, so these two have to disagree.
+  describe('GET /health/live', () => {
+    let degraded: INestApplication;
+    let degradedServer: Server;
+
+    beforeAll(async () => {
+      degraded = await createE2eApp(
+        { imports: [AppModule] },
+        {
+          customise: (builder) =>
+            overrideMongo(
+              overrideRedis(
+                builder,
+                new FakeRedisClient({ unreachable: true }),
+              ),
+              // Never settled: the connection mongoose is still opening while
+              // the server it is opening to is not there.
+              new FakeMongoConnection({ unreachable: true }),
+            ),
+        },
+      );
+
+      degradedServer = degraded.getHttpServer() as Server;
+    });
+
+    afterAll(async () => {
+      await degraded.close();
+    });
+
+    it('answers 200 while the dependencies report down', async () => {
+      const response = await request(degradedServer)
+        .get('/health/live')
+        .expect(200);
+
+      expect(response.body).toMatchObject({ status: 'ok', details: {} });
+    });
+
+    it('is the only one of the two that says so', async () => {
+      const response = await request(degradedServer).get('/health');
+
+      expect(response.status).toBe(503);
+      expect(response.body).toMatchObject({
+        status: 'error',
+        error: {
+          redis: { status: 'down' },
+          mongodb: { status: 'down' },
+        },
+      });
+    });
+
+    it('is not exposed under the api/v1 prefix', async () => {
+      await request(degradedServer).get('/api/v1/health/live').expect(404);
     });
   });
 

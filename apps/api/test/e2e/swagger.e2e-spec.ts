@@ -15,6 +15,7 @@ import { overrideRedis } from './override-redis';
 // PRs extend this list as they add routes.
 const EXPECTED_PATHS: ReadonlyArray<readonly [string, string]> = [
   ['/health', 'get'],
+  ['/health/live', 'get'],
   ['/api/v1/rates', 'get'],
   ['/api/v1/convert', 'post'],
   ['/api/v1/rates/cache', 'delete'],

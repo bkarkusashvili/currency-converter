@@ -24,7 +24,7 @@ npm run start:dev
 - API: `http://localhost:3000/api/v1`
 - Swagger UI: `http://localhost:3000/docs`
 - OpenAPI JSON: `http://localhost:3000/docs-json`
-- Health: `http://localhost:3000/health`
+- Health: `http://localhost:3000/health` (liveness: `/health/live`)
 
 ## Endpoints
 
@@ -35,7 +35,8 @@ npm run start:dev
 | `DELETE` | `/api/v1/rates/cache` | Drops both cache keys so the next read refetches. `204`; needs `x-api-key` when `ADMIN_API_KEY` is set |
 | `GET` | `/api/v1/currencies` | The currencies of the current snapshot, with ISO 4217 names and numeric codes, sorted by code |
 | `GET` | `/api/v1/history` | The most recent conversions, newest first. `?limit=` is `1..50`, default `10` |
-| `GET` | `/health` | Terminus report with the `redis`, `mongodb` and `monobank` indicators |
+| `GET` | `/health` | Terminus report with the `redis`, `mongodb` and `monobank` indicators. `503` when any of them is down |
+| `GET` | `/health/live` | Liveness: `200` whenever the process is up, whatever its dependencies are doing |
 
 `source` is worth reading: `stale-cache` is a `200` served from the fallback key
 because the upstream could not be reached, so the rates are older than the cache
@@ -185,7 +186,14 @@ generic message and keeps the detail in the log.
 
 `/health` is the one exception to the envelope: it answers with the Terminus
 report so a failing indicator stays visible to monitoring, and it is exempt from
-the rate limit so a liveness probe cannot throttle itself into a restart loop.
+the rate limit so a probe cannot throttle itself into a restart loop.
+
+`/health/live` is the liveness probe, and it is the one Railway's
+`healthcheckPath`, the Dockerfile's `HEALTHCHECK` and the Compose healthcheck
+point at. `/health` reporting `503` is the right answer for monitoring and the
+wrong one for a deploy gate: Redis or Mongo being down degrades this API without
+stopping it converting, so neither should fail a rollout or restart a container
+that is serving.
 
 ## Docker
 

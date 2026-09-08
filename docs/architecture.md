@@ -178,9 +178,36 @@ is down, a short sanitised `reason` it chose itself. A driver error is never
 passed through: a Mongo or Redis connection failure carries the connection
 string, credentials included, in its message.
 
-`/health` is also exempt from the throttler (`@SkipThrottle()`). A liveness probe
-runs far more often than a client, and sharing a bucket with one would let the
-rate limit restart a healthy process.
+### GET `/health/live`
+
+The same Terminus shape with no indicators at all, so it answers `200` whenever
+the process is up and able to serve a request:
+
+```json
+{ "status": "ok", "info": {}, "error": {}, "details": {} }
+```
+
+The two routes exist because they answer different questions, and one answer
+must not be used for the other's job:
+
+- `/health` is the **dependency report**, and it is what monitoring reads: `503`
+  the moment any indicator is down, with the report saying which.
+- `/health/live` is the **liveness probe**, and it is what deploy gates and
+  container health checks use: Railway's `healthcheckPath`, the Dockerfile's
+  `HEALTHCHECK` and the Compose `api` healthcheck all point here.
+
+Pointing a deploy gate at `/health` makes every dependency a hard one. Redis
+being down degrades the rates cache to an upstream call and Mongo being down
+degrades one route out of five (§2) — neither stops the API converting, and
+neither is a reason to fail a rollout or restart the container. Sending the
+probes here and monitoring there is what keeps `/health` free to report `503`
+honestly.
+
+Both routes are exempt from the throttler (`@SkipThrottle()` on the controller).
+A probe runs far more often than a client, and sharing a bucket with one would
+let the rate limit restart a healthy process. Both are excluded from the
+versioned prefix, and a successful probe of either is dropped from the request
+log (§7); a failing one is not.
 
 ### Error envelope
 
@@ -198,18 +225,18 @@ Every non-2xx response has this shape:
 }
 ```
 
-| HTTP | `code`                 | When                                              |
-| ---- | ---------------------- | ------------------------------------------------- |
+| HTTP | `code`                 | When                                                 |
+| ---- | ---------------------- | ---------------------------------------------------- |
 | 400  | `VALIDATION_ERROR`     | DTO validation failed; `details.errors` lists fields |
-| 401  | `UNAUTHORIZED`         | Missing/invalid admin API key                     |
-| 403  | `FORBIDDEN`            | The caller may not perform this operation         |
-| 404  | `NOT_FOUND`            | Unknown route                                     |
-| 422  | `UNSUPPORTED_CURRENCY` | Code is not in the snapshot                       |
-| 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                |
-| 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                          |
-| 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists          |
-| 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read        |
-| 500  | `INTERNAL_ERROR`       | Anything unexpected; message is generic           |
+| 401  | `UNAUTHORIZED`         | Missing/invalid admin API key                        |
+| 403  | `FORBIDDEN`            | The caller may not perform this operation            |
+| 404  | `NOT_FOUND`            | Unknown route                                        |
+| 422  | `UNSUPPORTED_CURRENCY` | Code is not in the snapshot                          |
+| 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                   |
+| 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                             |
+| 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists             |
+| 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read          |
+| 500  | `INTERNAL_ERROR`       | Anything unexpected; message is generic              |
 
 Any other 4xx keeps its status and takes its `code` from the name the exception
 reports, upper-snake-cased, falling back to the status's own name: a 406 answers
@@ -414,8 +441,9 @@ abstract class AppError extends Error {
 ```
 
 Concrete: `UnsupportedCurrencyError`, `RateNotAvailableError`,
-`RatesUnavailableError`, `UnauthorizedError`. `CircuitOpenError` is internal
-and is translated to `RatesUnavailableError` by `RatesService`.
+`RatesUnavailableError`, `HistoryUnavailableError`, `UnauthorizedError`.
+`CircuitOpenError` is internal and is translated to `RatesUnavailableError` by
+`RatesService`.
 
 `GlobalExceptionFilter` (registered with `APP_FILTER`):
 
@@ -662,7 +690,7 @@ newest-first page and the retention ride on the same key rather than on two.
 | Layer                | Tool                         | What is covered                                   |
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
-| E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history` with a store that is up and one that is down, `/health` |
+| E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history` with a store that is up and one that is down, `/health`, `/health/live` while the dependencies report down |
 | Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
 
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and

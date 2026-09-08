@@ -73,6 +73,36 @@ describe('HealthController', () => {
     });
   });
 
+  // Liveness is the deploy gate: a dependency the API degrades around must not
+  // be able to fail a rollout of a process that is up and converting.
+  describe('liveness', () => {
+    it('reports ok while every indicator is down', async () => {
+      const controller = await createController([
+        {
+          check: () =>
+            Promise.reject(
+              new HealthCheckError('mongodb is unreachable', {
+                mongodb: { status: 'down' },
+              }),
+            ),
+        },
+      ]);
+
+      const result = await controller.live();
+
+      expect(result.status).toBe('ok');
+    });
+
+    it('runs no indicator at all', async () => {
+      const check = jest.fn();
+      const controller = await createController([{ check }]);
+
+      await controller.live();
+
+      expect(check).not.toHaveBeenCalled();
+    });
+  });
+
   it('delegates the aggregation to terminus rather than reimplementing it', async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [TerminusModule],
