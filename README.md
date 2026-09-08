@@ -170,7 +170,7 @@ in `.env` form.
 | `RATES_STALE_TTL_SECONDS`           | `86400`                                          | TTL of the long-lived stale fallback key                                         |
 | `THROTTLE_TTL_SECONDS`              | `60`                                             | Rate-limit window                                                                |
 | `THROTTLE_LIMIT`                    | `60`                                             | Requests per window per client                                                   |
-| `ADMIN_API_KEY`                     | *(unset)*                                        | `x-api-key` for cache invalidation; unset leaves it open                         |
+| `ADMIN_API_KEY`                     | *(unset)*                                        | `x-api-key` for cache invalidation; unset leaves it open, and is refused outright when `NODE_ENV` is `production` |
 
 ### Web (`apps/web`)
 
@@ -183,8 +183,9 @@ in `.env` form.
 
 [`.env.example`](.env.example) documents the handful of values a developer might
 want to change locally: `API_PORT`, `WEB_PORT`, `REDIS_PORT`, `MONGO_PORT`,
-`LOG_LEVEL`, `RATES_CACHE_TTL_SECONDS`, `RATES_STALE_TTL_SECONDS`. Copy it to
-`.env`; Compose picks it up automatically.
+`LOG_LEVEL`, `ADMIN_API_KEY`, `RATES_CACHE_TTL_SECONDS`,
+`RATES_STALE_TTL_SECONDS`. Copy it to `.env`; Compose picks it up
+automatically.
 
 ## Project layout
 

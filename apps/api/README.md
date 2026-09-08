@@ -191,11 +191,14 @@ the rate limit so a liveness probe cannot throttle itself into a restart loop.
 
 ```bash
 docker build -t currency-api:local .
-docker run --rm -p 3000:3000 currency-api:local
+docker run --rm -p 3000:3000 -e ADMIN_API_KEY=local-admin-key currency-api:local
 ```
 
 The image is multi-stage, installs production dependencies only, and runs as the
-unprivileged `node` user. CI builds it on every pull request.
+unprivileged `node` user. CI builds it on every pull request. It sets
+`NODE_ENV=production`, where the schema refuses to start without an
+`ADMIN_API_KEY`: an unset key leaves cache invalidation open to anyone who can
+reach the deployment.
 
 With a Redis and a Mongo to talk to:
 
@@ -203,6 +206,7 @@ With a Redis and a Mongo to talk to:
 docker run -d --name cc-redis -p 6379:6379 redis:7-alpine
 docker run -d --name cc-mongo -p 27017:27017 mongo:7
 docker run --rm -p 3000:3000 \
+  -e ADMIN_API_KEY=local-admin-key \
   -e REDIS_URL=redis://host.docker.internal:6379 \
   -e MONGO_URL=mongodb://host.docker.internal:27017/currency_converter \
   currency-api:local
