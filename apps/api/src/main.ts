@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
+import { errorStack } from './common/logging/error-stack';
 import { setupSwagger } from './common/swagger/setup-swagger';
 import type { TypedConfigService } from './config/typed-config.service';
 import { configureHttp } from './configure-http';
@@ -28,7 +29,7 @@ async function bootstrap(): Promise<void> {
 bootstrap().catch((error: unknown) => {
   new NestLogger('Bootstrap').error(
     'Application failed to start',
-    error instanceof Error ? error.stack : String(error),
+    errorStack(error),
   );
   process.exitCode = 1;
 });

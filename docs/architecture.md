@@ -481,6 +481,11 @@ Concrete: `UnsupportedCurrencyError`, `RateNotAvailableError`,
   envelope with the codes from §3.
 - Anything else → `500 INTERNAL_ERROR`, generic message, full stack logged.
 
+A failure is logged as pino's `err` field rather than interpolated into the
+message, which is what serialises the stack into the JSON line; the two
+bootstrap paths that log before or during the logger's own flush use the Nest
+logger and `errorStack` instead.
+
 Logging uses `nestjs-pino`: JSON in production, `pino-pretty` in development,
 one log line per request carrying exactly the request id, method, path, client
 address, status and duration. Those fields are produced by custom
@@ -586,7 +591,8 @@ apps/api
 │   │   ├── errors/              AppError, ErrorCode, concrete errors
 │   │   ├── filters/             GlobalExceptionFilter, ErrorResponseDto, status → code mapping
 │   │   ├── guards/              ApiKeyGuard
-│   │   ├── logging/             nestjs-pino setup, request id middleware, log level, serializers
+│   │   ├── logging/             nestjs-pino setup, request id middleware, log level, serializers,
+│   │   │                        errorStack for the two bootstrap paths pino cannot serve
 │   │   ├── validation/          ValidationPipe options, error flattening, the upper-case transform
 │   │   ├── throttling/          buildThrottlerOptions and the global guard
 │   │   ├── swagger/             OpenAPI document, ApiErrorResponses decorator

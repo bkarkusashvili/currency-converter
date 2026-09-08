@@ -30,14 +30,17 @@ export function createRedisClient(
   // once a second would drown the log for as long as Redis stays down.
   let outageReported = false;
 
+  // The error travels as a pino field rather than interpolated into the
+  // sentence: that is what puts a serialised stack in the JSON line instead of
+  // one message with the rest of the failure thrown away.
   client.on('error', (error: Error) => {
     if (outageReported) {
-      logger.debug(`Redis reconnect attempt failed: ${error.message}`);
+      logger.debug({ err: error }, 'Redis reconnect attempt failed');
       return;
     }
 
     outageReported = true;
-    logger.warn(`Redis connection error: ${error.message}`);
+    logger.warn({ err: error }, 'Redis connection error');
   });
 
   client.on('ready', () => {

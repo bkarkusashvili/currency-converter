@@ -114,9 +114,8 @@ export class RedisRatesRepository implements RatesRepository {
   // down to an upstream call, it does not fail one.
   private degrade(operation: string, error: unknown): void {
     this.logger.warn(
-      `Rates cache ${operation} failed, degrading: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      { err: error },
+      `Rates cache ${operation} failed, degrading`,
     );
   }
 }

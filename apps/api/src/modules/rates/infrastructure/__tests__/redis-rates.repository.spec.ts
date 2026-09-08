@@ -69,6 +69,7 @@ describe('RedisRatesRepository', () => {
       await expect(offline.save(SNAPSHOT)).resolves.toBeUndefined();
 
       expect(logger.warn).toHaveBeenCalledWith(
+        { err: expect.any(Error) as Error },
         expect.stringContaining('save failed'),
       );
     });
@@ -90,6 +91,7 @@ describe('RedisRatesRepository', () => {
       await build(rejected).save(SNAPSHOT);
 
       expect(logger.warn).toHaveBeenCalledWith(
+        { err: expect.any(Error) as Error },
         expect.stringContaining('save failed'),
       );
     });
@@ -111,6 +113,7 @@ describe('RedisRatesRepository', () => {
       await build(aborted).save(SNAPSHOT);
 
       expect(logger.warn).toHaveBeenCalledWith(
+        { err: expect.any(Error) as Error },
         expect.stringContaining('save failed'),
       );
     });
@@ -163,6 +166,7 @@ describe('RedisRatesRepository', () => {
       await expect(offline.getFresh()).resolves.toBeNull();
 
       expect(logger.warn).toHaveBeenCalledWith(
+        { err: expect.any(Error) as Error },
         expect.stringContaining(`read of ${RATES_CACHE_KEYS.fresh}`),
       );
     });
@@ -176,8 +180,13 @@ describe('RedisRatesRepository', () => {
 
       await expect(build(stalled.asRedis()).getFresh()).resolves.toBeNull();
 
+      // The message the deadline produced reaches the log as the error field's
+      // own, which is where a stack survives.
       expect(logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining(COMMAND_TIMED_OUT),
+        {
+          err: expect.objectContaining({ message: COMMAND_TIMED_OUT }) as Error,
+        },
+        expect.stringContaining('read of'),
       );
     });
   });
@@ -198,6 +207,7 @@ describe('RedisRatesRepository', () => {
       await expect(offline.clear()).resolves.toBeUndefined();
 
       expect(logger.warn).toHaveBeenCalledWith(
+        { err: expect.any(Error) as Error },
         expect.stringContaining('clear failed'),
       );
     });

@@ -53,8 +53,15 @@ describe('RedisConnection', () => {
       await connection.onModuleInit();
 
       expect(logger.warn).toHaveBeenCalledTimes(1);
+      // The reason travels as the pino error field, which is what carries a
+      // stack into the JSON line; interpolating the message drops it.
       expect(logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('ECONNREFUSED'),
+        {
+          err: expect.objectContaining({
+            message: expect.stringContaining('ECONNREFUSED') as string,
+          }) as Error,
+        },
+        expect.stringContaining('starts degraded'),
       );
     });
   });

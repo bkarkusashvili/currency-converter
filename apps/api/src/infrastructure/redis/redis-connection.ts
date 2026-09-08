@@ -28,9 +28,8 @@ export class RedisConnection implements OnModuleInit, OnApplicationShutdown {
       this.logger.info('Redis connection established');
     } catch (error) {
       this.logger.warn(
-        `Redis is unavailable at startup, the cache starts degraded: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        { err: error },
+        'Redis is unavailable at startup, the cache starts degraded',
       );
     }
   }
