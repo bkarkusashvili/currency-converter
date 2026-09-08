@@ -6,6 +6,7 @@ import type {
   CurrenciesResponse,
   HealthResponse,
   HistoryResponse,
+  RatesSnapshotResponse,
 } from '../../api/types';
 
 /** Either the value the repository answers with, or the error it rejects with. */
@@ -14,6 +15,7 @@ export type Answer<T> = T | ApiError;
 export interface FakeRepositoriesOptions {
   convert?: Answer<ConvertResponse>;
   currencies?: Answer<CurrenciesResponse>;
+  rates?: Answer<RatesSnapshotResponse>;
   history?: Answer<HistoryResponse>;
   health?: Answer<HealthResponse>;
 }
@@ -27,6 +29,11 @@ export interface FakeRepositories {
 const EMPTY_CURRENCIES: CurrenciesResponse = { currencies: [] };
 const EMPTY_HISTORY: HistoryResponse = { items: [] };
 const HEALTHY: HealthResponse = { status: 'ok', details: {} };
+const EMPTY_SNAPSHOT: RatesSnapshotResponse = {
+  source: 'cache',
+  fetchedAt: '2026-09-08T12:00:00.000Z',
+  rates: [],
+};
 
 /**
  * In-memory stand-in for the repository layer. Tests inject it through
@@ -45,6 +52,9 @@ export function createFakeRepositories(options: FakeRepositoriesOptions = {}): F
     },
     currencies: {
       list: () => answer(options.currencies ?? EMPTY_CURRENCIES),
+    },
+    rates: {
+      getSnapshot: () => answer(options.rates ?? EMPTY_SNAPSHOT),
     },
     history: {
       recent(limit) {

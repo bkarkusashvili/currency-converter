@@ -27,7 +27,8 @@
       "submit": "Convert",
       "submitting": "Converting…",
       "currencyOption": "{{code}} — {{name}}",
-      "currenciesUnavailable": "The currency list did not load ({{message}}) — the two defaults are still available."
+      "currenciesUnavailable": "The currency list did not load ({{message}}) — the two defaults are still available.",
+      "currenciesFromCache": "The currency list did not load ({{message}}) — the copy saved in this browser is being used."
     },
     "amountErrors": {
       "empty": "Enter an amount to convert.",
@@ -79,9 +80,16 @@
         "value": "stale cache",
         "note": "Monobank was unreachable, so the last good snapshot was used. This rate may be out of date."
       },
+      "offline-estimate": {
+        "value": "offline estimate",
+        "note": "API unreachable; estimated from rates fetched"
+      },
       "unknown": {
         "note": "This client does not recognise the source the API reported, so it is shown exactly as it was returned."
       }
+    },
+    "offline": {
+      "withoutSnapshot": "No rates have been cached in this browser yet, so there is nothing to estimate from."
     },
     "history": {
       "heading": "Recent conversions",
@@ -153,6 +161,13 @@
           "term": "This client",
           "description": "React 19, Vite, TanStack Query and Tailwind v4 with a dark-aware token palette. Components depend on repository interfaces, never on HTTP; every string comes from an i18n dictionary. Vitest and Testing Library cover the repositories, the amount parser, the form, the history panel and this page."
         }
+      ]
+    },
+    "fallback": {
+      "title": "Two-layer fallback",
+      "paragraphs": [
+        "Two different things can be down, and each has its own answer. When Monobank is unreachable the API converts from the last good snapshot it kept in Redis and labels the response stale cache, so a request still gets a number and the number still says where it came from. When the API itself is unreachable, this client converts from the rate snapshot and currency list it persisted in the browser, applying the same rules from §5 with the same big.js arithmetic, and labels the result an offline estimate with the age of the rates it used. Anything the API can answer — a validation error, an unsupported currency, no rate path — is left as the API answered it, and an estimate is never added to the history, because history is the list of what the API actually converted.",
+        "Try it: load the page once so the snapshot is saved, then stop the API — or set the Network tab in devtools to Offline — and convert again. The result comes back badged as an offline estimate instead of as an error, and it says how old the rates behind it are."
       ]
     },
     "whyTheseDecisions": {

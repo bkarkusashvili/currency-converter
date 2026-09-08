@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../http/ApiError';
-import type { ConvertResponse, HealthResponse } from '../../types';
+import type { ConvertResponse, HealthResponse, RatesSnapshotResponse } from '../../types';
 import { createHttpConversionRepository } from '../createHttpConversionRepository';
 import { createHttpCurrenciesRepository } from '../createHttpCurrenciesRepository';
 import { createHttpHealthRepository } from '../createHttpHealthRepository';
 import { createHttpHistoryRepository } from '../createHttpHistoryRepository';
+import { createHttpRatesRepository } from '../createHttpRatesRepository';
 import { createHttpRepositories } from '../createHttpRepositories';
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -25,6 +26,15 @@ const conversion: ConvertResponse = {
   strategy: 'cross',
   source: 'cache',
   ratesTimestamp: '2026-09-08T12:00:00.000Z',
+};
+
+const snapshot: RatesSnapshotResponse = {
+  source: 'cache',
+  fetchedAt: '2026-09-08T12:00:00.000Z',
+  rates: [
+    { base: 'USD', quote: 'UAH', buy: 44.35, sell: 44.831, date: '2026-09-08T11:00:00.000Z' },
+    { base: 'GBP', quote: 'UAH', cross: 60.7562, date: '2026-09-08T11:00:00.000Z' },
+  ],
 };
 
 const degradedReport: HealthResponse = {
@@ -83,6 +93,46 @@ describe('createHttpHistoryRepository', () => {
       signal: undefined,
       headers: { Accept: 'application/json' },
       body: undefined,
+    });
+  });
+});
+
+describe('createHttpRatesRepository', () => {
+  it('gets /api/v1/rates', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(snapshot));
+
+    await expect(createHttpRatesRepository().getSnapshot()).resolves.toEqual(snapshot);
+
+    expect(fetchMock).toHaveBeenCalledWith('https://api.test/api/v1/rates', {
+      method: 'GET',
+      signal: undefined,
+      headers: { Accept: 'application/json' },
+      body: undefined,
+    });
+  });
+
+  it('refuses a body that is not a snapshot rather than converting from it later', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ source: 'cache', fetchedAt: 12, rates: [] }));
+
+    await expect(createHttpRatesRepository().getSnapshot()).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
+    });
+
+    fetchMock.mockResolvedValue(jsonResponse({ ...snapshot, rates: [{ base: 'USD' }] }));
+
+    await expect(createHttpRatesRepository().getSnapshot()).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
+    });
+
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        ...snapshot,
+        rates: [{ base: 'USD', quote: 'UAH', buy: '44.35', date: '2026-09-08T11:00:00.000Z' }],
+      }),
+    );
+
+    await expect(createHttpRatesRepository().getSnapshot()).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
     });
   });
 });
@@ -158,6 +208,12 @@ describe('createHttpRepositories', () => {
   it('assembles one implementation per resource', () => {
     const repositories = createHttpRepositories();
 
-    expect(Object.keys(repositories)).toEqual(['conversion', 'currencies', 'history', 'health']);
+    expect(Object.keys(repositories)).toEqual([
+      'conversion',
+      'currencies',
+      'rates',
+      'history',
+      'health',
+    ]);
   });
 });

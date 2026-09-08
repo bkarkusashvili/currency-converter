@@ -2,11 +2,10 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ConvertRequest } from '../../../api/types';
 import { useFormatters } from '../../../lib/useFormatters';
+import { DEFAULT_FROM, DEFAULT_TO } from '../lib/defaultCurrencies';
 import { MAX_AMOUNT, parseAmount, type AmountErrorCode } from '../lib/parseAmount';
 import type { FormField, FormFieldErrors } from '../lib/serverFieldErrors';
 
-const DEFAULT_FROM = 'USD';
-const DEFAULT_TO = 'UAH';
 const DEFAULT_AMOUNT = '100';
 
 interface UseConverterFormOptions {

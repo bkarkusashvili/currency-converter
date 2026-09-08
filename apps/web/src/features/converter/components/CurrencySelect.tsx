@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import type { Currency } from '../../../api/types';
+import { optionName, type CurrencyOption } from '../lib/currencyOptions';
 
 interface CurrencySelectProps {
   id: string;
   label: string;
   value: string;
-  currencies: Currency[];
+  currencies: readonly CurrencyOption[];
   error: string | null;
   onChange: (code: string) => void;
 }
@@ -19,7 +19,6 @@ export function CurrencySelect({
   onChange,
 }: CurrencySelectProps) {
   const { t } = useTranslation();
-  const options = currencies.length > 0 ? currencies : [{ code: value, name: value }];
   const errorId = `${id}-error`;
 
   return (
@@ -37,11 +36,17 @@ export function CurrencySelect({
           onChange(event.target.value);
         }}
       >
-        {options.map((currency) => (
-          <option key={currency.code} value={currency.code}>
-            {t('converter.form.currencyOption', { code: currency.code, name: currency.name })}
-          </option>
-        ))}
+        {currencies.map((currency) => {
+          const name = optionName(currency);
+
+          return (
+            <option key={currency.code} value={currency.code}>
+              {name === undefined
+                ? currency.code
+                : t('converter.form.currencyOption', { code: currency.code, name })}
+            </option>
+          );
+        })}
       </select>
       {error !== null && (
         <p id={errorId} role="alert" className="text-danger mt-2 text-sm">

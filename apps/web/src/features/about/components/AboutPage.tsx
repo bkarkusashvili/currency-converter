@@ -14,6 +14,7 @@ export function AboutPage() {
   const purpose = t('about.purpose', { returnObjects: true });
   const statusItems = t('about.status.items', { returnObjects: true });
   const builtPoints = t('about.whatWasBuilt.points', { returnObjects: true });
+  const fallback = t('about.fallback.paragraphs', { returnObjects: true });
   const whyPoints = t('about.whyTheseDecisions.points', { returnObjects: true });
   const runBlocks = t('about.howToRun.blocks', { returnObjects: true });
   const runNotes = t('about.howToRun.notes', { returnObjects: true });
@@ -60,6 +61,10 @@ export function AboutPage() {
 
       <ContentSection id="what-was-built" title={t('about.whatWasBuilt.title')}>
         <PointList points={builtPoints} />
+      </ContentSection>
+
+      <ContentSection id="two-layer-fallback" title={t('about.fallback.title')}>
+        <ParagraphList paragraphs={fallback} />
       </ContentSection>
 
       <ContentSection id="why-these-decisions" title={t('about.whyTheseDecisions.title')}>

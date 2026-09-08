@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { useConvert } from '../../../api/hooks/useConvert';
 import { useCurrencies } from '../../../api/hooks/useCurrencies';
 import { ApiErrorNotice } from '../../../components/ApiErrorNotice';
+import { useConvertWithFallback } from '../hooks/useConvertWithFallback';
 import { splitServerFieldErrors } from '../lib/serverFieldErrors';
 import { ConversionResultCard } from './ConversionResultCard';
 import { ConverterForm } from './ConverterForm';
@@ -10,7 +10,7 @@ import { HistoryPanel } from './HistoryPanel';
 export function ConverterPage() {
   const { t } = useTranslation();
   const currencies = useCurrencies();
-  const conversion = useConvert();
+  const conversion = useConvertWithFallback();
 
   const serverErrors = splitServerFieldErrors(conversion.error);
 
@@ -22,21 +22,25 @@ export function ConverterPage() {
 
       <div className="mt-9 grid gap-4">
         <ConverterForm
-          currencies={currencies.data?.currencies ?? []}
+          currencies={currencies.data?.currencies}
           currenciesError={currencies.error}
           serverErrors={serverErrors.fields}
           isSubmitting={conversion.isPending}
           onSubmit={(request) => {
-            conversion.mutate(request);
+            conversion.convert(request);
           }}
         />
 
         {conversion.error !== null && (
-          <ApiErrorNotice error={conversion.error} fieldErrors={serverErrors.rest} />
+          <ApiErrorNotice
+            error={conversion.error}
+            fieldErrors={serverErrors.rest}
+            note={conversion.withoutSnapshot ? t('converter.offline.withoutSnapshot') : undefined}
+          />
         )}
 
         <div aria-live="polite">
-          {conversion.data !== undefined && <ConversionResultCard result={conversion.data} />}
+          {conversion.outcome !== undefined && <ConversionResultCard result={conversion.outcome} />}
         </div>
       </div>
 
