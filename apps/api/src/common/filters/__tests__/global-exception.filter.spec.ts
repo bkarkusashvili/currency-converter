@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   HttpException,
   HttpStatus,
+  NotAcceptableException,
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -174,12 +175,19 @@ describe('GlobalExceptionFilter', () => {
       expect(body.code).toBe(code);
     });
 
-    it('keeps the status of an unmapped 4xx and falls back to INTERNAL_ERROR', () => {
+    it('gives a forbidden request its own code', () => {
       const body = captureEnvelope(new ForbiddenException('Nope'));
 
       expect(body.statusCode).toBe(HttpStatus.FORBIDDEN);
-      expect(body.code).toBe(ErrorCode.INTERNAL_ERROR);
+      expect(body.code).toBe(ErrorCode.FORBIDDEN);
       expect(body.message).toBe('Nope');
+    });
+
+    it('names an unmapped 4xx after the exception rather than INTERNAL_ERROR', () => {
+      const body = captureEnvelope(new NotAcceptableException());
+
+      expect(body.statusCode).toBe(HttpStatus.NOT_ACCEPTABLE);
+      expect(body.code).toBe('NOT_ACCEPTABLE');
     });
 
     it('does not leak the message of a 5xx HttpException', () => {

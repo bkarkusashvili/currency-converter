@@ -11,15 +11,9 @@ import { AppError } from '../errors/app-error';
 import { ErrorCode } from '../errors/error-code.enum';
 import { getRequestId } from '../logging/get-request-id';
 import { isValidationErrorPayload } from '../validation/validation-error-payload';
+import { deriveErrorCode } from './derive-error-code';
 import { ErrorResponse } from './error-response';
 import { extractHttpExceptionMessage } from './extract-http-exception-message';
-
-const ERROR_CODES_BY_STATUS: ReadonlyMap<number, ErrorCode> = new Map([
-  [HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR],
-  [HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHORIZED],
-  [HttpStatus.NOT_FOUND, ErrorCode.NOT_FOUND],
-  [HttpStatus.TOO_MANY_REQUESTS, ErrorCode.TOO_MANY_REQUESTS],
-]);
 
 const INTERNAL_ERROR_MESSAGE = 'An unexpected error occurred';
 
@@ -97,15 +91,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
-    // An unmapped status keeps its HTTP meaning but has no domain code of its
-    // own, and a 5xx must not leak an internal message to the client.
-    const code =
-      ERROR_CODES_BY_STATUS.get(statusCode) ?? ErrorCode.INTERNAL_ERROR;
+    // A 5xx must not leak an internal message to the client; a 4xx says what
+    // the caller got wrong.
     const message =
       statusCode >= SERVER_ERROR_FLOOR
         ? INTERNAL_ERROR_MESSAGE
         : extractHttpExceptionMessage(payload, exception.message);
 
-    return { statusCode, code, message };
+    return {
+      statusCode,
+      code: deriveErrorCode(statusCode, payload),
+      message,
+    };
   }
 }
