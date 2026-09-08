@@ -29,7 +29,7 @@ beforeEach(() => {
 });
 
 describe('AboutPage', () => {
-  it('links to the repository, the API docs and the health endpoint', () => {
+  it('links to the repository, the API docs and both health routes', () => {
     renderAbout();
 
     expect(screen.getByRole('link', { name: /Source on GitHub/i })).toHaveAttribute(
@@ -43,6 +43,12 @@ describe('AboutPage', () => {
     expect(screen.getByRole('link', { name: /Health endpoint/i })).toHaveAttribute(
       'href',
       'https://api.test/health',
+    );
+    // The dependency report and the liveness probe answer different questions
+    // (§3), so the page has to offer both rather than one standing in for the other.
+    expect(screen.getByRole('link', { name: /Liveness probe/i })).toHaveAttribute(
+      'href',
+      'https://api.test/health/live',
     );
   });
 
@@ -107,9 +113,52 @@ describe('AboutPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Where it stands' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'What was built' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Requirements, and where each one is' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Two-layer fallback' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Why these decisions' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How to run it' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'How this was built' })).toBeInTheDocument();
+  });
+
+  // The page a reviewer is pointed at said modules were still to come long after
+  // they had merged. Whatever else it says, it has to say where the work stands.
+  it('says the work is merged and deployed rather than in progress', () => {
+    renderAbout();
+
+    expect(screen.getByText(/merged on main and deployed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/subsequent pull requests/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/in review/i)).not.toBeInTheDocument();
+  });
+
+  it('traces each numbered requirement to where it is met', () => {
+    renderAbout();
+
+    expect(screen.getByText(/1\. Node backend, NestJS, design patterns/)).toBeInTheDocument();
+    expect(screen.getByText(/4\. Caching layer/)).toBeInTheDocument();
+    expect(screen.getByText(/8\. Documentation/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Open the traceability table/i })).toHaveAttribute(
+      'href',
+      'https://github.com/bkarkusashvili/currency-converter#requirements-traceability',
+    );
+  });
+
+  // A reviewer should not have to infer this from the commit trailers.
+  it('is explicit that the implementation was AI-assisted under review', () => {
+    renderAbout();
+
+    expect(screen.getByText(/AI-assisted, under human direction and review/i)).toBeInTheDocument();
+    expect(screen.getByText(/Co-Authored-By trailer/i)).toBeInTheDocument();
+  });
+
+  it('names the decisions a reviewer is most likely to ask about', () => {
+    renderAbout();
+
+    expect(screen.getByText('No gateway in front')).toBeInTheDocument();
+    expect(screen.getByText('Two layers of fallback, not one')).toBeInTheDocument();
+    expect(screen.getByText('A warning is not an error')).toBeInTheDocument();
+    expect(screen.getByText('Liveness and readiness are different questions')).toBeInTheDocument();
   });
 
   it('explains both fallbacks and how to see the client one', () => {
@@ -119,15 +168,19 @@ describe('AboutPage', () => {
     expect(screen.getByText(/set the Network tab in devtools to Offline/)).toBeInTheDocument();
   });
 
-  it('describes how to run the app without promising a Compose file', () => {
+  // Both commands run the whole stack from the repository root. The page used to
+  // show how to run this app alone, which is not what a reviewer wants to do.
+  it('gives the two root commands that bring the whole thing up', () => {
     renderAbout();
 
     expect(screen.getByRole('link', { name: /Open the README/i })).toHaveAttribute(
       'href',
       'https://github.com/bkarkusashvili/currency-converter#readme',
     );
-    expect(screen.getByText(/npm ci && npm run dev/)).toBeInTheDocument();
-    expect(screen.getByText(/docker build -t currency-web:local \./)).toBeInTheDocument();
-    expect(screen.queryByText(/docker compose up/i)).not.toBeInTheDocument();
+    // Matched as one string so the order is asserted too; the block's newlines
+    // are collapsed to spaces by the default text normaliser.
+    expect(screen.getByText(/npm ci && npm run setup npm run dev/)).toBeInTheDocument();
+    expect(screen.getByText(/cd currency-converter docker compose up --build/)).toBeInTheDocument();
+    expect(screen.queryByText(/cd currency-converter\/apps\/web/)).not.toBeInTheDocument();
   });
 });
