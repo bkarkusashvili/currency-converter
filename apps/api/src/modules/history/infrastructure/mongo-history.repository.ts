@@ -153,7 +153,7 @@ export class MongoHistoryRepository implements HistoryRepository {
       rate: document.rate,
       strategy: document.strategy,
       source: document.source,
-      ratesTimestamp: document.ratesTimestamp,
+      ratesTimestamp: document.ratesTimestamp.toISOString(),
       createdAt: document.createdAt.toISOString(),
     };
   }

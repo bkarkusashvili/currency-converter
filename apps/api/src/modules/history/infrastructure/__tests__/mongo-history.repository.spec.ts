@@ -24,7 +24,14 @@ const ENTRY: NewConversionRecord = {
 const STORED_ID = new Types.ObjectId('6f0000000000000000000001');
 const CREATED_AT = new Date('2026-09-08T12:00:05.000Z');
 
-const STORED = { ...ENTRY, _id: STORED_ID, createdAt: CREATED_AT };
+// What the driver hands back: both timestamps are BSON dates in the collection,
+// and turning them into the ISO strings §3 publishes is the mapper's job.
+const STORED = {
+  ...ENTRY,
+  _id: STORED_ID,
+  ratesTimestamp: new Date(ENTRY.ratesTimestamp),
+  createdAt: CREATED_AT,
+};
 
 // Short enough that the suite waits it out in real time rather than mocking the
 // clock the helper reads, and long enough that a machine under load does not

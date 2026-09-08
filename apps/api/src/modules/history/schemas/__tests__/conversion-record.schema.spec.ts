@@ -80,6 +80,23 @@ describe('buildConversionRecordSchema', () => {
       expect(validate('ConversionRecordAccepts', { ...ENTRY })).toBeUndefined();
     });
 
+    // The domain publishes an ISO string and the collection holds a BSON date,
+    // like `createdAt`. Stored as text the two would neither sort nor compare
+    // against each other, and "how stale were the rates" is their difference.
+    it('casts the rates timestamp to a date', () => {
+      const model = mongoose.model<ConversionRecordDocument>(
+        'ConversionRecordCasts',
+        buildConversionRecordSchema(TTL_DAYS),
+      );
+
+      const document = new model({
+        ...ENTRY,
+      } as unknown as ConversionRecordDocument);
+
+      expect(document.ratesTimestamp).toBeInstanceOf(Date);
+      expect(document.ratesTimestamp.toISOString()).toBe(ENTRY.ratesTimestamp);
+    });
+
     it('rejects a record with a field missing', () => {
       expect(
         validate('ConversionRecordRequires', { from: 'EUR' }),

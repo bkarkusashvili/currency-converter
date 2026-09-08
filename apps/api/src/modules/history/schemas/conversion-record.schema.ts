@@ -42,8 +42,13 @@ export class ConversionRecordDocument {
   @Prop({ required: true, type: String, enum: RATES_SOURCES })
   source!: RatesSource;
 
-  @Prop({ required: true })
-  ratesTimestamp!: string;
+  // A Date, like `createdAt`, rather than the ISO string the domain publishes:
+  // stored as text the two timestamps would not compare or sort against each
+  // other, and "how stale were the rates" is exactly a subtraction of the two.
+  // Mongoose casts the ISO string a conversion hands over on the way in, and
+  // the adapter's mapper serialises it back on the way out.
+  @Prop({ required: true, type: Date })
+  ratesTimestamp!: Date;
 
   @Prop()
   createdAt!: Date;
