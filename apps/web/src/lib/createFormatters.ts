@@ -1,4 +1,8 @@
+import type { AmountSeparators } from '../features/converter/lib/formatAmountInput';
+
+/** §3 publishes an effective rate to six places; a rate never needs more. */
 const RATE_DECIMALS = 6;
+const MIN_RATE_DECIMALS = 2;
 const SIGNIFICANT_RATE_DECIMALS = 2;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RELATIVE_DAY_LIMIT = 7;
@@ -15,6 +19,8 @@ export interface Formatters {
   rate(value: number): string;
   splitRate(value: number): { lead: string; tail: string };
   timestamp(isoTimestamp: string, now?: Date): FormattedTimestamp | null;
+  /** The grouping and decimal marks of this locale, for the amount field to reuse. */
+  separators: AmountSeparators;
 }
 
 export function createFormatters(locale: string): Formatters {
@@ -23,10 +29,11 @@ export function createFormatters(locale: string): Formatters {
     maximumFractionDigits: 2,
   });
   const integer = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+  // Trailing zeros are noise on a rate — `44.35` is the published number and
+  // `44.350000` only looks like more precision than Monobank quoted.
   const rate = new Intl.NumberFormat(locale, {
-    minimumFractionDigits: RATE_DECIMALS,
+    minimumFractionDigits: MIN_RATE_DECIMALS,
     maximumFractionDigits: RATE_DECIMALS,
-    useGrouping: false,
   });
   const timeOnly = new Intl.DateTimeFormat(locale, { timeStyle: 'short' });
   const dateAndTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
@@ -70,6 +77,23 @@ export function createFormatters(locale: string): Formatters {
 
       return { iso: date.toISOString(), text, title: full.format(date) };
     },
+
+    separators: separatorsOf(integer),
+  };
+}
+
+/**
+ * Read off a formatted number rather than hardcoded per language, so the field
+ * groups the way every other number on the page does.
+ */
+function separatorsOf(format: Intl.NumberFormat): AmountSeparators {
+  const parts = new Intl.NumberFormat(format.resolvedOptions().locale, {
+    minimumFractionDigits: 1,
+  }).formatToParts(1111.1);
+
+  return {
+    group: parts.find((part) => part.type === 'group')?.value ?? '',
+    decimal: parts.find((part) => part.type === 'decimal')?.value ?? '.',
   };
 }
 

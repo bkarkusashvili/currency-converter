@@ -11,6 +11,8 @@ const DEFAULT_AMOUNT = '100';
 interface UseConverterFormOptions {
   serverErrors: FormFieldErrors;
   onSubmit: (request: ConvertRequest) => void;
+  /** Called instead of submitting, so the form can put the caret on what needs fixing. */
+  onAmountInvalid: () => void;
 }
 
 export interface ConverterFormState {
@@ -28,6 +30,7 @@ export interface ConverterFormState {
 export function useConverterForm({
   serverErrors,
   onSubmit,
+  onAmountInvalid,
 }: UseConverterFormOptions): ConverterFormState {
   const { t } = useTranslation();
   const formatters = useFormatters();
@@ -87,6 +90,7 @@ export function useConverterForm({
     const parsed = parseAmount(amount);
     if (!parsed.ok) {
       setAmountErrorCode(parsed.error);
+      onAmountInvalid();
       return;
     }
 

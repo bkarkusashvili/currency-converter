@@ -50,7 +50,7 @@ describe('ConverterPage', () => {
     expect(fake.convertCalls).toEqual([]);
   });
 
-  it('names the reason the amount is not a number', async () => {
+  it('names the reason the amount cannot be converted', async () => {
     const user = userEvent.setup();
     const fake = renderPage();
     const amount = screen.getByLabelText('Amount');
@@ -59,11 +59,10 @@ describe('ConverterPage', () => {
     await user.click(screen.getByRole('button', { name: 'Convert' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter an amount to convert.');
 
+    // Letters never reach the value, so what is left is an empty field.
     await user.type(amount, 'abc');
-    await user.click(screen.getByRole('button', { name: 'Convert' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Amount must be a number');
+    expect(amount).toHaveValue('');
 
-    await user.clear(amount);
     await user.type(amount, '1000000000001');
     await user.click(screen.getByRole('button', { name: 'Convert' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -71,6 +70,18 @@ describe('ConverterPage', () => {
     );
 
     expect(fake.convertCalls).toEqual([]);
+  });
+
+  it('puts the caret on the amount when it is the amount that is wrong', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(amount).toHaveFocus();
   });
 
   it('submits a normalised payload, thousands separator and all', async () => {
@@ -167,7 +178,7 @@ describe('ConverterPage', () => {
     await waitFor(() => {
       expect(amount).toHaveAttribute('aria-invalid', 'true');
     });
-    expect(amount).toHaveAttribute('aria-describedby', 'amount-error');
+    expect(amount).toHaveAttribute('aria-describedby', 'amount-hint amount-error');
     expect(document.getElementById('amount-error')).toHaveTextContent(
       'amount must be a positive number',
     );
@@ -215,7 +226,7 @@ describe('ConverterPage', () => {
     await user.type(amount, '5');
 
     expect(amount).toHaveAttribute('aria-invalid', 'false');
-    expect(amount).not.toHaveAttribute('aria-describedby');
+    expect(amount).toHaveAttribute('aria-describedby', 'amount-hint');
     expect(document.getElementById('amount-error')).toBeNull();
 
     // The untouched field still carries what the server said about it.
@@ -339,5 +350,128 @@ describe('the currency list', () => {
           .map((option) => option.textContent),
       ).toEqual(['USD', 'XDR']);
     });
+  });
+});
+
+describe('the amount field', () => {
+  it('refuses a character even when the value it would leave is unchanged', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.type(amount, 'x');
+
+    expect(amount).toHaveValue('100');
+  });
+
+  it('takes the digit after the separator when delete lands on one', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234');
+    await user.keyboard('{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{Delete}');
+
+    expect(amount).toHaveValue('134');
+  });
+
+  it('leaves a selection to the browser to replace', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234');
+    await user.keyboard('{Control>}a{/Control}{Backspace}');
+
+    expect(amount).toHaveValue('');
+  });
+
+  it('groups thousands as they are typed and sends the number behind them', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234567.891');
+
+    // The third decimal never lands, and the grouping is the locale's.
+    expect(amount).toHaveValue('1,234,567.89');
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    await waitFor(() => {
+      expect(fake.convertCalls).toEqual([{ from: 'USD', to: 'UAH', amount: 1234567.89 }]);
+    });
+  });
+
+  it('accepts a pasted amount and throws away everything around it', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.click(amount);
+    await user.paste('  $1,234,567.899  ');
+
+    expect(amount).toHaveValue('1,234,567.89');
+  });
+
+  it('takes the digit with the separator when backspace lands on one', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234');
+    expect(amount).toHaveValue('1,234');
+
+    // Caret to just after the separator, where backspace would otherwise do nothing.
+    await user.keyboard('{ArrowLeft}{ArrowLeft}{ArrowLeft}{Backspace}');
+
+    expect(amount).toHaveValue('234');
+  });
+
+  it('drops a decimal separator left dangling when the field is left', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '12.');
+    expect(amount).toHaveValue('12.');
+
+    await user.tab();
+
+    expect(amount).toHaveValue('12');
+  });
+
+  it('describes what the field accepts', () => {
+    renderPage();
+
+    expect(screen.getByLabelText('Amount')).toHaveAttribute('inputmode', 'decimal');
+    expect(document.getElementById('amount-hint')).toHaveTextContent(
+      'Numbers only, up to 2 decimal places, 1,000,000,000,000 maximum.',
+    );
+  });
+});
+
+describe('while a conversion is in flight', () => {
+  it('says so on the button and stops a second submission', async () => {
+    const user = userEvent.setup();
+    const fake = createFakeRepositories({ currencies });
+    renderWithProviders(<ConverterPage />, {
+      repositories: {
+        ...fake.repositories,
+        conversion: { convert: () => new Promise<ConvertResponse>(() => undefined) },
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const button = await screen.findByRole('button', { name: 'Converting…' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
   });
 });

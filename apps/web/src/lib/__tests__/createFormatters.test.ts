@@ -13,10 +13,17 @@ function daysBefore(days: number): string {
 }
 
 describe('number formatting', () => {
-  it('groups money to two decimals and rates to six', () => {
+  it('groups money to two decimals and a rate to as many as it needs', () => {
     expect(formatters.money(4143.5)).toBe('4,143.50');
     expect(formatters.integer(1_000_000_000_000)).toBe('1,000,000,000,000');
-    expect(formatters.rate(41.435)).toBe('41.435000');
+    expect(formatters.rate(44.35)).toBe('44.35');
+    expect(formatters.rate(0.022548)).toBe('0.022548');
+    expect(formatters.rate(41)).toBe('41.00');
+  });
+
+  it('reads the field separators off the locale rather than assuming them', () => {
+    expect(formatters.separators).toEqual({ group: ',', decimal: '.' });
+    expect(createFormatters('de-DE').separators).toEqual({ group: '.', decimal: ',' });
   });
 
   it('splits a rate after two significant decimals', () => {

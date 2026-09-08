@@ -1,10 +1,16 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ApiError } from '../../../api/http/ApiError';
 import type { ConvertRequest, Currency } from '../../../api/types';
+import { Spinner } from '../../../components/Spinner';
 import { useApiErrorMessage } from '../../../lib/useApiErrorMessage';
+import { useFormatters } from '../../../lib/useFormatters';
 import { useConverterForm } from '../hooks/useConverterForm';
 import { currencyOptions } from '../lib/currencyOptions';
+import { MAX_FRACTION_DIGITS } from '../lib/formatAmountInput';
+import { MAX_AMOUNT } from '../lib/parseAmount';
 import type { FormFieldErrors } from '../lib/serverFieldErrors';
+import { AmountField } from './AmountField';
 import { CurrencySelect } from './CurrencySelect';
 import { SwapButton } from './SwapButton';
 
@@ -12,6 +18,8 @@ interface ConverterFormProps {
   /** Undefined until the list loads, and after a failure that no persisted copy answered. */
   currencies: Currency[] | undefined;
   currenciesError: ApiError | null;
+  /** No list has arrived and none was stored, so the selects have nothing to offer yet. */
+  currenciesLoading: boolean;
   serverErrors: FormFieldErrors;
   isSubmitting: boolean;
   onSubmit: (request: ConvertRequest) => void;
@@ -20,13 +28,20 @@ interface ConverterFormProps {
 export function ConverterForm({
   currencies,
   currenciesError,
+  currenciesLoading,
   serverErrors,
   isSubmitting,
   onSubmit,
 }: ConverterFormProps) {
   const { t } = useTranslation();
+  const formatters = useFormatters();
   const messageOf = useApiErrorMessage();
-  const form = useConverterForm({ serverErrors, onSubmit });
+  const amountRef = useRef<HTMLInputElement>(null);
+  const form = useConverterForm({
+    serverErrors,
+    onSubmit,
+    onAmountInvalid: () => amountRef.current?.focus(),
+  });
   const options = currencyOptions(currencies);
   // A failed request whose persisted copy is answering is a different sentence
   // from one that left the form with nothing but its defaults.
@@ -37,29 +52,19 @@ export function ConverterForm({
 
   return (
     <form className="card p-5 sm:p-7" onSubmit={form.handleSubmit} noValidate>
-      <div>
-        <label className="field-label" htmlFor="amount">
-          {t('converter.form.amount')}
-        </label>
-        <input
-          id="amount"
-          name="amount"
-          className="control control-amount"
-          inputMode="decimal"
-          autoComplete="off"
-          value={form.amount}
-          aria-invalid={form.errors.amount !== null}
-          aria-describedby={form.errors.amount === null ? undefined : 'amount-error'}
-          onChange={(event) => {
-            form.setAmount(event.target.value);
-          }}
-        />
-        {form.errors.amount !== null && (
-          <p id="amount-error" role="alert" className="text-danger mt-2 text-sm">
-            {form.errors.amount}
-          </p>
-        )}
-      </div>
+      <AmountField
+        id="amount"
+        label={t('converter.form.amount')}
+        hint={t('converter.form.amountHint', {
+          decimals: MAX_FRACTION_DIGITS,
+          max: formatters.integer(MAX_AMOUNT),
+        })}
+        value={form.amount}
+        error={form.errors.amount}
+        separators={formatters.separators}
+        inputRef={amountRef}
+        onChange={form.setAmount}
+      />
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="sm:flex-1">
@@ -68,6 +73,7 @@ export function ConverterForm({
             label={t('converter.form.from')}
             value={form.from}
             currencies={options}
+            isLoading={currenciesLoading}
             error={form.errors.from}
             onChange={form.setFrom}
           />
@@ -79,6 +85,7 @@ export function ConverterForm({
             label={t('converter.form.to')}
             value={form.to}
             currencies={options}
+            isLoading={currenciesLoading}
             error={form.errors.to}
             onChange={form.setTo}
           />
@@ -97,6 +104,7 @@ export function ConverterForm({
         disabled={isSubmitting}
         aria-busy={isSubmitting}
       >
+        {isSubmitting && <Spinner className="h-4 w-4" />}
         {isSubmitting ? t('converter.form.submitting') : t('converter.form.submit')}
       </button>
     </form>
