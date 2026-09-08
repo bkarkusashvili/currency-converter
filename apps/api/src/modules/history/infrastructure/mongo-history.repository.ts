@@ -46,7 +46,11 @@ export class MongoHistoryRepository implements HistoryRepository {
         { err: error },
         'Conversion history write failed, dropping the record',
       );
+
+      return;
     }
+
+    this.reportRecordsResumed();
   }
 
   // The read has the opposite contract: /history has nothing to answer with, so
@@ -68,18 +72,7 @@ export class MongoHistoryRepository implements HistoryRepository {
   }
 
   private isConnected(): boolean {
-    if (this.connection.readyState !== ConnectionStates.connected) {
-      return false;
-    }
-
-    if (this.dropReported) {
-      this.dropReported = false;
-      this.logger.info(
-        'MongoDB is reachable again, conversions are being recorded',
-      );
-    }
-
-    return true;
+    return this.connection.readyState === ConnectionStates.connected;
   }
 
   // Once per outage, not once per conversion: a burst of traffic while Mongo is
@@ -93,6 +86,21 @@ export class MongoHistoryRepository implements HistoryRepository {
     this.dropReported = true;
     this.logger.warn(
       'MongoDB is not connected, conversions are answered but not recorded',
+    );
+  }
+
+  // The other half of that pair, and it belongs to the write path: what closes
+  // the outage is a record that was actually stored, not a connection that
+  // happens to be up. Reading /history is not evidence a conversion would be
+  // recorded, and answering one used to log a sentence about writes.
+  private reportRecordsResumed(): void {
+    if (!this.dropReported) {
+      return;
+    }
+
+    this.dropReported = false;
+    this.logger.info(
+      'MongoDB is reachable again, conversions are being recorded',
     );
   }
 

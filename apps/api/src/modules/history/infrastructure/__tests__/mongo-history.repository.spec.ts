@@ -169,6 +169,18 @@ describe('MongoHistoryRepository', () => {
       expect(model.create).toHaveBeenCalledTimes(1);
     });
 
+    // A connection that is up again is not evidence that a conversion would be
+    // recorded, and "conversions are being recorded" is a sentence about the
+    // write path: answering /history must not be what says it.
+    it('does not announce the write path recovering when only a read ran', async () => {
+      await repository.record(ENTRY);
+      connection.settle();
+
+      await repository.findRecent(10);
+
+      expect(logger.info).not.toHaveBeenCalled();
+    });
+
     it('answers a read with the typed outage rather than an empty page', async () => {
       await expect(repository.findRecent(10)).rejects.toBeInstanceOf(
         HistoryUnavailableError,
