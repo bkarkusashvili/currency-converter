@@ -1,11 +1,7 @@
 import { ExecutionContext } from '@nestjs/common';
 import { UnauthorizedError } from '../../errors/unauthorized.error';
 import { ApiKeyGuard } from '../api-key.guard';
-import type { TypedConfigService } from '../../../config/typed-config.service';
-
-function createConfig(adminApiKey: string | null): TypedConfigService {
-  return { get: () => adminApiKey } as unknown as TypedConfigService;
-}
+import { fakeConfig } from '../../../config/__tests__/fake-config';
 
 // Only the header bag is reachable from a guard's ExecutionContext.
 function createContext(headers: Record<string, unknown>): ExecutionContext {
@@ -16,7 +12,7 @@ function createContext(headers: Record<string, unknown>): ExecutionContext {
 
 describe('ApiKeyGuard', () => {
   describe('when ADMIN_API_KEY is unset', () => {
-    const guard = new ApiKeyGuard(createConfig(null));
+    const guard = new ApiKeyGuard(fakeConfig({ ADMIN_API_KEY: null }));
 
     it('allows a request with no key', () => {
       expect(guard.canActivate(createContext({}))).toBe(true);
@@ -30,7 +26,7 @@ describe('ApiKeyGuard', () => {
   });
 
   describe('when ADMIN_API_KEY is configured', () => {
-    const guard = new ApiKeyGuard(createConfig('s3cret'));
+    const guard = new ApiKeyGuard(fakeConfig({ ADMIN_API_KEY: 's3cret' }));
 
     it('allows the matching key', () => {
       expect(guard.canActivate(createContext({ 'x-api-key': 's3cret' }))).toBe(

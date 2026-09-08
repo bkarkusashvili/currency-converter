@@ -7,7 +7,7 @@ import {
 } from '../../../../../common/logging/__tests__/fake-pino-logger';
 import { CircuitBreaker } from '../../../../../common/resilience/circuit-breaker';
 import { CircuitOpenError } from '../../../../../common/resilience/circuit-open.error';
-import type { TypedConfigService } from '../../../../../config/typed-config.service';
+import { fakeConfig } from '../../../../../config/__tests__/fake-config';
 import { MonobankRatesProvider } from '../monobank-rates.provider';
 
 const API_URL = 'https://api.monobank.ua/bank/currency';
@@ -61,15 +61,12 @@ describe('MonobankRatesProvider', () => {
     });
     logger = createFakePinoLogger();
 
-    const config = {
-      get: (key: string): unknown =>
-        ({
-          MONOBANK_API_URL: API_URL,
-          MONOBANK_RETRY_ATTEMPTS: 3,
-          // Real sleeps, kept to a millisecond so the suite does not wait.
-          MONOBANK_RETRY_BASE_DELAY_MS: 1,
-        })[key],
-    } as unknown as TypedConfigService;
+    const config = fakeConfig({
+      MONOBANK_API_URL: API_URL,
+      MONOBANK_RETRY_ATTEMPTS: 3,
+      // Real sleeps, kept to a millisecond so the suite does not wait.
+      MONOBANK_RETRY_BASE_DELAY_MS: 1,
+    });
 
     provider = new MonobankRatesProvider(
       { get } as unknown as HttpService,
