@@ -123,8 +123,17 @@ Most recent conversions, newest first. `limit` is `1..50`, default `10`.
 ### GET `/health`
 
 `@nestjs/terminus` response with indicators `redis`, `mongodb`, `monobank`.
-The Monobank indicator reports the circuit-breaker state and does **not** call
-the upstream (Monobank allows one request per minute).
+
+- `redis` — `PING` under a short budget of its own. `up`, or `down` with the
+  reason `ping failed` or `timeout`.
+- `mongodb` — not registered yet. It lands with the history module, which is
+  what introduces Mongo; until then the response carries `redis` and `monobank`
+  only.
+- `monobank` — the circuit-breaker state; it does **not** call the upstream,
+  which allows one request per minute and would be starved by a probe running
+  every few seconds. `CLOSED` is `up`, `HALF_OPEN` is `up` with the reason
+  `circuit half-open` (the next call is allowed through and the stale cache is
+  answering meanwhile), `OPEN` is `down` with the reason `circuit open`.
 
 Indicators are injected through the `HEALTH_INDICATORS` token as
 `HealthIndicatorPort`s, so adding one does not touch the controller. This route
@@ -199,6 +208,15 @@ Monobank returns numeric ISO codes; they are mapped to alpha-3 with the
 `currency-codes` package. Entries whose numeric code is unknown are dropped
 (logged at debug level). Entries with no usable rate are dropped.
 
+Both ways into a snapshot are validated with `zod` before anything reads them:
+the upstream payload in `MonobankRatesProvider`, so a malformed response fails
+at the boundary instead of poisoning the cache, and a cached value in
+`RedisRatesRepository`, because the key outlives a deploy and is shared by every
+instance — "this process wrote it" is not a reason to trust its shape. Unknown
+fields are ignored rather than rejected, so a field Monobank adds cannot take
+the API down. A cached value that does not parse is discarded and read as a
+miss.
+
 ### Ports
 
 ```ts
@@ -226,7 +244,12 @@ miss → single-flight:
         stale ? { snapshot: stale, source: 'stale-cache' } : throw RatesUnavailableError
 ```
 
-- Concurrent callers during a miss share one in-flight promise.
+- Concurrent callers during a miss share one in-flight promise, cleared in a
+  `finally` so a failed refresh does not strand the caller behind it.
+- `RatesUnavailableError` carries a `details.reason` that names the resilience
+  decision — `upstream circuit open` or `upstream request failed` — and never
+  the upstream's own message, which travels to the client in the envelope and
+  carries the url, the status text and sometimes the body.
 - Every `RatesRepository` method catches Redis errors, logs a warning with the
   operation name, and degrades (`null` on reads, no-op on writes).
 
@@ -281,8 +304,20 @@ interface ConversionStrategy {
   `CircuitOpenError` while open, allows a single trial call after
   `resetTimeoutMs`, closes on success / reopens on failure. Exposes `state` for
   the health indicator. Implemented in-house (~80 lines) so it is fully unit
-  tested and dependency-free.
-- **Timeout** on every upstream request (`MONOBANK_TIMEOUT_MS`).
+  tested and dependency-free. The instance is bound to the
+  `MONOBANK_CIRCUIT_BREAKER` token (declared beside the other rates tokens in
+  `rates/domain`) by `MonobankModule`, which `RatesModule` re-exports, so the
+  health indicator reports the breaker the provider actually trips rather than
+  one of its own that nothing ever opens — and reaches it through the rates
+  module's exports instead of importing its infrastructure folder.
+- **Timeout** on every upstream request (`MONOBANK_TIMEOUT_MS`), and an overall
+  budget on the whole call (`MONOBANK_TOTAL_BUDGET_MS`, 8 s):
+  `withTimeout(retry(...), budget)` inside the breaker. The per-request timeout
+  bounds one attempt, so the attempts plus the backoff between them add up to
+  far longer than any of them, and single-flight makes every concurrent caller
+  wait out the same sum — for a stale copy that was already in Redis when the
+  first one arrived. The budget sits inside the breaker so an expiry counts as
+  an upstream failure rather than passing through unnoticed.
 - **Throttling** via `@nestjs/throttler` on all routes.
 - **Single-flight** cache refresh (see §4) so a burst of misses produces one
   upstream call.
@@ -340,18 +375,37 @@ reads.
 | `CORS_ORIGINS`                      | `http://localhost:5173,http://localhost:8080` |
 | `TRUST_PROXY`                       | `false`                                   |
 | `REDIS_URL`                         | `redis://localhost:6379`                  |
+| `REDIS_COMMAND_TIMEOUT_MS`          | `300`                                     |
 | `MONGO_URL`                         | `mongodb://localhost:27017/currency_converter` |
 | `MONOBANK_API_URL`                  | `https://api.monobank.ua/bank/currency`   |
 | `MONOBANK_TIMEOUT_MS`               | `5000`                                    |
 | `MONOBANK_RETRY_ATTEMPTS`           | `3`                                       |
 | `MONOBANK_RETRY_BASE_DELAY_MS`      | `300`                                     |
+| `MONOBANK_TOTAL_BUDGET_MS`          | `8000`                                    |
 | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5`                                       |
 | `CIRCUIT_BREAKER_RESET_TIMEOUT_MS`  | `30000`                                   |
 | `RATES_CACHE_TTL_SECONDS`           | `300`                                     |
 | `RATES_STALE_TTL_SECONDS`           | `86400`                                   |
 | `THROTTLE_TTL_SECONDS`              | `60`                                      |
 | `THROTTLE_LIMIT`                    | `60`                                      |
-| `ADMIN_API_KEY`                     | *(unset → cache invalidation is open)*    |
+| `ADMIN_API_KEY`                     | *(unset → cache invalidation is open; required in production)* |
+
+`ADMIN_API_KEY` is optional in development and test, where an unset key makes
+`ApiKeyGuard` a no-op so a local run needs no secret, and required when
+`NODE_ENV=production`: the schema's `superRefine` fails startup without one.
+`DELETE /rates/cache` clears the snapshot every instance reads, so leaving it
+open on a deployment hands anyone who can reach it a lever on an upstream that
+allows one request a minute — alternating `DELETE` and `GET` spends exactly the
+budget the cache exists to protect. Swagger also advertises the route as
+secured, which is only true once the key is set.
+
+`REDIS_COMMAND_TIMEOUT_MS` is the deadline on a single Redis command.
+`maxRetriesPerRequest` bounds the reconnects that follow a socket error and
+`enableOfflineQueue: false` refuses a command issued while the socket is down,
+but neither ends a command already written to a socket that stops answering.
+The cache is on the request path, so without a deadline `GET /rates` waits on it
+indefinitely; with one, the command rejects and `RedisRatesRepository` degrades
+it to a miss and an upstream call.
 
 `TRUST_PROXY` feeds Express's `trust proxy`: `false` trusts nobody, `true` trusts
 every hop, and a number is how many proxies sit in front of the process. It
@@ -374,21 +428,30 @@ apps/api
 │   │   ├── guards/              ApiKeyGuard
 │   │   ├── logging/             nestjs-pino setup, request id middleware, log level, serializers
 │   │   ├── validation/          ValidationPipe options, validation error flattening
-│   │   ├── throttling/          ThrottlerModule setup and the global guard
+│   │   ├── throttling/          buildThrottlerOptions and the global guard
 │   │   ├── swagger/             OpenAPI document, ApiErrorResponses decorator
 │   │   ├── resilience/          retry, CircuitBreaker, CircuitOpenError
-│   │   └── utils/               money rounding helpers (big.js), constant-time compare
+│   │   └── utils/               money rounding helpers (big.js), constant-time compare, withTimeout
 │   ├── infrastructure/
 │   │   ├── redis/               REDIS_CLIENT (ioredis) and the RedisConnection lifecycle
 │   │   └── mongo/               MongoModule (MongooseModule.forRootAsync)
 │   └── modules/
-│       ├── currencies/          ISO 4217 numeric↔alpha mapping, GET /currencies
+│       ├── currencies/
+│       │   ├── dto/             CurrencyDto, CurrenciesResponseDto
+│       │   ├── iso-4217.ts      numeric↔alpha mapping and the ISO 4217 description
+│       │   ├── currency.ts      Currency
+│       │   ├── collect-currencies.ts  snapshot → sorted currency list
+│       │   ├── currencies.controller.ts  GET /currencies
+│       │   └── currencies.module.ts
 │       ├── rates/
-│       │   ├── domain/          ExchangeRate, RatesSnapshot, ports + tokens
+│       │   ├── domain/          ExchangeRate, RatesSnapshot, RatesSource, ports + tokens
+│       │   ├── dto/             ExchangeRateDto, RatesSnapshotResponseDto
 │       │   ├── infrastructure/
-│       │   │   ├── monobank/    MonobankRatesProvider, raw types, mapper
+│       │   │   ├── monobank/    provider, zod payload schema, mapper, retry predicate
+│       │   │   ├── cached-rates-snapshot.schema.ts  zod schema for a cached value
+│       │   │   ├── rates-cache-keys.ts
 │       │   │   └── redis-rates.repository.ts
-│       │   ├── application/     RatesService
+│       │   ├── application/     RatesService, describeRatesFailure
 │       │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
 │       │   └── rates.module.ts
 │       ├── conversion/
@@ -406,6 +469,8 @@ apps/api
 │       └── health/              controller, HealthIndicatorPort + Redis / Mongo / Monobank indicators
 └── test
     ├── e2e/                     supertest suites over the real HTTP surface
+    │   ├── env/                 per-suite environment, imported before AppModule
+    │   └── fixtures/            snapshots the suites assert against
     └── jest-e2e.json
 ```
 

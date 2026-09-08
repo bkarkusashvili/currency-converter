@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { AppConfig } from '../../../config/app-config';
-import type { TypedConfigService } from '../../../config/typed-config.service';
+import { fakeConfig } from '../../../config/__tests__/fake-config';
 import { buildLoggerParams } from '../build-logger-params';
 
 // The parts of pino-http's options this module fills in. Reaching for them
@@ -22,14 +22,8 @@ interface RequestLoggerOptions {
   };
 }
 
-function createConfig(values: Partial<AppConfig>): TypedConfigService {
-  return {
-    get: (key: keyof AppConfig) => values[key],
-  } as unknown as TypedConfigService;
-}
-
 function optionsFor(values: Partial<AppConfig>): RequestLoggerOptions {
-  return buildLoggerParams(createConfig(values))
+  return buildLoggerParams(fakeConfig(values))
     .pinoHttp as unknown as RequestLoggerOptions;
 }
 

@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { createE2eApp } from './create-e2e-app';
+import { overrideRedis } from './override-redis';
 
 // One of the origins the default CORS_ORIGINS list carries: the Vite dev server
 // the web app runs on.
@@ -14,7 +15,10 @@ describe('HTTP hardening (e2e)', () => {
   let server: Server;
 
   beforeAll(async () => {
-    app = await createE2eApp({ imports: [AppModule] });
+    app = await createE2eApp(
+      { imports: [AppModule] },
+      { customise: overrideRedis },
+    );
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;

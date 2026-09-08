@@ -40,7 +40,7 @@ export default tseslint.config(
   {
     // Non-null assertions are a legitimate shorthand once a test has already
     // asserted the value is present; they stay banned in application code.
-    files: ['**/*.spec.ts', 'test/**/*.ts'],
+    files: ['**/*.spec.ts', '**/__tests__/**', 'test/**/*.ts'],
     rules: {
       '@typescript-eslint/no-non-null-assertion': 'off',
     },

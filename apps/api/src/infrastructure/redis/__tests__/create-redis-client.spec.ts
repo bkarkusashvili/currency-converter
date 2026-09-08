@@ -1,11 +1,12 @@
 import type Redis from 'ioredis';
-import type { TypedConfigService } from '../../../config/typed-config.service';
+import {
+  createFakePinoLogger,
+  FakePinoLogger,
+} from '../../../common/logging/__tests__/fake-pino-logger';
+import { fakeConfig } from '../../../config/__tests__/fake-config';
 import { createRedisClient } from '../create-redis-client';
-import { createFakePinoLogger, FakePinoLogger } from './fake-pino-logger';
 
-function createConfig(redisUrl: string): TypedConfigService {
-  return { get: () => redisUrl } as unknown as TypedConfigService;
-}
+const COMMAND_TIMEOUT_MS = 300;
 
 describe('createRedisClient', () => {
   let client: Redis;
@@ -14,7 +15,10 @@ describe('createRedisClient', () => {
   beforeEach(() => {
     logger = createFakePinoLogger();
     client = createRedisClient(
-      createConfig('redis://localhost:6379'),
+      fakeConfig({
+        REDIS_URL: 'redis://localhost:6379',
+        REDIS_COMMAND_TIMEOUT_MS: COMMAND_TIMEOUT_MS,
+      }),
       logger.asPinoLogger(),
     );
   });
@@ -29,6 +33,33 @@ describe('createRedisClient', () => {
 
   it('takes its host and port from the configured url', () => {
     expect(client.options).toMatchObject({ host: 'localhost', port: 6379 });
+  });
+
+  // The four options the module's design rests on: RedisConnection opens the
+  // socket itself, so the client must not; a command issued while Redis is down
+  // has to fail rather than queue behind an outage that may not end; and one
+  // sent to a socket that stops answering has to give up on its own.
+  it('is lazy, fails a command fast and never buffers one', () => {
+    expect(client.options).toMatchObject({
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      commandTimeout: COMMAND_TIMEOUT_MS,
+    });
+  });
+
+  it('takes the command deadline from the configuration rather than a default', () => {
+    const configured = createRedisClient(
+      fakeConfig({
+        REDIS_URL: 'redis://localhost:6379',
+        REDIS_COMMAND_TIMEOUT_MS: 42,
+      }),
+      logger.asPinoLogger(),
+    );
+
+    expect(configured.options).toMatchObject({ commandTimeout: 42 });
+
+    configured.disconnect();
   });
 
   it('reports a connection error as a warning instead of letting it escape', () => {

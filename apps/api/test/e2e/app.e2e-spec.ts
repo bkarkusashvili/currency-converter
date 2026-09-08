@@ -4,6 +4,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
 import { createE2eApp } from './create-e2e-app';
+import { overrideRedis } from './override-redis';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const UUID_PATTERN =
@@ -14,7 +15,10 @@ describe('API (e2e)', () => {
   let server: Server;
 
   beforeAll(async () => {
-    app = await createE2eApp({ imports: [AppModule] });
+    app = await createE2eApp(
+      { imports: [AppModule] },
+      { customise: overrideRedis },
+    );
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;
@@ -29,7 +33,13 @@ describe('API (e2e)', () => {
       const response = await request(server).get('/health');
 
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ status: 'ok', details: {} });
+      expect(response.body).toMatchObject({
+        status: 'ok',
+        details: {
+          redis: { status: 'up' },
+          monobank: { status: 'up' },
+        },
+      });
     });
 
     it('is not exposed under the api/v1 prefix', async () => {

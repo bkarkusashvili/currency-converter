@@ -10,11 +10,13 @@ describe('validateEnv', () => {
         TRUST_PROXY: false,
         CORS_ORIGINS: ['http://localhost:5173', 'http://localhost:8080'],
         REDIS_URL: 'redis://localhost:6379',
+        REDIS_COMMAND_TIMEOUT_MS: 300,
         MONGO_URL: 'mongodb://localhost:27017/currency_converter',
         MONOBANK_API_URL: 'https://api.monobank.ua/bank/currency',
         MONOBANK_TIMEOUT_MS: 5000,
         MONOBANK_RETRY_ATTEMPTS: 3,
         MONOBANK_RETRY_BASE_DELAY_MS: 300,
+        MONOBANK_TOTAL_BUDGET_MS: 8000,
         CIRCUIT_BREAKER_FAILURE_THRESHOLD: 5,
         CIRCUIT_BREAKER_RESET_TIMEOUT_MS: 30000,
         RATES_CACHE_TTL_SECONDS: 300,
@@ -52,13 +54,36 @@ describe('validateEnv', () => {
     });
 
     it('keeps a provided value over the default', () => {
-      expect(validateEnv({ NODE_ENV: 'production' }).NODE_ENV).toBe(
-        'production',
-      );
+      expect(validateEnv({ LOG_LEVEL: 'debug' }).LOG_LEVEL).toBe('debug');
       expect(validateEnv({ ADMIN_API_KEY: 'secret' }).ADMIN_API_KEY).toBe(
         'secret',
       );
     });
+  });
+
+  // ApiKeyGuard is open while the key is unset, which is what makes a local run
+  // need no secret and what makes a deployment without one a lever on an
+  // upstream that allows one request a minute.
+  describe('admin key', () => {
+    it('refuses a production configuration that names no key', () => {
+      expect(() => validateEnv({ NODE_ENV: 'production' })).toThrow(
+        /- ADMIN_API_KEY: is required when NODE_ENV is production/,
+      );
+    });
+
+    it('accepts a production configuration that names one', () => {
+      expect(
+        validateEnv({ NODE_ENV: 'production', ADMIN_API_KEY: 'secret' })
+          .ADMIN_API_KEY,
+      ).toBe('secret');
+    });
+
+    it.each(['development', 'test'])(
+      'leaves %s permissive so a local run needs no secret',
+      (nodeEnv) => {
+        expect(validateEnv({ NODE_ENV: nodeEnv }).ADMIN_API_KEY).toBeNull();
+      },
+    );
   });
 
   describe('trust proxy', () => {
@@ -123,6 +148,7 @@ describe('validateEnv', () => {
       ['NODE_ENV', 'staging'],
       ['LOG_LEVEL', 'chatty'],
       ['REDIS_URL', 'not-a-url'],
+      ['REDIS_COMMAND_TIMEOUT_MS', '0'],
       ['MONGO_URL', 'not-a-url'],
       ['MONOBANK_API_URL', 'not-a-url'],
       ['MONOBANK_TIMEOUT_MS', '-1'],
