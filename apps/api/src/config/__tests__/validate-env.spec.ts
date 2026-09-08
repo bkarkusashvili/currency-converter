@@ -7,6 +7,7 @@ describe('validateEnv', () => {
         NODE_ENV: 'development',
         PORT: 3000,
         LOG_LEVEL: 'info',
+        TRUST_PROXY: false,
         CORS_ORIGINS: ['http://localhost:5173', 'http://localhost:8080'],
         REDIS_URL: 'redis://localhost:6379',
         MONGO_URL: 'mongodb://localhost:27017/currency_converter',
@@ -56,6 +57,33 @@ describe('validateEnv', () => {
       );
       expect(validateEnv({ ADMIN_API_KEY: 'secret' }).ADMIN_API_KEY).toBe(
         'secret',
+      );
+    });
+  });
+
+  describe('trust proxy', () => {
+    it('trusts nobody unless told to', () => {
+      expect(validateEnv({}).TRUST_PROXY).toBe(false);
+    });
+
+    it.each([
+      ['false', false],
+      ['true', true],
+    ])('reads %s as a boolean', (value, expected) => {
+      expect(validateEnv({ TRUST_PROXY: value }).TRUST_PROXY).toBe(expected);
+    });
+
+    it.each([
+      ['0', 0],
+      ['1', 1],
+      ['3', 3],
+    ])('reads %s as a hop count', (value, expected) => {
+      expect(validateEnv({ TRUST_PROXY: value }).TRUST_PROXY).toBe(expected);
+    });
+
+    it.each(['yes', '-1', '1.5', '11'])('rejects %s', (value) => {
+      expect(() => validateEnv({ TRUST_PROXY: value })).toThrow(
+        /- TRUST_PROXY:/,
       );
     });
   });

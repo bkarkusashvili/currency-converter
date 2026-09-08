@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import type { Application } from 'express';
 import helmet from 'helmet';
 import { requestIdMiddleware } from './common/logging/request-id.middleware';
 import type { TypedConfigService } from './config/typed-config.service';
@@ -13,9 +14,17 @@ export function configureHttp(
   app: INestApplication,
   config: TypedConfigService,
 ): void {
-  // First in the chain: Nest's body parser is registered after everything here
-  // and before the pino middleware, so a request that dies in the parser still
-  // has an id to report and to log under.
+  // Express only reads the client address out of X-Forwarded-For when it is
+  // told how far down the chain to trust. Without it everyone behind nginx or
+  // Railway collapses into the proxy's address: one throttle bucket for every
+  // client, and a request log naming the load balancer. Nest types the
+  // adapter's instance as `any`.
+  const expressApp = app.getHttpAdapter().getInstance() as Application;
+  expressApp.set('trust proxy', config.get('TRUST_PROXY', { infer: true }));
+
+  // First in the chain: Nest registers its body parser after everything here
+  // and before any module middleware, so a request that dies in the parser
+  // still has an id to report and to log under.
   app.use(requestIdMiddleware);
 
   app.use(

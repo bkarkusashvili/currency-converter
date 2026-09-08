@@ -12,6 +12,17 @@ const commaSeparatedList = z
   )
   .pipe(z.array(z.string().min(1)).min(1));
 
+// Express `trust proxy`: false trusts nobody, true trusts every hop, and a
+// number is how many proxies sit between the client and this process. It
+// decides whether req.ip is the caller or the load balancer, which is both what
+// the throttler keys its buckets on and what the request log reports.
+const trustProxy = z
+  .union([
+    z.enum(['true', 'false']).transform((value) => value === 'true'),
+    z.coerce.number().int().min(0).max(10),
+  ])
+  .default(false);
+
 export const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -20,6 +31,7 @@ export const envSchema = z.object({
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),
+  TRUST_PROXY: trustProxy,
   CORS_ORIGINS: commaSeparatedList.default([
     'http://localhost:5173',
     'http://localhost:8080',

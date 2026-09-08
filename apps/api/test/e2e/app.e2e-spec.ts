@@ -1,13 +1,9 @@
 import { Server } from 'node:http';
 import { INestApplication } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Test } from '@nestjs/testing';
-import { Logger } from 'nestjs-pino';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
-import type { TypedConfigService } from '../../src/config/typed-config.service';
-import { configureHttp } from '../../src/configure-http';
+import { createE2eApp } from './create-e2e-app';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const UUID_PATTERN =
@@ -18,15 +14,7 @@ describe('API (e2e)', () => {
   let server: Server;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleRef.createNestApplication({ bufferLogs: true });
-    app.useLogger(app.get(Logger));
-    configureHttp(app, app.get<TypedConfigService>(ConfigService));
-
-    await app.init();
+    app = await createE2eApp({ imports: [AppModule] });
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;
