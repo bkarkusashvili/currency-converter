@@ -29,6 +29,11 @@ export interface CurrenciesResponse {
   currencies: Currency[];
 }
 
+/**
+ * §3: an entry carries the provenance the conversion was answered with as well
+ * as its numbers. `source` and `ratesTimestamp` are what explain a stored rate
+ * that does not match the ones published around it.
+ */
 export interface HistoryItem {
   id: string;
   from: string;
@@ -37,6 +42,8 @@ export interface HistoryItem {
   result: number;
   rate: number;
   strategy: ConversionStrategy;
+  source: RateSource;
+  ratesTimestamp: string;
   createdAt: string;
 }
 
