@@ -9,6 +9,12 @@ import { describeAgainst } from './gate';
 const FRESH_TTL_SECONDS = 300;
 const STALE_TTL_SECONDS = 86_400;
 
+// The suite writes the application's own key names, and `INTEGRATION_REDIS_URL`
+// may well be a stack someone is using, where `rates:latest` is the cache it is
+// serving from. Redis numbers sixteen databases and the app only ever uses the
+// default one, so the last is free to be emptied between cases.
+const TEST_DB = 15;
+
 const SNAPSHOT: RatesSnapshot = {
   fetchedAt: '2026-09-08T12:00:00.000Z',
   rates: [
@@ -30,17 +36,28 @@ describeAgainst(
     let repository: RedisRatesRepository;
 
     beforeAll(async () => {
-      client = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1 });
+      client = new Redis(url, {
+        lazyConnect: true,
+        maxRetriesPerRequest: 1,
+        db: TEST_DB,
+      });
       await client.connect();
+      // Selected as well as configured: ioredis lets a database in the URL's
+      // path win over the option, and FLUSHDB must not land on whatever that
+      // would be. The option is what a reconnect re-selects, so both are here.
+      await client.select(TEST_DB);
+      // FLUSHDB, not FLUSHALL: it is scoped to the selected database, and what
+      // it clears here is whatever an interrupted run left behind.
+      await client.flushdb();
     });
 
     afterAll(async () => {
-      await client.del(RATES_CACHE_KEYS.fresh, RATES_CACHE_KEYS.stale);
+      await client.flushdb();
       await client.quit();
     });
 
     beforeEach(async () => {
-      await client.del(RATES_CACHE_KEYS.fresh, RATES_CACHE_KEYS.stale);
+      await client.flushdb();
       repository = new RedisRatesRepository(
         client,
         fakeConfig({
@@ -53,7 +70,7 @@ describeAgainst(
 
     // The unit spec asserts the expiries against a fake that records what it was
     // asked to do; this asks Redis what it actually holds.
-    it('writes both keys in one transaction with the configured expiries', async () => {
+    it('writes both keys with their TTLs', async () => {
       await expect(repository.save(SNAPSHOT)).resolves.toStrictEqual({
         degraded: false,
       });
