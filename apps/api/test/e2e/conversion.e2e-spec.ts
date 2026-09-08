@@ -62,8 +62,10 @@ describe('conversion (e2e)', () => {
 
   describe('the documented response', () => {
     // §3's own example, priced from the fixture: EUR and GBP are both quoted
-    // against the hryvnia and not against each other.
-    it('answers 200 with exactly the fields §3 lists', async () => {
+    // against the hryvnia and not against each other. The status is part of
+    // the assertion — a conversion creates nothing and leaves nothing behind
+    // to fetch, so the POST is not Nest's default 201 for one.
+    it('answers 200, not 201, with exactly the fields §3 lists', async () => {
       const response = await convert({
         from: 'EUR',
         to: 'GBP',
@@ -80,11 +82,6 @@ describe('conversion (e2e)', () => {
         source: 'provider',
         ratesTimestamp: RATES_SNAPSHOT.fetchedAt,
       });
-    });
-
-    // A conversion creates nothing, so the POST is not a 201.
-    it('does not answer 201', async () => {
-      await convert({ from: 'EUR', to: 'GBP', amount: 100 }).expect(200);
     });
   });
 
@@ -133,6 +130,11 @@ describe('conversion (e2e)', () => {
       });
     });
 
+    // Both legs of the §5 table on mid rates: 60.7562 hryvnia to the pound out,
+    // 1 / 12.1834 zloty to the hryvnia back. The rate is 4.98680171380731…,
+    // published as 4.986802, and 250 of them is 1246.70042…, so the cent is
+    // 1246.70. Rounding the rate first would agree here; the million-pound
+    // case in the service spec is where the two answers part.
     it('crosses two currencies that only share the hryvnia', async () => {
       const response = await convert({
         from: 'GBP',
@@ -144,6 +146,25 @@ describe('conversion (e2e)', () => {
         rate: 4.986802,
         result: 1246.7,
         strategy: 'cross',
+      });
+    });
+
+    // The other end of the scale: 0.01 hryvnia is 0.000223 dollars, less than
+    // half a cent, so the money rounds to nothing. It is a 200 rather than an
+    // error — the conversion succeeded and that is what it is worth — and
+    // `rate` is what makes the zero readable. §5 records the choice.
+    it('answers zero for an amount worth less than half a cent', async () => {
+      const response = await convert({
+        from: 'UAH',
+        to: 'USD',
+        amount: 0.01,
+      }).expect(200);
+
+      expect(response.body).toMatchObject({
+        amount: 0.01,
+        result: 0,
+        rate: 0.022306,
+        strategy: 'direct',
       });
     });
 

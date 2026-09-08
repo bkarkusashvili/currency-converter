@@ -84,6 +84,16 @@ describe('ConversionService', () => {
     ).resolves.toMatchObject({ result: 12.34, rate: 1, strategy: 'identity' });
   });
 
+  // Half-up at the seam, on the value a float loses: 1.005 reads as
+  // 1.00499999999999989, so `Math.round(amount * 100) / 100` answers 1. The
+  // identity rate is 1, so the tie is the amount's own and nothing but the
+  // rounding can have moved it.
+  it('rounds a tie up rather than to the nearest float', async () => {
+    await expect(
+      service.convert({ from: 'USD', to: 'USD', amount: 1.005 }),
+    ).resolves.toMatchObject({ result: 1.01 });
+  });
+
   it('names the strategy that priced the pair', async () => {
     await expect(
       service.convert({ from: 'GBP', to: 'PLN', amount: 1 }),
