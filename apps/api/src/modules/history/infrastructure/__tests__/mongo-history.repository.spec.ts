@@ -192,6 +192,7 @@ describe('MongoHistoryRepository', () => {
 
         expect(logger.warn).toHaveBeenCalledTimes(1);
         expect(logger.warn).toHaveBeenCalledWith(
+          { err: undefined },
           'MongoDB is not connected, conversions are answered but not recorded',
         );
       });
@@ -244,6 +245,7 @@ describe('MongoHistoryRepository', () => {
 
       expect(logger.warn).toHaveBeenCalledTimes(1);
       expect(logger.warn).toHaveBeenCalledWith(
+        { err: undefined },
         'MongoDB is not connected, conversions are answered but not recorded',
       );
     });

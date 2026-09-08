@@ -36,12 +36,16 @@ describe('createOutageReporter', () => {
     expect(logger.warn).toHaveBeenCalledWith({ err: failure }, MESSAGES.down);
   });
 
+  // Nothing to carry is not a second way of calling the logger: pino drops a
+  // key whose value is undefined, so the line an outage without an error
+  // produces is the message and nothing else.
   it('reports an outage that has no failure to carry as the message alone', () => {
     const outage = createOutageReporter(logger.asPinoLogger(), MESSAGES);
 
     outage.report();
 
-    expect(logger.warn).toHaveBeenCalledWith(MESSAGES.down);
+    expect(logger.warn).toHaveBeenCalledWith({ err: undefined }, MESSAGES.down);
+    expect(JSON.stringify({ err: undefined })).toBe('{}');
   });
 
   it('says so once when the outage ends', () => {

@@ -77,6 +77,7 @@ describe('MongoConnection', () => {
 
         expect(logger.warn).toHaveBeenCalledTimes(1);
         expect(logger.warn).toHaveBeenCalledWith(
+          { err: undefined },
           'MongoDB is unavailable, the conversion history is degraded',
         );
         // The reason every failed attempt carries stays readable without
@@ -102,8 +103,10 @@ describe('MongoConnection', () => {
       const { logger } = createConnection(connection);
 
       // A state read carries no failure to attach: the error this outage
-      // produced was dropped by mongoose before anything was listening.
+      // produced was dropped by mongoose before anything was listening, and
+      // pino leaves an undefined `err` out of the line it writes.
       expect(logger.warn).toHaveBeenCalledWith(
+        { err: undefined },
         'MongoDB is unavailable, the conversion history is degraded',
       );
     });

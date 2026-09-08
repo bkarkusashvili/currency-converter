@@ -29,7 +29,10 @@ export interface OutageReporter {
 // thousand copies of itself.
 //
 // The error travels as pino's `err` field rather than in the message, which is
-// what serialises a stack into the JSON line.
+// what serialises a stack into the JSON line. A caller with no error to carry —
+// a connection that is simply not up — passes none, and pino leaves the key out
+// of the line rather than writing an undefined one, so there is no arity to
+// branch on here.
 export function createOutageReporter(
   logger: PinoLogger,
   messages: OutageMessages,
@@ -47,12 +50,7 @@ export function createOutageReporter(
       }
 
       reported = true;
-
-      if (error === undefined) {
-        logger.warn(messages.down);
-      } else {
-        logger.warn({ err: error }, messages.down);
-      }
+      logger.warn({ err: error }, messages.down);
     },
 
     clear(): void {
