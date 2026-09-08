@@ -708,6 +708,7 @@ apps/api
 │       │   ├── history.controller.ts  GET /history
 │       │   └── history.module.ts
 │       └── health/              controller, HealthExceptionFilter, HEALTH_INDICATORS,
+│                             collectIndicators, pingIndicator with the probe budget,
 │                             HealthIndicatorPort + Redis / Mongo / Monobank indicators
 └── test
     ├── e2e/                     supertest suites over the real HTTP surface
