@@ -1,7 +1,7 @@
 import {
   Inject,
   Injectable,
-  OnModuleDestroy,
+  OnApplicationShutdown,
   OnModuleInit,
 } from '@nestjs/common';
 import Redis from 'ioredis';
@@ -9,7 +9,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { REDIS_CLIENT } from './redis-client.token';
 
 @Injectable()
-export class RedisConnection implements OnModuleInit, OnModuleDestroy {
+export class RedisConnection implements OnModuleInit, OnApplicationShutdown {
   constructor(
     @Inject(REDIS_CLIENT) private readonly client: Redis,
     private readonly logger: PinoLogger,
@@ -35,7 +35,11 @@ export class RedisConnection implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async onModuleDestroy(): Promise<void> {
+  // A shutdown hook rather than a destroy hook: Nest closes the HTTP listener
+  // in `dispose()`, which runs after every `onModuleDestroy` and before every
+  // `onApplicationShutdown`. Quitting here is what keeps the requests still in
+  // flight during a rolling deploy from losing the cache under them.
+  async onApplicationShutdown(): Promise<void> {
     // A client that never opened a socket cannot QUIT: with the offline queue
     // disabled the command is rejected rather than sent.
     if (this.client.status === 'wait' || this.client.status === 'end') {

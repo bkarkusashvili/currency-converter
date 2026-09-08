@@ -437,6 +437,12 @@ float.
 - **Throttling** via `@nestjs/throttler` on all routes.
 - **Single-flight** cache refresh (see §4) so a burst of misses produces one
   upstream call.
+- **Shutdown order.** `RedisConnection` and `MongoConnection` tear down in
+  `onApplicationShutdown`, not `onModuleDestroy`: Nest closes the HTTP listener
+  in `dispose()`, which runs between the two. Declared as destroy hooks they
+  took the cache and the history store away from the requests still in flight
+  during a rolling deploy, which is the one window where the degradation
+  promises above would have been broken by the shutdown itself.
 
 ## 7. Errors and logging
 

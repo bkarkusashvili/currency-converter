@@ -1,7 +1,7 @@
 import {
   Inject,
   Injectable,
-  OnModuleDestroy,
+  OnApplicationShutdown,
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -19,7 +19,7 @@ import { buildMongoConnectOptions } from './mongo-connect.options';
 const RECONNECT_DELAY_MS = 5000;
 
 @Injectable()
-export class MongoConnection implements OnModuleInit, OnModuleDestroy {
+export class MongoConnection implements OnModuleInit, OnApplicationShutdown {
   private retryTimer: NodeJS.Timeout | undefined;
   private established = false;
   private outageReported = false;
@@ -63,7 +63,11 @@ export class MongoConnection implements OnModuleInit, OnModuleDestroy {
   // Closing emits the same disconnect an outage does, and a shutdown is not an
   // outage: the flag is what keeps the last line of the process from being a
   // warning about a database nothing is going to ask for again.
-  async onModuleDestroy(): Promise<void> {
+  //
+  // A shutdown hook rather than a destroy hook, for the same reason the Redis
+  // one is: Nest closes the HTTP listener in `dispose()`, between the two, so
+  // closing here leaves the requests still in flight with a store to write to.
+  async onApplicationShutdown(): Promise<void> {
     this.stopping = true;
     clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
