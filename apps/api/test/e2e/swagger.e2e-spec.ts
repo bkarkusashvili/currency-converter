@@ -236,6 +236,18 @@ describe('OpenAPI document (e2e)', () => {
     });
   });
 
+  // The record is the conversion that was answered, not the request that
+  // produced it: what degraded while it ran is not part of what was converted,
+  // and the store has never had a column for it.
+  it('describes a record without the warnings of the response it mirrors', () => {
+    const record = document.components?.schemas?.ConversionRecordDto as {
+      properties: Record<string, unknown>;
+    };
+
+    expect(record.properties).not.toHaveProperty('warnings');
+    expect(record.properties).toHaveProperty('ratesTimestamp');
+  });
+
   it('puts the cache invalidation behind the admin key scheme', () => {
     const invalidate = document.paths['/api/v1/rates/cache']?.delete;
 

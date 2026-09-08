@@ -1,11 +1,24 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { CONVERSION_STRATEGY_NAMES } from '../../conversion/strategies/conversion-strategy-name';
-import type { ConversionStrategyName } from '../../conversion/strategies/conversion-strategy-name';
-import { RATES_SOURCES } from '../../rates/domain/rates-source';
-import type { RatesSource } from '../../rates/domain/rates-source';
+import { ApiProperty, OmitType } from '@nestjs/swagger';
+import { ConvertResponseDto } from '../../conversion/dto/convert-response.dto';
 import { ConversionRecord } from '../domain/conversion-record';
 
-export class ConversionRecordDto implements ConversionRecord {
+// A record is the conversion that was answered plus the two fields the store
+// owns, and this says so rather than re-describing eight properties the convert
+// response already describes — a second copy of those descriptions is one that
+// drifts from the first, and §3 publishes them as the same fields.
+//
+// `warnings` is the one part of an answer that is not part of the conversion:
+// it says what degraded while the request ran, which is a fact about that
+// request rather than about what was converted. The record has never carried it
+// and `NewConversionRecord` has no place for it.
+//
+// `@nestjs/swagger` copies the decorated properties of the base into the
+// schema, so `swagger.e2e-spec.ts` — which asserts every field of this DTO is
+// required and both enums are present — is the guard on this being equivalent.
+export class ConversionRecordDto
+  extends OmitType(ConvertResponseDto, ['warnings'] as const)
+  implements ConversionRecord
+{
   @ApiProperty({
     description: 'Identifier of the stored record.',
     example: '6f0000000000000000000001',
@@ -13,63 +26,9 @@ export class ConversionRecordDto implements ConversionRecord {
   id!: string;
 
   @ApiProperty({
-    description: 'The code that was converted from, upper-cased.',
-    example: 'EUR',
-  })
-  from!: string;
-
-  @ApiProperty({
-    description: 'The code that was converted to, upper-cased.',
-    example: 'GBP',
-  })
-  to!: string;
-
-  @ApiProperty({
-    description: 'The amount that was converted.',
-    example: 100,
-  })
-  amount!: number;
-
-  @ApiProperty({
-    description: 'The converted amount, as it was answered.',
-    example: 84.73,
-  })
-  result!: number;
-
-  @ApiProperty({
-    description: 'The effective `to` per `from` rate the conversion used.',
-    example: 0.847312,
-  })
-  rate!: number;
-
-  @ApiProperty({
-    description: 'How the rate was arrived at.',
-    enum: CONVERSION_STRATEGY_NAMES,
-    example: 'cross',
-  })
-  strategy!: ConversionStrategyName;
-
-  @ApiProperty({
     description:
-      'Where the rates came from. `stale-cache` means the conversion was ' +
-      'priced from the fallback copy because the upstream could not be ' +
-      'reached, which is what explains a rate that does not match the ones ' +
-      'published around it.',
-    enum: RATES_SOURCES,
-    example: 'cache',
-  })
-  source!: RatesSource;
-
-  @ApiProperty({
-    description:
-      'When the upstream fetch that produced the rates ran, ISO 8601. Read ' +
-      'with `createdAt` it is how old the quote was when it was used.',
-    example: '2026-09-08T12:00:00.000Z',
-  })
-  ratesTimestamp!: string;
-
-  @ApiProperty({
-    description: 'When the conversion was recorded, ISO 8601.',
+      'When the conversion was recorded, ISO 8601. Read with ' +
+      '`ratesTimestamp` it is how old the quote was when it was used.',
     example: '2026-09-08T12:00:05.000Z',
   })
   createdAt!: string;
