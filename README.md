@@ -206,9 +206,11 @@ docker-compose.dev.yml  overlay: backing services only, ports published
 
 ## Testing
 
-CI runs both jobs on every pull request: lint, format check, typecheck, build,
-unit tests with coverage, and a `docker build` of each image. The API job also
-runs the e2e suite.
+CI runs three jobs on every pull request. `api` and `web` each do lint, format
+check, typecheck, build, unit tests with coverage and a `docker build` of the
+image; the API job also runs the e2e suite. `orchestration` validates what
+belongs to neither app — the root lockfile, both Compose files (`config -q` on
+the base and on the base plus overlay) and both `railway.json` files.
 
 `npm test`, `npm run lint`, `npm run typecheck`, `npm run format:check` and
 `npm run build` from the root run the same checks across both apps and let both
