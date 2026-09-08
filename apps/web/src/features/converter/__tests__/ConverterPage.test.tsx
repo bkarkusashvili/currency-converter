@@ -2,7 +2,12 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../../api/http/ApiError';
-import type { ConvertResponse, CurrenciesResponse } from '../../../api/types';
+import type {
+  ConvertResponse,
+  CurrenciesResponse,
+  RatesSnapshotResponse,
+  ResponseWarningCode,
+} from '../../../api/types';
 import {
   createFakeRepositories,
   type FakeRepositoriesOptions,
@@ -50,7 +55,7 @@ describe('ConverterPage', () => {
     expect(fake.convertCalls).toEqual([]);
   });
 
-  it('names the reason the amount is not a number', async () => {
+  it('names the reason the amount cannot be converted', async () => {
     const user = userEvent.setup();
     const fake = renderPage();
     const amount = screen.getByLabelText('Amount');
@@ -59,11 +64,10 @@ describe('ConverterPage', () => {
     await user.click(screen.getByRole('button', { name: 'Convert' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter an amount to convert.');
 
+    // Letters never reach the value, so what is left is an empty field.
     await user.type(amount, 'abc');
-    await user.click(screen.getByRole('button', { name: 'Convert' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Amount must be a number');
+    expect(amount).toHaveValue('');
 
-    await user.clear(amount);
     await user.type(amount, '1000000000001');
     await user.click(screen.getByRole('button', { name: 'Convert' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -71,6 +75,18 @@ describe('ConverterPage', () => {
     );
 
     expect(fake.convertCalls).toEqual([]);
+  });
+
+  it('puts the caret on the amount when it is the amount that is wrong', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(amount).toHaveFocus();
   });
 
   it('submits a normalised payload, thousands separator and all', async () => {
@@ -106,7 +122,6 @@ describe('ConverterPage', () => {
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
     const card = await screen.findByRole('region', { name: 'Result' });
-    expect(card.parentElement).toHaveAttribute('aria-live', 'polite');
     expect(card).toHaveTextContent('425.71 PLN');
     expect(card).toHaveTextContent('1 EUR = 4.257112 PLN');
     expect(within(card).getByText('cross')).toBeInTheDocument();
@@ -118,6 +133,21 @@ describe('ConverterPage', () => {
       within(card).getByText(/Monobank was unreachable, so the last good snapshot was used/i),
     ).toBeInTheDocument();
     expect(within(card).getByText(/the rate was derived through UAH/i)).toBeInTheDocument();
+  });
+
+  it('announces one sentence rather than reading the whole card out', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const announcement = await screen.findByText('100.00 EUR is 425.71 PLN');
+    expect(announcement).toHaveAttribute('aria-live', 'polite');
+    // The card is a sibling, not a child: it stays there to be read, and is
+    // not what gets read out.
+    const card = screen.getByRole('region', { name: 'Result' });
+    expect(announcement).not.toContainElement(card);
+    expect(card.closest('[aria-live]')).toBeNull();
   });
 
   it('does not throw on a strategy or source it has never heard of', async () => {
@@ -141,6 +171,20 @@ describe('ConverterPage', () => {
     expect(
       within(card).getByText(/does not recognise the strategy the API reported/i),
     ).toBeInTheDocument();
+  });
+
+  it('draws no path for identity, which converted nothing', async () => {
+    const user = userEvent.setup();
+    renderPage({
+      convert: { ...conversion, from: 'EUR', to: 'EUR', strategy: 'identity', result: 100 },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const card = await screen.findByRole('region', { name: 'Result' });
+    expect(within(card).queryByRole('list', { name: /Conversion path/ })).not.toBeInTheDocument();
+    // The provenance note still says why there is nothing to draw.
+    expect(within(card).getByText(/nothing was converted/i)).toBeInTheDocument();
   });
 
   it('routes validation messages onto the inputs they belong to', async () => {
@@ -167,7 +211,7 @@ describe('ConverterPage', () => {
     await waitFor(() => {
       expect(amount).toHaveAttribute('aria-invalid', 'true');
     });
-    expect(amount).toHaveAttribute('aria-describedby', 'amount-error');
+    expect(amount).toHaveAttribute('aria-describedby', 'amount-hint amount-error');
     expect(document.getElementById('amount-error')).toHaveTextContent(
       'amount must be a positive number',
     );
@@ -215,7 +259,7 @@ describe('ConverterPage', () => {
     await user.type(amount, '5');
 
     expect(amount).toHaveAttribute('aria-invalid', 'false');
-    expect(amount).not.toHaveAttribute('aria-describedby');
+    expect(amount).toHaveAttribute('aria-describedby', 'amount-hint');
     expect(document.getElementById('amount-error')).toBeNull();
 
     // The untouched field still carries what the server said about it.
@@ -298,7 +342,7 @@ describe('the currency list', () => {
         .map((option) => option.textContent),
     ).toEqual(['EUR — Euro', 'PLN — Zloty', 'UAH — Hryvnia', 'USD — US Dollar']);
     expect(
-      await screen.findByText(/the copy saved in this browser is being used/),
+      await screen.findByText(/The copy saved in this browser is being used/),
     ).toBeInTheDocument();
   });
 
@@ -339,5 +383,255 @@ describe('the currency list', () => {
           .map((option) => option.textContent),
       ).toEqual(['USD', 'XDR']);
     });
+  });
+});
+
+describe('while the currency list is loading', () => {
+  it('stands the selects in a status region rather than labelling nothing', () => {
+    const fake = createFakeRepositories({ convert: conversion });
+    renderWithProviders(<ConverterPage />, {
+      repositories: {
+        ...fake.repositories,
+        currencies: { list: () => new Promise<CurrenciesResponse>(() => undefined) },
+      },
+    });
+
+    const [from, to] = screen.getAllByRole('status');
+    expect(from).toHaveTextContent('Loading the currency list for From…');
+    expect(to).toHaveTextContent('Loading the currency list for To…');
+    // No control to name yet, so nothing claims to name one.
+    expect(document.querySelectorAll('label[for="from"], label[for="to"]')).toHaveLength(0);
+    expect(screen.queryByLabelText('From')).not.toBeInTheDocument();
+  });
+});
+
+describe('warnings on a successful answer', () => {
+  it('says what degraded while the conversion was answered', async () => {
+    const user = userEvent.setup();
+    renderPage({
+      convert: {
+        ...conversion,
+        warnings: [
+          { code: 'HISTORY_NOT_RECORDED', message: 'Raw server sentence, not for a reader.' },
+        ],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const card = await screen.findByRole('region', { name: 'Result' });
+    // The answer still stands; the note is what it cost.
+    expect(card).toHaveTextContent('425.71 PLN');
+    expect(
+      within(card).getByText(/could not be saved, so it will not appear under recent conversions/i),
+    ).toBeInTheDocument();
+    expect(within(card).queryByText('Raw server sentence, not for a reader.')).toBeNull();
+  });
+
+  it('shows the server sentence for a warning code it does not know', async () => {
+    const user = userEvent.setup();
+    renderPage({
+      convert: {
+        ...conversion,
+        warnings: [
+          {
+            // A code the API grew after this client shipped.
+            code: 'CLOCK_SKEW' as ResponseWarningCode,
+            message: 'The rate clock drifted while this was answered.',
+          },
+        ],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    expect(
+      await screen.findByText('The rate clock drifted while this was answered.'),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing at all when nothing degraded', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const card = await screen.findByRole('region', { name: 'Result' });
+    expect(within(card).queryByText(/could not be reached/i)).toBeNull();
+  });
+
+  it('carries a list warning under the form, once, however many lists report it', async () => {
+    const snapshot: RatesSnapshotResponse = {
+      source: 'provider',
+      fetchedAt: '2024-03-05T12:00:00.000Z',
+      rates: [],
+      warnings: [{ code: 'CACHE_UNAVAILABLE', message: 'Server sentence.' }],
+    };
+    renderPage({
+      currencies: {
+        ...currencies,
+        warnings: [{ code: 'CACHE_UNAVAILABLE', message: 'Server sentence.' }],
+      },
+      rates: snapshot,
+    });
+
+    // One line, not one per query that noticed the same cache was down.
+    const notes = await screen.findAllByText(/The rates cache could not be reached/i);
+    expect(notes).toHaveLength(1);
+    expect(screen.queryByText('Server sentence.')).toBeNull();
+  });
+});
+
+describe('the amount field', () => {
+  it('refuses a character even when the value it would leave is unchanged', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.type(amount, 'x');
+
+    expect(amount).toHaveValue('100');
+  });
+
+  it('takes the digit after the separator when delete lands on one', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234');
+    await user.keyboard('{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{Delete}');
+
+    expect(amount).toHaveValue('134');
+  });
+
+  it('leaves a selection to the browser to replace', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234');
+    await user.keyboard('{Control>}a{/Control}{Backspace}');
+
+    expect(amount).toHaveValue('');
+  });
+
+  it('groups thousands as they are typed and sends the number behind them', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234567.891');
+
+    // The third decimal never lands, and the grouping is the locale's.
+    expect(amount).toHaveValue('1,234,567.89');
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    await waitFor(() => {
+      expect(fake.convertCalls).toEqual([{ from: 'USD', to: 'UAH', amount: 1234567.89 }]);
+    });
+  });
+
+  it('accepts a pasted amount and throws away everything around it', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.click(amount);
+    await user.paste('  $1,234,567.899  ');
+
+    expect(amount).toHaveValue('1,234,567.89');
+  });
+
+  it('takes the digit with the separator when backspace lands on one', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234');
+    expect(amount).toHaveValue('1,234');
+
+    // Caret to just after the separator, where backspace would otherwise do nothing.
+    await user.keyboard('{ArrowLeft}{ArrowLeft}{ArrowLeft}{Backspace}');
+
+    expect(amount).toHaveValue('234');
+  });
+
+  it('drops a decimal separator left dangling when the field is left', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '12.');
+    expect(amount).toHaveValue('12.');
+
+    await user.tab();
+
+    expect(amount).toHaveValue('12');
+  });
+
+  it('submits the number in front of a dangling separator when Enter skips the blur', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '12.{Enter}');
+
+    // The field still shows what was typed — only blur tidies that — and the
+    // form has already sent the number it stands for.
+    expect(amount).toHaveValue('12.');
+    await waitFor(() => {
+      expect(fake.convertCalls).toEqual([{ from: 'USD', to: 'UAH', amount: 12 }]);
+    });
+    expect(screen.queryByText('Enter a number, for example 250.75.')).not.toBeInTheDocument();
+  });
+
+  it('sends the number behind the grouping when Enter follows a dangling separator', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234.{Enter}');
+
+    expect(amount).toHaveValue('1,234.');
+    await waitFor(() => {
+      expect(fake.convertCalls).toEqual([{ from: 'USD', to: 'UAH', amount: 1234 }]);
+    });
+  });
+
+  it('describes what the field accepts', () => {
+    renderPage();
+
+    expect(screen.getByLabelText('Amount')).toHaveAttribute('inputmode', 'decimal');
+    expect(document.getElementById('amount-hint')).toHaveTextContent(
+      'Numbers only, up to 13 digits and 2 decimal places.',
+    );
+  });
+});
+
+describe('while a conversion is in flight', () => {
+  it('says so on the button and stops a second submission', async () => {
+    const user = userEvent.setup();
+    const fake = createFakeRepositories({ currencies });
+    renderWithProviders(<ConverterPage />, {
+      repositories: {
+        ...fake.repositories,
+        conversion: { convert: () => new Promise<ConvertResponse>(() => undefined) },
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const button = await screen.findByRole('button', { name: 'Converting…' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
   });
 });

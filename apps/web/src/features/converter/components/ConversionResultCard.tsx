@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { InfoBadge } from '../../../components/InfoBadge';
 import { Timestamp } from '../../../components/Timestamp';
+import { WarningNotes } from '../../../components/WarningNotes';
 import { useFormatters } from '../../../lib/useFormatters';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
+import { inverseRate } from '../lib/inverseRate';
 import { HUB_CURRENCY, OFFLINE_ESTIMATE, sourceCopy, strategyCopy } from '../lib/provenance';
 import { ConversionPath } from './ConversionPath';
 
@@ -13,6 +15,8 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
   const strategy = strategyCopy(result.strategy);
   const source = sourceCopy(result.source);
   const rate = formatters.splitRate(result.rate);
+  // Both directions of the same rate, except when they are the same sentence.
+  const inverse = result.from === result.to ? null : inverseRate(result.rate);
   // The estimate's note is the only one that has to say how old its rates are,
   // and it is where a reader looks for it: the shared line below would be the
   // same timestamp a second time, so the card carries one or the other.
@@ -38,24 +42,41 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
         </div>
       </div>
 
-      <p className="text-muted numeric mt-6 font-mono text-sm">
-        {formatters.money(result.amount)} {result.from}
-      </p>
-      <p className="figure mt-1.5">
-        {formatters.money(result.result)}{' '}
-        <span className="text-muted text-[0.42em] font-semibold tracking-[0.08em]">
-          {result.to}
-        </span>
-      </p>
+      <div className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div>
+          <p className="text-muted numeric font-mono text-sm">
+            {formatters.money(result.amount)} {result.from}
+          </p>
+          <p className="figure mt-1.5 break-words">
+            {formatters.money(result.result)}{' '}
+            <span className="text-muted text-[0.42em] font-semibold tracking-[0.08em]">
+              {result.to}
+            </span>
+          </p>
+        </div>
 
-      <p className="mt-4 font-mono text-sm">
-        <span className="text-muted">{t('converter.result.rateLead', { from: result.from })}</span>
-        <span className="numeric text-ink">
-          {rate.lead}
-          <span className="text-faint">{rate.tail}</span>
-        </span>
-        <span className="text-muted">{t('converter.result.rateTrail', { to: result.to })}</span>
-      </p>
+        <div className="grid gap-1.5 font-mono text-sm sm:justify-items-end sm:text-right">
+          <p>
+            <span className="text-muted">
+              {t('converter.result.rateLead', { from: result.from })}
+            </span>
+            <span className="numeric text-ink">
+              {rate.lead}
+              <span className="text-faint">{rate.tail}</span>
+            </span>
+            <span className="text-muted">{t('converter.result.rateTrail', { to: result.to })}</span>
+          </p>
+          {inverse !== null && (
+            <p className="text-faint numeric">
+              {t('converter.result.inverseRate', {
+                from: result.to,
+                rate: formatters.rate(inverse),
+                to: result.from,
+              })}
+            </p>
+          )}
+        </div>
+      </div>
 
       <div className="border-line mt-6 border-t pt-5">
         <ConversionPath from={result.from} to={result.to} strategy={result.strategy} />
@@ -80,7 +101,7 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
               {isEstimate && (
                 <>
                   {' '}
-                  <Timestamp value={result.ratesTimestamp} />
+                  <Timestamp value={result.ratesTimestamp} withPreposition />
                 </>
               )}
             </dd>
@@ -89,9 +110,14 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
 
         {!isEstimate && (
           <p className="eyebrow mt-4">
-            {t('converter.result.ratesFetched')} <Timestamp value={result.ratesTimestamp} />
+            {t('converter.result.ratesFetched')}{' '}
+            <Timestamp value={result.ratesTimestamp} withPreposition />
           </p>
         )}
+
+        {/* What degraded while this answer was produced (§3). The answer above
+            still stands; this is what it cost. */}
+        <WarningNotes warnings={result.warnings} className="mt-4" />
       </div>
     </section>
   );

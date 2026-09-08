@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ConvertRequest } from '../../../api/types';
 import { useFormatters } from '../../../lib/useFormatters';
+import { canonicalAmount } from '../lib/canonicalAmount';
 import { DEFAULT_FROM, DEFAULT_TO } from '../lib/defaultCurrencies';
 import { MAX_AMOUNT, parseAmount, type AmountErrorCode } from '../lib/parseAmount';
 import type { FormField, FormFieldErrors } from '../lib/serverFieldErrors';
@@ -11,6 +12,8 @@ const DEFAULT_AMOUNT = '100';
 interface UseConverterFormOptions {
   serverErrors: FormFieldErrors;
   onSubmit: (request: ConvertRequest) => void;
+  /** Called instead of submitting, so the form can put the caret on what needs fixing. */
+  onAmountInvalid: () => void;
 }
 
 export interface ConverterFormState {
@@ -28,6 +31,7 @@ export interface ConverterFormState {
 export function useConverterForm({
   serverErrors,
   onSubmit,
+  onAmountInvalid,
 }: UseConverterFormOptions): ConverterFormState {
   const { t } = useTranslation();
   const formatters = useFormatters();
@@ -84,9 +88,13 @@ export function useConverterForm({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const parsed = parseAmount(amount);
+    // The field writes its value in the active locale, and Enter submits
+    // without blurring, so what is in it on submit is neither the number nor
+    // necessarily finished. `canonicalAmount` is what turns one into the other.
+    const parsed = parseAmount(canonicalAmount(amount, formatters.separators));
     if (!parsed.ok) {
       setAmountErrorCode(parsed.error);
+      onAmountInvalid();
       return;
     }
 
