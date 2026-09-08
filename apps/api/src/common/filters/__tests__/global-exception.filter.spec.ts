@@ -14,7 +14,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { ErrorCode } from '../../errors/error-code.enum';
 import { RatesUnavailableError } from '../../errors/rates-unavailable.error';
 import { UnsupportedCurrencyError } from '../../errors/unsupported-currency.error';
-import { ErrorResponse } from '../error-response';
+import { ErrorResponseDto } from '../error-response.dto';
 import { GlobalExceptionFilter } from '../global-exception.filter';
 
 const PATH = '/api/v1/convert';
@@ -22,9 +22,9 @@ const REQUEST_ID = 'request-id-1';
 
 function createResponseDouble(): {
   status: jest.Mock;
-  json: jest.Mock<void, [ErrorResponse]>;
+  json: jest.Mock<void, [ErrorResponseDto]>;
 } {
-  const json = jest.fn<void, [ErrorResponse]>();
+  const json = jest.fn<void, [ErrorResponseDto]>();
   const status = jest.fn(() => ({ json }));
 
   return { status, json };
@@ -52,7 +52,7 @@ describe('GlobalExceptionFilter', () => {
   function captureEnvelope(
     exception: unknown,
     requestId?: unknown,
-  ): ErrorResponse {
+  ): ErrorResponseDto {
     filter.catch(
       exception,
       createHost(response, requestId === undefined ? REQUEST_ID : requestId),

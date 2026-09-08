@@ -1,13 +1,11 @@
 import { Logger as NestLogger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
-import { buildSwaggerConfig } from './common/swagger/build-swagger-config';
-import { readPackageMetadata } from './common/swagger/read-package-metadata';
+import { setupSwagger } from './common/swagger/setup-swagger';
 import type { TypedConfigService } from './config/typed-config.service';
-import { DOCS_JSON_PATH, DOCS_PATH, configureHttp } from './configure-http';
+import { configureHttp } from './configure-http';
 
 async function bootstrap(): Promise<void> {
   // Startup logs are buffered until the pino logger takes over, so nothing is
@@ -19,13 +17,7 @@ async function bootstrap(): Promise<void> {
 
   configureHttp(app, config);
 
-  const document = SwaggerModule.createDocument(
-    app,
-    buildSwaggerConfig(readPackageMetadata()),
-  );
-  SwaggerModule.setup(DOCS_PATH, app, document, {
-    jsonDocumentUrl: DOCS_JSON_PATH,
-  });
+  setupSwagger(app);
 
   app.enableShutdownHooks();
 

@@ -1,4 +1,8 @@
-import { buildSwaggerConfig } from '../build-swagger-config';
+import { API_KEY_HEADER } from '../../guards/api-key.constant';
+import {
+  ADMIN_SECURITY_SCHEME,
+  buildSwaggerConfig,
+} from '../build-swagger-config';
 
 describe('buildSwaggerConfig', () => {
   const config = buildSwaggerConfig({
@@ -17,5 +21,11 @@ describe('buildSwaggerConfig', () => {
 
   it('produces a document without paths, which Swagger fills in from the routes', () => {
     expect(config).not.toHaveProperty('paths');
+  });
+
+  it('offers the admin api key so the guarded routes can be tried from /docs', () => {
+    expect(
+      config.components?.securitySchemes?.[ADMIN_SECURITY_SCHEME],
+    ).toStrictEqual({ type: 'apiKey', name: API_KEY_HEADER, in: 'header' });
   });
 });

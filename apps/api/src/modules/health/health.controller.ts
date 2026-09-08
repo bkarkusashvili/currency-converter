@@ -1,5 +1,10 @@
 import { Controller, Get, Inject, UseFilters } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   HealthCheck,
   HealthCheckResult,
@@ -26,8 +31,17 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @ApiOperation({
+    summary: 'Report whether the service and its dependencies are healthy',
+  })
   @ApiOkResponse({
     description: 'Every registered indicator reports the service as up.',
+  })
+  @ApiServiceUnavailableResponse({
+    description:
+      'At least one indicator is down. This route answers with the Terminus ' +
+      'report rather than the error envelope, so which dependency failed ' +
+      'stays visible.',
   })
   check(): Promise<HealthCheckResult> {
     return this.health.check(

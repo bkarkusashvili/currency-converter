@@ -12,7 +12,7 @@ import { ErrorCode } from '../errors/error-code.enum';
 import { getRequestId } from '../logging/get-request-id';
 import { isValidationErrorPayload } from '../validation/validation-error-payload';
 import { deriveErrorCode } from './derive-error-code';
-import { ErrorResponse } from './error-response';
+import { ErrorResponseDto } from './error-response.dto';
 import { extractHttpExceptionMessage } from './extract-http-exception-message';
 
 const INTERNAL_ERROR_MESSAGE = 'An unexpected error occurred';
@@ -22,7 +22,7 @@ const INTERNAL_ERROR_MESSAGE = 'An unexpected error occurred';
 const SERVER_ERROR_FLOOR: number = HttpStatus.INTERNAL_SERVER_ERROR;
 
 type ErrorDescription = Pick<
-  ErrorResponse,
+  ErrorResponseDto,
   'statusCode' | 'code' | 'message' | 'details'
 >;
 
@@ -47,7 +47,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       this.logger.error({ err: exception, requestId }, 'Unhandled exception');
     }
 
-    const body: ErrorResponse = {
+    const body: ErrorResponseDto = {
       ...this.describe(exception),
       timestamp: new Date().toISOString(),
       path: request.originalUrl,
