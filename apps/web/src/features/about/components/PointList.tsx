@@ -9,7 +9,7 @@ export function PointList({ points }: { points: readonly ContentPoint[] }) {
       {points.map((point) => (
         <div key={point.term}>
           <dt className="font-semibold">{point.term}</dt>
-          <dd className="text-muted mt-1.5 text-sm">{point.description}</dd>
+          <dd className="text-muted mt-1.5 text-sm text-pretty">{point.description}</dd>
         </div>
       ))}
     </dl>

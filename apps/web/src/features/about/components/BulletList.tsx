@@ -6,7 +6,7 @@ export function BulletList({ items }: { items: readonly string[] }) {
           <span aria-hidden="true" className="text-faint">
             ▸
           </span>
-          <span>{item}</span>
+          <span className="text-pretty">{item}</span>
         </li>
       ))}
     </ul>
