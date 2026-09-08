@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { queryKeys } from '../../queryKeys';
 import { shouldPersistQuery } from '../shouldPersistQuery';
 
-function query(queryKey: readonly unknown[], status = 'success') {
-  return { queryKey, state: { status } };
+/** The shape query-core hands `shouldDehydrateQuery`, narrowed to what the filter reads. */
+function query(queryKey: readonly unknown[], state: { data?: unknown; status?: string } = {}) {
+  return { queryKey, state: { data: { rates: [] }, status: 'success', ...state } };
 }
 
 describe('shouldPersistQuery', () => {
@@ -18,9 +19,18 @@ describe('shouldPersistQuery', () => {
     expect(shouldPersistQuery(query(queryKeys.health))).toBe(false);
   });
 
-  it('drops a query that has not succeeded', () => {
-    expect(shouldPersistQuery(query(queryKeys.rates, 'pending'))).toBe(false);
-    expect(shouldPersistQuery(query(queryKeys.rates, 'error'))).toBe(false);
+  it('keeps the data a failed refetch left behind, which is when it is needed', () => {
+    expect(shouldPersistQuery(query(queryKeys.rates, { status: 'error' }))).toBe(true);
+    expect(shouldPersistQuery(query(queryKeys.currencies, { status: 'error' }))).toBe(true);
+  });
+
+  it('drops a query with nothing to persist', () => {
+    expect(shouldPersistQuery(query(queryKeys.rates, { data: undefined, status: 'pending' }))).toBe(
+      false,
+    );
+    expect(shouldPersistQuery(query(queryKeys.rates, { data: undefined, status: 'error' }))).toBe(
+      false,
+    );
   });
 
   it('drops a key that is not one of ours', () => {

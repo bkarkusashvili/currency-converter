@@ -6,6 +6,8 @@ import type { KeyValueStorage } from '../webStorage';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+const SNAPSHOT = { source: 'cache', fetchedAt: 'now', rates: [] };
+
 function memoryStorage(): KeyValueStorage {
   const entries = new Map<string, string>();
   return {
@@ -21,11 +23,20 @@ function memoryStorage(): KeyValueStorage {
 
 function seededClient(): QueryClient {
   const client = new QueryClient();
-  client.setQueryData(queryKeys.rates, { source: 'cache', fetchedAt: 'now', rates: [] });
+  client.setQueryData(queryKeys.rates, SNAPSHOT);
   client.setQueryData(queryKeys.currencies, { currencies: [] });
   client.setQueryData(queryKeys.history.list(10), { items: [] });
   client.setQueryData(queryKeys.health, { status: 'ok', details: {} });
   return client;
+}
+
+/** A client that reports a failure instead of parking on it, as the app's does. */
+function offlineClient(): QueryClient {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+}
+
+async function fetchRates(client: QueryClient, queryFn: () => Promise<unknown>): Promise<void> {
+  await client.fetchQuery({ queryKey: queryKeys.rates, queryFn }).catch(() => undefined);
 }
 
 afterEach(() => {
@@ -46,6 +57,33 @@ describe('createPersistOptions', () => {
       queryKeys.rates,
       queryKeys.currencies,
     ]);
+  });
+
+  // The state the app is in the moment the API goes away: query-core reports
+  // `error` while still holding the data of the last good fetch, and that data
+  // is what the offline estimate is priced from after the next reload.
+  it('keeps the snapshot a failed refetch could not replace', async () => {
+    const options = createPersistOptions(memoryStorage());
+    const client = offlineClient();
+    await fetchRates(client, () => Promise.resolve(SNAPSHOT));
+    await fetchRates(client, () => Promise.reject(new Error('unreachable')));
+
+    expect(client.getQueryState(queryKeys.rates)?.status).toBe('error');
+    expect(client.getQueryData(queryKeys.rates)).toEqual(SNAPSHOT);
+
+    const dehydrated = dehydrate(client, options?.dehydrateOptions);
+
+    expect(dehydrated.queries.map((query) => query.queryKey)).toEqual([queryKeys.rates]);
+  });
+
+  it('writes nothing for a query that never answered', async () => {
+    const options = createPersistOptions(memoryStorage());
+    const client = offlineClient();
+    await fetchRates(client, () => Promise.reject(new Error('unreachable')));
+
+    const dehydrated = dehydrate(client, options?.dehydrateOptions);
+
+    expect(dehydrated.queries).toEqual([]);
   });
 
   it('keeps a cache for a week and busts it on a new app version', () => {
