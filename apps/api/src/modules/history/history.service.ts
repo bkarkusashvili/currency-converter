@@ -16,7 +16,7 @@ export class HistoryService {
   }
 
   // The conversion is the answer and the record is a side effect of it (§2), so
-  // this resolves whatever the store did. The catch is not a second line of
+  // this resolves whatever the store did, answering whether the record landed. The catch is not a second line of
   // defence for the adapter's own degradation but the guarantee itself: any
   // repository bound to the port keeps this promise, however it fails.
   //
@@ -24,14 +24,16 @@ export class HistoryService {
   // `ConversionResult`, which is structurally the same thing: a conversion
   // hands over what it answered and the history module does not have to know
   // where it came from.
-  async record(entry: NewConversionRecord): Promise<void> {
+  async record(entry: NewConversionRecord): Promise<boolean> {
     try {
-      await this.repository.record(entry);
+      return await this.repository.record(entry);
     } catch (error) {
       this.logger.warn(
         { err: error },
         'Conversion history write escaped the repository; the conversion is unaffected',
       );
+
+      return false;
     }
   }
 

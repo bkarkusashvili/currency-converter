@@ -25,7 +25,8 @@ export class ConversionController {
     description:
       'The converted amount, the effective rate, and the provenance of the ' +
       'rates it used. A `source` of `stale-cache` is a degraded answer ' +
-      'priced from the fallback copy, not a fresh one.',
+      'priced from the fallback copy, not a fresh one; a `warnings` entry ' +
+      'says what could not be reached while the conversion was answered.',
     type: ConvertResponseDto,
   })
   @ApiErrorResponses(

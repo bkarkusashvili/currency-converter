@@ -14,6 +14,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
+import { collectWarnings } from '../../common/warnings/collect-warnings';
 import { ADMIN_SECURITY_SCHEME } from '../../common/swagger/build-swagger-config';
 import { ApiErrorResponses } from '../../common/swagger/api-error-responses.decorator';
 import { RatesService } from './application/rates.service';
@@ -31,7 +32,8 @@ export class RatesController {
   @ApiOkResponse({
     description:
       'The current snapshot, with the source it was served from. A 200 with ' +
-      '`stale-cache` is a degraded answer, not a fresh one.',
+      '`stale-cache` is a degraded answer, not a fresh one, and a `warnings` ' +
+      'entry says what could not be reached while it was produced.',
     type: RatesSnapshotResponseDto,
   })
   @ApiErrorResponses(
@@ -40,9 +42,17 @@ export class RatesController {
     HttpStatus.INTERNAL_SERVER_ERROR,
   )
   async getRates(): Promise<RatesSnapshotResponseDto> {
-    const { snapshot, source } = await this.rates.getSnapshot();
+    const { snapshot, source, cacheDegraded } = await this.rates.getSnapshot();
+    const warnings = collectWarnings({ CACHE_UNAVAILABLE: cacheDegraded });
+    const answer = {
+      source,
+      fetchedAt: snapshot.fetchedAt,
+      rates: snapshot.rates,
+    };
 
-    return { source, fetchedAt: snapshot.fetchedAt, rates: snapshot.rates };
+    // Spread rather than assigned undefined: a healthy answer is exactly the
+    // one this route has always given, down to the absent key.
+    return warnings === undefined ? answer : { ...answer, warnings };
   }
 
   @Delete('cache')

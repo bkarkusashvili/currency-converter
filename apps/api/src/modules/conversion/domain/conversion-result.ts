@@ -1,3 +1,4 @@
+import { ResponseWarning } from '../../../common/warnings/response-warning';
 import { RatesSource } from '../../rates/domain/rates-source';
 import { ConversionStrategyName } from '../strategies/conversion-strategy-name';
 import { ConversionRequest } from './conversion-request';
@@ -15,4 +16,10 @@ export interface ConversionResult extends ConversionRequest {
   source: RatesSource;
   // fetchedAt of the snapshot the rate came from, ISO 8601.
   ratesTimestamp: string;
+  // What degraded while this conversion was answered, absent when nothing did.
+  // It belongs to the answer rather than to the conversion: a record of what
+  // was converted is the same record whether or not the cache was up while it
+  // happened, so `NewConversionRecord` does not carry it and the history never
+  // sees one.
+  warnings?: ResponseWarning[];
 }

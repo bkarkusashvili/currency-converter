@@ -85,6 +85,8 @@ Response `200`:
   Arithmetic uses `big.js`; floating point is never used for money.
 - `strategy`: `identity` | `direct` | `cross`.
 - `source`: `cache` | `provider` | `stale-cache`.
+- `warnings` is absent unless something degraded while the conversion was
+  answered — see **Warnings** below.
 
 ### GET `/api/v1/rates`
 
@@ -100,6 +102,8 @@ Returns the current snapshot the service would convert with:
   ]
 }
 ```
+
+`warnings` appears here on the same terms as on `/convert`.
 
 ### DELETE `/api/v1/rates/cache`
 
@@ -214,6 +218,39 @@ route with no limit at all is an amplifier pointed at both. Both routes are
 excluded from the versioned prefix, and a successful probe of either is dropped
 from the request log (§7); a failing one is not.
 
+### Warnings
+
+`POST /api/v1/convert` and `GET /api/v1/rates` can carry a `warnings` array
+beside their answer:
+
+```json
+{
+  "warnings": [
+    {
+      "code": "CACHE_UNAVAILABLE",
+      "message": "The rates cache could not be reached, so these rates were fetched from the upstream and could not be cached for the next request."
+    }
+  ]
+}
+```
+
+The request succeeded — that is what separates a warning from the error
+envelope below — and each entry says what degraded while it was being answered.
+The field is **absent, not empty**, when nothing did: it exists to be noticed,
+and a healthy response is byte for byte the one it has always been.
+
+| `code`                 | When                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CACHE_UNAVAILABLE`    | Redis could not be read from or written to while the request was answered, so the snapshot came from the upstream and was not cached — the next request pays again |
+| `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but its record was dropped or timed out, so it will not appear in `/history`                                      |
+
+`message` is a sentence safe to show to a user; a client switches on `code`.
+Both are the counterpart of the degradation model in §2: Redis being down and
+Mongo being down each cost something the client could not previously see, and a
+warning is where the answer says so. A cache that answered with an unreadable
+value is not `CACHE_UNAVAILABLE` — it was reached, the value is discarded and
+the request pays an upstream call, which is exactly what an expiry costs.
+
 ### Error envelope
 
 Every non-2xx response has this shape:
@@ -295,10 +332,12 @@ const RATES_PROVIDER = Symbol('RATES_PROVIDER');
 interface RatesProvider { fetchRates(): Promise<RatesSnapshot>; }
 
 const RATES_REPOSITORY = Symbol('RATES_REPOSITORY');
+interface CachedSnapshot { snapshot: RatesSnapshot | null; degraded: boolean; }
+
 interface RatesRepository {
-  getFresh(): Promise<RatesSnapshot | null>;
-  getStale(): Promise<RatesSnapshot | null>;
-  save(snapshot: RatesSnapshot): Promise<void>;
+  getFresh(): Promise<CachedSnapshot>;
+  getStale(): Promise<CachedSnapshot>;
+  save(snapshot: RatesSnapshot): Promise<{ degraded: boolean }>;
   clear(): Promise<void>;
 }
 ```
@@ -313,6 +352,8 @@ miss → single-flight:
         return { snapshot, source: 'provider' }
   catch stale = repo.getStale()
         stale ? { snapshot: stale, source: 'stale-cache' } : throw RatesUnavailableError
+
+every branch also carries cacheDegraded: whether any of those cache calls failed
 ```
 
 - Concurrent callers during a miss share one in-flight promise, cleared in a
@@ -321,8 +362,11 @@ miss → single-flight:
   decision — `upstream circuit open` or `upstream request failed` — and never
   the upstream's own message, which travels to the client in the envelope and
   carries the url, the status text and sometimes the body.
-- Every `RatesRepository` method catches Redis errors, logs a warning with the
-  operation name, and degrades (`null` on reads, no-op on writes).
+- The request-path methods catch Redis errors, log a warning with the operation
+  name, and degrade (no snapshot on reads, no-op on writes) — and report that
+  they did, because `null` alone cannot tell an expiry from an outage. That flag
+  travels on `RatesLookup.cacheDegraded` and becomes §3's `CACHE_UNAVAILABLE`
+  warning on the response.
 
 ### Redis keys
 
@@ -588,6 +632,7 @@ apps/api
 │   ├── app.module.ts
 │   ├── config/                  zod schema, typed AppConfig, ConfigModule setup
 │   ├── common/
+│   │   ├── warnings/            ResponseWarning, its DTO and collectWarnings — the §3 codes
 │   │   ├── currency/            CurrencyCode, Currency and the ISO 4217 table, read by the
 │   │   │                        Monobank mapper and the currencies projection alike
 │   │   ├── errors/              AppError, ErrorCode, concrete errors
@@ -667,8 +712,9 @@ by `src/common/filters/__tests__/global-exception.filter.spec.ts`.
 Conversion persists a `ConversionRecord` after a successful conversion. The
 write is awaited, so a client that reads `/history` straight after a conversion
 finds it there. It is not guarded again at the call site: `HistoryService.record`
-never rejects — a store that cannot take the record logs it and resolves — so a
-Mongo failure costs a log line and the response is still returned.
+never rejects — a store that cannot take the record logs it and resolves `false`
+— so a Mongo failure costs a log line, a `HISTORY_NOT_RECORDED` warning on the
+response (§3) and nothing else.
 
 Awaiting is only safe because nothing on that path waits for a database that is
 down, which is what the Mongo module is built for:

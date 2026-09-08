@@ -5,6 +5,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { API_KEY_HEADER } from '../../src/common/guards/api-key.constant';
 import { ADMIN_SECURITY_SCHEME } from '../../src/common/swagger/build-swagger-config';
+import { WARNING_CODES } from '../../src/common/warnings/response-warning';
 import { CONVERSION_STRATEGY_NAMES } from '../../src/modules/conversion/strategies/conversion-strategy-name';
 import { RATES_SOURCES } from '../../src/modules/rates/domain/rates-source';
 import { createE2eApp } from './create-e2e-app';
@@ -31,6 +32,7 @@ const EXPECTED_SCHEMAS: readonly string[] = [
   'CurrenciesResponseDto',
   'ConvertRequestDto',
   'ConvertResponseDto',
+  'ResponseWarningDto',
   'ConversionRecordDto',
   'HistoryResponseDto',
 ];
@@ -146,6 +148,32 @@ describe('OpenAPI document (e2e)', () => {
         source: { type: 'string', enum: [...RATES_SOURCES] },
       },
     });
+  });
+
+  // The codes are the contract a client switches on, so a warning added
+  // without reaching the document is a warning nothing can be written against.
+  it('enumerates the degradations a response can report', () => {
+    expect(document.components?.schemas?.ResponseWarningDto).toMatchObject({
+      properties: { code: { type: 'string', enum: [...WARNING_CODES] } },
+      required: ['code', 'message'],
+    });
+  });
+
+  it('describes the warnings as an optional array on both responses', () => {
+    for (const schema of ['ConvertResponseDto', 'RatesSnapshotResponseDto']) {
+      expect(document.components?.schemas?.[schema]).toMatchObject({
+        properties: {
+          warnings: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ResponseWarningDto' },
+          },
+        },
+      });
+      expect(
+        (document.components?.schemas?.[schema] as { required: string[] })
+          .required,
+      ).not.toContain('warnings');
+    }
   });
 
   it('declares every failure a conversion can answer with', () => {

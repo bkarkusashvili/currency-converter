@@ -4,10 +4,16 @@ import Redis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
 import type { TypedConfigService } from '../../../config/typed-config.service';
 import { REDIS_CLIENT } from '../../../infrastructure/redis/redis-client.token';
+import { CachedSnapshot, CacheWrite } from '../domain/cache-outcome';
 import { RatesRepository } from '../domain/rates-repository.port';
 import { RatesSnapshot } from '../domain/rates-snapshot';
 import { cachedRatesSnapshotSchema } from './cached-rates-snapshot.schema';
 import { RATES_CACHE_KEYS } from './rates-cache-keys';
+
+// A cache that answered, with nothing to answer with. Kept beside the degraded
+// case so the two ways of returning no snapshot are visibly different: this one
+// is an expiry, and nobody needs to be told about it.
+const MISS: CachedSnapshot = { snapshot: null, degraded: false };
 
 function parseJson(raw: string): unknown {
   try {
@@ -27,11 +33,11 @@ export class RedisRatesRepository implements RatesRepository {
     this.logger.setContext(RedisRatesRepository.name);
   }
 
-  getFresh(): Promise<RatesSnapshot | null> {
+  getFresh(): Promise<CachedSnapshot> {
     return this.read(RATES_CACHE_KEYS.fresh);
   }
 
-  getStale(): Promise<RatesSnapshot | null> {
+  getStale(): Promise<CachedSnapshot> {
     return this.read(RATES_CACHE_KEYS.stale);
   }
 
@@ -39,7 +45,7 @@ export class RedisRatesRepository implements RatesRepository {
   // but not atomicity, so another instance's two SETs could land between these
   // and leave the fallback holding an older snapshot than the fresh key it is
   // meant to back.
-  async save(snapshot: RatesSnapshot): Promise<void> {
+  async save(snapshot: RatesSnapshot): Promise<CacheWrite> {
     const value = JSON.stringify(snapshot);
 
     try {
@@ -70,10 +76,16 @@ export class RedisRatesRepository implements RatesRepository {
 
       if (failure) {
         this.degrade('save', failure);
+
+        return { degraded: true };
       }
     } catch (error) {
       this.degrade('save', error);
+
+      return { degraded: true };
     }
+
+    return { degraded: false };
   }
 
   async clear(): Promise<void> {
@@ -84,7 +96,7 @@ export class RedisRatesRepository implements RatesRepository {
     }
   }
 
-  private async read(key: string): Promise<RatesSnapshot | null> {
+  private async read(key: string): Promise<CachedSnapshot> {
     let raw: string | null;
 
     try {
@@ -92,22 +104,25 @@ export class RedisRatesRepository implements RatesRepository {
     } catch (error) {
       this.degrade(`read of ${key}`, error);
 
-      return null;
+      return { snapshot: null, degraded: true };
     }
 
     if (raw === null) {
-      return null;
+      return MISS;
     }
 
     const parsed = cachedRatesSnapshotSchema.safeParse(parseJson(raw));
 
+    // A cache that answered with something unreadable is not a cache that could
+    // not be reached: the value is discarded and the request pays an upstream
+    // call, which is exactly what an expiry costs.
     if (!parsed.success) {
       this.logger.warn(`Discarding a corrupt cache value at ${key}`);
 
-      return null;
+      return MISS;
     }
 
-    return parsed.data;
+    return { snapshot: parsed.data, degraded: false };
   }
 
   // Redis is a cache, not a hard dependency: a failure slows the next request

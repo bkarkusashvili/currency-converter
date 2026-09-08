@@ -4,6 +4,7 @@ import { CurrenciesController } from '../currencies.controller';
 
 const LOOKUP: RatesLookup = {
   source: 'cache',
+  cacheDegraded: false,
   snapshot: {
     fetchedAt: '2026-09-08T12:00:00.000Z',
     rates: [

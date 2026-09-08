@@ -6,6 +6,7 @@ import {
 } from '../../common/money/money-decimals';
 import { Money } from '../../common/money/money';
 import { roundHalfUp } from '../../common/money/round-half-up';
+import { collectWarnings } from '../../common/warnings/collect-warnings';
 import { HistoryService } from '../history/history.service';
 import { RatesService } from '../rates/application/rates.service';
 import { ConversionRequest } from './domain/conversion-request';
@@ -39,7 +40,7 @@ export class ConversionService {
     to,
     amount,
   }: ConversionRequest): Promise<ConversionResult> {
-    const { snapshot, source } = await this.rates.getSnapshot();
+    const { snapshot, source, cacheDegraded } = await this.rates.getSnapshot();
     const { strategy, rate } = this.resolver.resolve(from, to, snapshot.rates);
     const result = roundHalfUp(new Money(amount).times(rate), RESULT_DECIMALS);
 
@@ -66,9 +67,18 @@ export class ConversionService {
     // it there. Nothing is caught here: HistoryService.record never rejects —
     // that is the promise it exists to keep, because the conversion is the
     // answer and the record is a side effect of it (§2) — and a second guard
-    // over it would only be a branch no test can reach honestly.
-    await this.history.record(answer);
+    // over it would only be a branch no test can reach honestly. It does report
+    // whether the record landed, which is the one thing the client cannot see
+    // for itself: /history will not have this conversion in it.
+    const recorded = await this.history.record(answer);
 
-    return answer;
+    const warnings = collectWarnings({
+      CACHE_UNAVAILABLE: cacheDegraded,
+      HISTORY_NOT_RECORDED: !recorded,
+    });
+
+    // Spread rather than assigned undefined: an answer nothing degraded is
+    // exactly the one this route has always given, down to the absent key.
+    return warnings === undefined ? answer : { ...answer, warnings };
   }
 }

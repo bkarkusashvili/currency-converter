@@ -45,11 +45,11 @@ export class MongoHistoryRepository implements HistoryRepository {
   // server that answers slowly is never disconnected at all. Past the deadline
   // this is the same outage as a connection that is down, reported the same
   // once-per-outage way rather than once per conversion.
-  async record(entry: NewConversionRecord): Promise<void> {
+  async record(entry: NewConversionRecord): Promise<boolean> {
     if (!this.isConnected()) {
       this.reportDroppedRecords();
 
-      return;
+      return false;
     }
 
     try {
@@ -64,10 +64,15 @@ export class MongoHistoryRepository implements HistoryRepository {
         );
       }
 
-      return;
+      return false;
     }
 
     this.reportRecordsResumed();
+
+    // A deadline that expired stops the wait without cancelling the write, so
+    // `false` means "not recorded as far as this request could tell" rather
+    // than "certainly not stored": a dropped record can still land afterwards.
+    return true;
   }
 
   // The read has the opposite contract: /history has nothing to answer with, so

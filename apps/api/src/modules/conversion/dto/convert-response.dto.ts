@@ -1,4 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ResponseWarningDto } from '../../../common/warnings/response-warning.dto';
 import { RATES_SOURCES } from '../../rates/domain/rates-source';
 import type { RatesSource } from '../../rates/domain/rates-source';
 import { ConversionResult } from '../domain/conversion-result';
@@ -71,4 +72,21 @@ export class ConvertResponseDto implements ConversionResult {
     example: '2026-09-08T12:00:00.000Z',
   })
   ratesTimestamp!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'What degraded while this request was answered. Absent when nothing ' +
+      'did: the request succeeded either way, and this is what the client ' +
+      'should know about how the answer was produced.',
+    type: [ResponseWarningDto],
+    example: [
+      {
+        code: 'CACHE_UNAVAILABLE',
+        message:
+          'The rates cache could not be reached, so these rates were fetched ' +
+          'from the upstream and could not be cached for the next request.',
+      },
+    ],
+  })
+  warnings?: ResponseWarningDto[];
 }

@@ -18,6 +18,7 @@ const FETCHED_AT = '2026-09-08T12:00:00.000Z';
 
 const LOOKUP: RatesLookup = {
   source: 'cache',
+  cacheDegraded: false,
   snapshot: { fetchedAt: FETCHED_AT, rates: [...RATES] },
 };
 
@@ -42,7 +43,7 @@ describe('ConversionService', () => {
   // asserting on the stub.
   beforeEach(() => {
     rates = { getSnapshot: jest.fn().mockResolvedValue(LOOKUP) };
-    history = { record: jest.fn().mockResolvedValue(undefined) };
+    history = { record: jest.fn().mockResolvedValue(true) };
     logger = createFakePinoLogger();
     service = new ConversionService(
       rates as unknown as RatesService,
@@ -68,6 +69,75 @@ describe('ConversionService', () => {
       strategy: 'direct',
       source: 'cache',
       ratesTimestamp: FETCHED_AT,
+    });
+  });
+
+  // §3: absent unless something degraded, so the answer a healthy request gets
+  // is the one it has always got.
+  it('carries no warnings field when nothing degraded', async () => {
+    const answer = await service.convert({
+      from: 'USD',
+      to: 'UAH',
+      amount: 100,
+    });
+
+    expect(answer).not.toHaveProperty('warnings');
+  });
+
+  describe('what it reports about the answer it produced', () => {
+    it('warns that the rates cache could not be reached', async () => {
+      rates.getSnapshot.mockResolvedValue({ ...LOOKUP, cacheDegraded: true });
+
+      await expect(
+        service.convert({ from: 'USD', to: 'UAH', amount: 1 }),
+      ).resolves.toMatchObject({
+        warnings: [
+          { code: 'CACHE_UNAVAILABLE', message: expect.any(String) as string },
+        ],
+      });
+    });
+
+    // The conversion is answered whatever the store did, and this is the part
+    // of that the client cannot see for itself: /history will not have it.
+    it('warns that the conversion was not recorded', async () => {
+      history.record.mockResolvedValue(false);
+
+      await expect(
+        service.convert({ from: 'USD', to: 'UAH', amount: 1 }),
+      ).resolves.toMatchObject({
+        warnings: [{ code: 'HISTORY_NOT_RECORDED' }],
+      });
+    });
+
+    it('reports both degradations of one conversion', async () => {
+      rates.getSnapshot.mockResolvedValue({ ...LOOKUP, cacheDegraded: true });
+      history.record.mockResolvedValue(false);
+
+      const answer = await service.convert({
+        from: 'USD',
+        to: 'UAH',
+        amount: 1,
+      });
+
+      expect(answer.warnings?.map((warning) => warning.code)).toStrictEqual([
+        'CACHE_UNAVAILABLE',
+        'HISTORY_NOT_RECORDED',
+      ]);
+    });
+
+    // The record is what happened, not what the request cost: a stored
+    // conversion carrying a warning about the cache would be a record of the
+    // outage rather than of the conversion.
+    it('keeps the warnings out of the record it stores', async () => {
+      rates.getSnapshot.mockResolvedValue({ ...LOOKUP, cacheDegraded: true });
+
+      await service.convert({ from: 'USD', to: 'UAH', amount: 1 });
+
+      const [recorded] = history.record.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
+
+      expect(recorded).not.toHaveProperty('warnings');
     });
   });
 

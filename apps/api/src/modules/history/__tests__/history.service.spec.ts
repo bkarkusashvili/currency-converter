@@ -40,7 +40,7 @@ describe('HistoryService', () => {
 
   beforeEach(() => {
     repository = {
-      record: jest.fn().mockResolvedValue(undefined),
+      record: jest.fn().mockResolvedValue(true),
       findRecent: jest.fn().mockResolvedValue([RECORD]),
     };
     logger = createFakePinoLogger();
@@ -49,9 +49,17 @@ describe('HistoryService', () => {
 
   describe('record', () => {
     it('stores the conversion as it was answered', async () => {
-      await service.record(RESULT);
+      await expect(service.record(RESULT)).resolves.toBe(true);
 
       expect(repository.record).toHaveBeenCalledWith(RESULT);
+    });
+
+    // The conversion is answered either way, and whether it can be read back
+    // from /history is what the caller turns into the documented warning.
+    it('reports a record the store dropped', async () => {
+      repository.record.mockResolvedValue(false);
+
+      await expect(service.record(RESULT)).resolves.toBe(false);
     });
 
     // The conversion is the answer and the record is a side effect of it: a
@@ -60,7 +68,7 @@ describe('HistoryService', () => {
     it('resolves even when the repository rejects', async () => {
       repository.record.mockRejectedValue(new Error('write concern failed'));
 
-      await expect(service.record(RESULT)).resolves.toBeUndefined();
+      await expect(service.record(RESULT)).resolves.toBe(false);
     });
 
     it('reports the write that escaped, with the reason', async () => {

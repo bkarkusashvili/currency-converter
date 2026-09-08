@@ -41,7 +41,9 @@ npm run start:dev
 `source` is worth reading: `stale-cache` is a `200` served from the fallback key
 because the upstream could not be reached, so the rates are older than the cache
 TTL. When the upstream fails and no fallback exists, `/rates` and `/currencies`
-answer `503 RATES_UNAVAILABLE`.
+answer `503 RATES_UNAVAILABLE`. Redis being down is not a failure at all: the
+rates come from the upstream and the answer carries a `CACHE_UNAVAILABLE`
+warning saying what that cost (see **Warnings** below).
 
 Monobank allows one request per minute. A cache miss is de-duplicated, so a
 burst of concurrent callers produces one upstream call rather than one each, and
@@ -86,6 +88,33 @@ the zero.
 A pair the current snapshot cannot price answers `422`: `UNSUPPORTED_CURRENCY`
 when a code is not in the snapshot at all, `RATE_NOT_AVAILABLE` when both codes
 are quoted and there is no path between them.
+
+### Warnings
+
+`/convert` and `/rates` add a `warnings` array when something degraded while
+the request was answered — and nothing at all when it did not, so a healthy
+response is exactly the one above:
+
+```json
+{
+  "result": 4435,
+  "source": "provider",
+  "warnings": [
+    {
+      "code": "CACHE_UNAVAILABLE",
+      "message": "The rates cache could not be reached, so these rates were fetched from the upstream and could not be cached for the next request."
+    }
+  ]
+}
+```
+
+| `code` | What it means |
+| ------ | ------------- |
+| `CACHE_UNAVAILABLE` | Redis could not be read or written, so these rates came from the upstream and were not cached; the next request pays again |
+| `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but not stored, so it will not appear in `/history` |
+
+The request succeeded either way — a warning is not an error, and the answer is
+the answer. `message` is safe to show to a user; a client switches on `code`.
 
 ## History
 

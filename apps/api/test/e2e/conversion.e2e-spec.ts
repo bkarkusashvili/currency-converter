@@ -31,13 +31,7 @@ describe('conversion (e2e)', () => {
   let redis: FakeRedisClient;
   let provider: ProviderStub;
 
-  // A fresh app per test: the cache and the upstream stub are both state that
-  // outlives a request, and the degraded cases are about what the second one
-  // does.
-  beforeEach(async () => {
-    redis = new FakeRedisClient();
-    provider = { fetchRates: jest.fn().mockResolvedValue(RATES_SNAPSHOT) };
-
+  async function boot(): Promise<void> {
     app = await createE2eApp(
       { imports: [AppModule] },
       {
@@ -50,6 +44,16 @@ describe('conversion (e2e)', () => {
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;
+  }
+
+  // A fresh app per test: the cache and the upstream stub are both state that
+  // outlives a request, and the degraded cases are about what the second one
+  // does.
+  beforeEach(async () => {
+    redis = new FakeRedisClient();
+    provider = { fetchRates: jest.fn().mockResolvedValue(RATES_SNAPSHOT) };
+
+    await boot();
   });
 
   afterEach(async () => {
@@ -302,6 +306,37 @@ describe('conversion (e2e)', () => {
         statusCode: 422,
         code: ErrorCode.RATE_NOT_AVAILABLE,
         details: { from: 'CHF', to: 'PLN' },
+      });
+    });
+  });
+
+  // The cache being down slows a conversion, it does not fail one — and until
+  // now the only place that was said was the log.
+  describe('when the cache cannot be reached', () => {
+    beforeEach(async () => {
+      await app.close();
+      redis = new FakeRedisClient({ unreachable: true });
+
+      await boot();
+    });
+
+    it('prices the conversion from the upstream and warns', async () => {
+      const response = await convert({
+        from: 'USD',
+        to: 'UAH',
+        amount: 100,
+      }).expect(200);
+
+      expect(response.body).toMatchObject({
+        result: 4435,
+        rate: 44.35,
+        source: 'provider',
+        warnings: [
+          {
+            code: 'CACHE_UNAVAILABLE',
+            message: expect.any(String) as string,
+          },
+        ],
       });
     });
   });
