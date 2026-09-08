@@ -90,7 +90,7 @@ function HistoryEmpty() {
 
   return (
     <div className="px-4 py-12 text-center">
-      <EmptyMark className="text-line-strong mx-auto h-8 w-8" />
+      <EmptyMark className="text-faint mx-auto h-8 w-8" />
       <p className="mt-4 font-semibold">{t('converter.history.emptyHeading')}</p>
       <p className="text-muted mx-auto mt-1.5 max-w-sm text-sm text-pretty">
         {t('converter.history.empty', { count: HISTORY_LIMIT })}
