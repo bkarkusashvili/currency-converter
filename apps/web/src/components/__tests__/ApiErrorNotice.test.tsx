@@ -61,5 +61,25 @@ describe('ApiErrorNotice', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('wat');
     expect(screen.getByRole('alert')).toHaveTextContent('nothing owns that');
     expect(screen.getByRole('alert')).toHaveTextContent('orphan');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The messages below say what needs fixing.',
+    );
+  });
+
+  it('drops the lead-in when every message was routed onto an input', () => {
+    renderWithProviders(
+      <ApiErrorNotice
+        error={
+          new ApiError({
+            statusCode: 400,
+            code: 'VALIDATION_ERROR',
+            message: 'Request validation failed',
+          })
+        }
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('The request did not pass validation.');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('The messages below');
   });
 });

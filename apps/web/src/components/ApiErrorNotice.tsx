@@ -16,7 +16,11 @@ export function ApiErrorNotice({ error, fieldErrors = [] }: ApiErrorNoticeProps)
 
   return (
     <div role="alert" className="rounded-card border-danger/30 bg-danger-soft border p-4 sm:p-5">
-      <p className="text-danger font-semibold">{message}</p>
+      <p className="text-danger font-semibold">
+        {message}
+        {/* The lead-in only makes sense when messages actually follow it. */}
+        {fieldErrors.length > 0 && ` ${t('errors.fieldErrorsLead')}`}
+      </p>
 
       {fieldErrors.length > 0 && (
         <ul className="text-ink mt-3 space-y-1 text-sm">

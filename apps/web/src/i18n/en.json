@@ -221,8 +221,9 @@
   },
   "errors": {
     "requestId": "request {{id}}",
+    "fieldErrorsLead": "The messages below say what needs fixing.",
     "codes": {
-      "VALIDATION_ERROR": "The request did not pass validation. The messages below say what needs fixing.",
+      "VALIDATION_ERROR": "The request did not pass validation.",
       "UNAUTHORIZED": "This request needs an admin API key.",
       "NOT_FOUND": "The API does not have that endpoint.",
       "UNSUPPORTED_CURRENCY": "That currency is not in the current rate snapshot.",
