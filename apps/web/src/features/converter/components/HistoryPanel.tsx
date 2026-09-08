@@ -1,35 +1,36 @@
-import { useHistory } from '../../api/useHistory';
-import type { HistoryItem } from '../../api/types';
-import { formatMoney, formatRate, formatTime } from '../../lib/format';
+import { useTranslation } from 'react-i18next';
+import { useHistory } from '../../../api/hooks/useHistory';
+import type { HistoryItem } from '../../../api/types';
+import { Timestamp } from '../../../components/Timestamp';
+import { useFormatters } from '../../../lib/useFormatters';
 
 export const HISTORY_LIMIT = 10;
 
-export function HistoryPanel({ limit = HISTORY_LIMIT }: { limit?: number }) {
-  const { data, isPending, error } = useHistory(limit);
+export function HistoryPanel() {
+  const { t } = useTranslation();
+  const { data, isPending, error } = useHistory(HISTORY_LIMIT);
 
   return (
     <section aria-labelledby="history-heading" className="mt-12">
       <div className="border-line flex items-baseline justify-between gap-4 border-b pb-3">
         <h2 id="history-heading" className="text-base">
-          Recent conversions
+          {t('converter.history.heading')}
         </h2>
-        <p className="eyebrow">Last {limit}</p>
+        <p className="eyebrow">{t('converter.history.limit', { count: HISTORY_LIMIT })}</p>
       </div>
 
       {isPending && <HistorySkeleton />}
 
       {error !== null && (
         <div className="py-6">
-          <p className="text-muted text-sm">
-            Recent conversions are unavailable. Converting still works.
-          </p>
+          <p className="text-muted text-sm">{t('converter.history.unavailable')}</p>
           <p className="text-faint mt-1 font-mono text-xs">{error.message}</p>
         </div>
       )}
 
       {data !== undefined && data.items.length === 0 && (
         <p className="text-muted py-6 text-sm">
-          No conversions yet. The last {limit} will be listed here.
+          {t('converter.history.empty', { count: HISTORY_LIMIT })}
         </p>
       )}
 
@@ -45,17 +46,24 @@ export function HistoryPanel({ limit = HISTORY_LIMIT }: { limit?: number }) {
 }
 
 function HistoryRow({ item }: { item: HistoryItem }) {
+  const { t } = useTranslation();
+  const formatters = useFormatters();
+
   return (
     <li className="border-line grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-1 border-b py-3">
       <span className="numeric font-mono text-sm">
-        {formatMoney(item.amount)} {item.from} <span className="text-faint">→</span>{' '}
+        {formatters.money(item.amount)} {item.from} <span className="text-faint">→</span>{' '}
         <span className="font-semibold">
-          {formatMoney(item.result)} {item.to}
+          {formatters.money(item.result)} {item.to}
         </span>
       </span>
-      <span className="text-faint numeric font-mono text-xs">{formatTime(item.createdAt)}</span>
+      <Timestamp value={item.createdAt} className="text-faint numeric font-mono text-xs" />
       <span className="text-muted numeric font-mono text-xs">
-        1 {item.from} = {formatRate(item.rate)} {item.to}
+        {t('converter.history.rate', {
+          from: item.from,
+          rate: formatters.rate(item.rate),
+          to: item.to,
+        })}
       </span>
       <span className="text-faint font-mono text-[0.625rem] tracking-[0.1em] uppercase">
         {item.strategy}

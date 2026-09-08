@@ -1,8 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router';
 import { AppFooter } from './components/AppFooter';
 import { AppHeader } from './components/AppHeader';
-import { AboutPage } from './features/about/AboutPage';
-import { ConverterPage } from './features/converter/ConverterPage';
+import { AboutPage } from './features/about/components/AboutPage';
+import { ConverterPage } from './features/converter/components/ConverterPage';
 
 export function App() {
   return (

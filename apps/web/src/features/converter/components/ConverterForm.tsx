@@ -1,12 +1,15 @@
-import type { ApiError } from '../../api/errors';
-import type { ConvertRequest, Currency } from '../../api/types';
+import { useTranslation } from 'react-i18next';
+import type { ApiError } from '../../../api/http/ApiError';
+import type { ConvertRequest, Currency } from '../../../api/types';
+import { useConverterForm } from '../hooks/useConverterForm';
+import type { FormFieldErrors } from '../lib/serverFieldErrors';
 import { CurrencySelect } from './CurrencySelect';
 import { SwapButton } from './SwapButton';
-import { useConverterForm } from './useConverterForm';
 
 interface ConverterFormProps {
   currencies: Currency[];
   currenciesError: ApiError | null;
+  serverErrors: FormFieldErrors;
   isSubmitting: boolean;
   onSubmit: (request: ConvertRequest) => void;
 }
@@ -14,16 +17,18 @@ interface ConverterFormProps {
 export function ConverterForm({
   currencies,
   currenciesError,
+  serverErrors,
   isSubmitting,
   onSubmit,
 }: ConverterFormProps) {
-  const form = useConverterForm(onSubmit);
+  const { t } = useTranslation();
+  const form = useConverterForm({ serverErrors, onSubmit });
 
   return (
     <form className="card p-5 sm:p-7" onSubmit={form.handleSubmit} noValidate>
       <div>
         <label className="field-label" htmlFor="amount">
-          Amount
+          {t('converter.form.amount')}
         </label>
         <input
           id="amount"
@@ -32,15 +37,15 @@ export function ConverterForm({
           inputMode="decimal"
           autoComplete="off"
           value={form.amount}
-          aria-invalid={form.amountError !== null}
-          aria-describedby={form.amountError === null ? undefined : 'amount-error'}
+          aria-invalid={form.errors.amount !== null}
+          aria-describedby={form.errors.amount === null ? undefined : 'amount-error'}
           onChange={(event) => {
             form.setAmount(event.target.value);
           }}
         />
-        {form.amountError !== null && (
+        {form.errors.amount !== null && (
           <p id="amount-error" role="alert" className="text-danger mt-2 text-sm">
-            {form.amountError}
+            {form.errors.amount}
           </p>
         )}
       </div>
@@ -49,9 +54,10 @@ export function ConverterForm({
         <div className="sm:flex-1">
           <CurrencySelect
             id="from"
-            label="From"
+            label={t('converter.form.from')}
             value={form.from}
             currencies={currencies}
+            error={form.errors.from}
             onChange={form.setFrom}
           />
         </div>
@@ -59,9 +65,10 @@ export function ConverterForm({
         <div className="sm:flex-1">
           <CurrencySelect
             id="to"
-            label="To"
+            label={t('converter.form.to')}
             value={form.to}
             currencies={currencies}
+            error={form.errors.to}
             onChange={form.setTo}
           />
         </div>
@@ -69,8 +76,7 @@ export function ConverterForm({
 
       {currenciesError !== null && (
         <p className="text-muted mt-3 text-sm">
-          The currency list did not load ({currenciesError.message}) — the two defaults are still
-          available.
+          {t('converter.form.currenciesUnavailable', { message: currenciesError.message })}
         </p>
       )}
 
@@ -80,7 +86,7 @@ export function ConverterForm({
         disabled={isSubmitting}
         aria-busy={isSubmitting}
       >
-        {isSubmitting ? 'Converting…' : 'Convert'}
+        {isSubmitting ? t('converter.form.submitting') : t('converter.form.submit')}
       </button>
     </form>
   );

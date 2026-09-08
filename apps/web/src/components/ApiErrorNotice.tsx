@@ -1,11 +1,22 @@
-import { extractFieldErrors, type ApiError } from '../api/errors';
+import { useTranslation } from 'react-i18next';
+import type { ApiError } from '../api/http/ApiError';
+import type { FieldError } from '../api/http/fieldErrors';
+import { errorMessageKey } from '../i18n/errorMessageKey';
 
-export function ApiErrorNotice({ error }: { error: ApiError }) {
-  const fieldErrors = extractFieldErrors(error);
+interface ApiErrorNoticeProps {
+  error: ApiError;
+  /** Field errors the form could not place on an input; the rest are shown here. */
+  fieldErrors?: FieldError[];
+}
+
+export function ApiErrorNotice({ error, fieldErrors = [] }: ApiErrorNoticeProps) {
+  const { t } = useTranslation();
+  const key = errorMessageKey(error.code);
+  const message = key === null ? error.message : t(key, { replace: error.details });
 
   return (
     <div role="alert" className="rounded-card border-danger/30 bg-danger-soft border p-4 sm:p-5">
-      <p className="text-danger font-semibold">{error.message}</p>
+      <p className="text-danger font-semibold">{message}</p>
 
       {fieldErrors.length > 0 && (
         <ul className="text-ink mt-3 space-y-1 text-sm">
@@ -24,7 +35,7 @@ export function ApiErrorNotice({ error }: { error: ApiError }) {
 
       <p className="eyebrow mt-3">
         {error.code}
-        {error.requestId !== undefined && ` · request ${error.requestId}`}
+        {error.requestId !== undefined && ` · ${t('errors.requestId', { id: error.requestId })}`}
       </p>
     </div>
   );
