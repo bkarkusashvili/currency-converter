@@ -1,4 +1,4 @@
-import type { AmountSeparators } from '../features/converter/lib/formatAmountInput';
+import type { AmountSeparators } from '../features/converter/lib/amount/formatAmountInput';
 
 /** §3 publishes an effective rate to six places; a rate never needs more. */
 const RATE_DECIMALS = 6;

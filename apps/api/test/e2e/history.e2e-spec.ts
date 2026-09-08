@@ -5,7 +5,7 @@ import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
 import { FakeRedisClient } from '../../src/infrastructure/redis/__tests__/fake-redis-client';
 import { InMemoryHistoryRepository } from '../../src/modules/history/__tests__/in-memory-history.repository';
-import { RATES_PROVIDER } from '../../src/modules/rates/domain/rates-provider.token';
+import { RATES_PROVIDER } from '../../src/modules/rates/domain/ports';
 import { createE2eApp } from './create-e2e-app';
 import { RATES_SNAPSHOT } from './fixtures/rates-snapshot';
 import { overrideHistory } from './override-history';

@@ -506,6 +506,8 @@ apps/
 │   │                   infrastructure (redis, mongo), modules (rates,
 │   │                   currencies, conversion, history, health)
 │   ├── test/e2e/       supertest suites over the real HTTP surface
+│   ├── test/integration/  the Redis and Mongo adapters against real servers,
+│   │                   skipped unless INTEGRATION_*_URL is set
 │   ├── Dockerfile      multi-stage, prod deps only, runs as `node`
 │   └── railway.json
 └── web/                React 19 + Vite + TypeScript, own package + lockfile
@@ -516,6 +518,9 @@ apps/
     ├── Dockerfile      node build stage, nginx runtime
     └── railway.json
 docs/architecture.md    the design contract
+docs/openapi.json       the published API contract, generated (`openapi:write`)
+fixtures/               the rates snapshot and golden conversions both suites price against
+scripts/check-fixtures.mjs  validates and re-prices them; `npm run check:fixtures`
 package.json            root scripts + `concurrently`; not a workspace
 docker-compose.yml      api, web, redis, mongo
 docker-compose.dev.yml  overlay: backing services only, published on loopback
@@ -524,15 +529,16 @@ docker-compose.dev.yml  overlay: backing services only, published on loopback
 
 ## Testing
 
-Three suites, all green on this commit:
+Four suites, all green on this commit:
 
-| Suite    | Command                             | Result                    | Coverage                                                                 | Gate                       |
-| -------- | ----------------------------------- | ------------------------- | ------------------------------------------------------------------------ | -------------------------- |
-| API unit | `apps/api: npm run test:cov`        | 74 suites, **661** tests  | stmts 98.24% · branches 88.78% · funcs 98.93% · lines 98.14%              | 85% lines + branches       |
-| API e2e  | `apps/api: npm run test:e2e`        | 7 suites, **117** tests   | not instrumented — see below                                             | none                       |
-| Web      | `apps/web: npm run test:coverage`   | 29 files, **220** tests   | stmts 99.16% (596/601) · branches 96.65% (434/449) · funcs 100% (191/191) · lines 99.15% | 90% on all four            |
+| Suite           | Command                                  | Result                    | Coverage                                                                 | Gate                       |
+| --------------- | ---------------------------------------- | ------------------------- | ------------------------------------------------------------------------ | -------------------------- |
+| API unit        | `apps/api: npm run test:cov`             | 65 suites, **661** tests  | stmts 98.13% · branches 88.78% · funcs 98.40% · lines 98.02%              | 85% lines + branches       |
+| API e2e         | `apps/api: npm run test:e2e`             | 8 suites, **124** tests   | not instrumented — see below                                             | none                       |
+| API integration | `apps/api: npm run test:integration`     | 2 suites, **12** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
+| Web             | `apps/web: npm run test:coverage`        | 27 files, **234** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
 
-**998 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
+**1031 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
 `npm run typecheck`, `npm run format:check` and `npm run build` run the same
 checks across both apps and let both report, so a failure in one does not hide
 the other. Coverage gates and the e2e suite stay per-app.
@@ -554,13 +560,53 @@ history repository for in-process fakes, and the environment points every URL at
 a dead host, so a suite that forgets an override fails instead of passing
 against whatever happens to be running.
 
+**The integration suite is the deliberate exception**, and the reason it exists:
+every other test of the Redis and Mongo adapters runs against a hand-written
+fake, which can only confirm the assumption its author had about the driver.
+`npm run test:integration` runs the same two adapters against real servers — the
+TTLs both cache keys are actually written with, the index Mongo actually holds,
+the order the page actually comes back in. It runs only when
+`INTEGRATION_REDIS_URL` and `INTEGRATION_MONGO_URL` point at one, and otherwise
+prints a line per suite naming the variable that would have run it — Jest says
+nothing about a file whose every suite is skipped, so the gap has to say so
+itself:
+
+```text
+SKIPPED: RedisRatesRepository against a real Redis — set INTEGRATION_REDIS_URL to run it against a real service
+```
+
+Under `CI` a missing variable is an error rather than a skip: the
+`orchestration` job starts both services and points the suite at them, so
+dropping that has to go red rather than quietly stop testing the drivers.
+
+```bash
+npm run infra:up                      # redis + mongo on the loopback
+INTEGRATION_REDIS_URL=redis://127.0.0.1:6379 \
+INTEGRATION_MONGO_URL=mongodb://127.0.0.1:27017/currency_converter_integration \
+  npm --prefix apps/api run test:integration
+```
+
+**Two implementations of §5, one set of numbers.** The browser's offline
+estimate re-prices a conversion with the same rules the API applies, and each
+side used to carry its own copy of the rates table — which had drifted on two of
+the five pairs. Both now read `fixtures/rates-snapshot.json` and assert every
+row of `fixtures/golden-conversions.json`, twelve vectors computed once by hand
+from the §5 rules. `npm run check:fixtures` validates both files,
+cross-references every vector's currencies against the snapshot, and re-prices
+all twelve from it in exact integer arithmetic — a third derivation of §5, so a
+slip in the hand-computed table is caught rather than agreed with by both
+suites.
+
 CI runs three jobs on every pull request. `api` and `web` each do lint, format
 check, typecheck, build, unit tests with coverage, `npm audit` and a
-`docker build` of the image; the API job also runs the e2e suite.
-`orchestration` validates what belongs to neither app — the root lockfile, both
-Compose files (`config -q` on the base and on the base plus overlay), both
-`railway.json` files — and then boots the whole stack with
-`docker compose up --build -d --wait` and probes `/health/live` and `/health`.
+`docker build` of the image; the API job also runs the e2e suite, which includes
+the check that `docs/openapi.json` still matches what the decorators generate.
+`orchestration` validates what belongs to neither app — the shared fixtures, the
+root lockfile, both Compose files (`config -q` on the base and on the base plus
+overlay), both `railway.json` files — then boots the whole stack with the dev
+overlay layered on (so Redis and Mongo publish on the loopback), probes
+`/health/live` and `/health`, and runs the integration suite against the
+services it just started.
 
 ## Deployment
 
@@ -620,8 +666,8 @@ test name, or a live URL; every row was re-verified against this commit.
 | ------ | -------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1a     | Node.js backend exposing a conversion endpoint | met | `apps/api/src/main.ts`, `apps/api/src/modules/conversion/conversion.controller.ts`. Node 24 pinned (`.nvmrc`, `engines.node>=24`). Live: `POST /api/v1/convert` → `200`                                                       |
 | 1b     | NestJS and TypeScript      | met    | `apps/api/package.json` (`@nestjs/*` 11), `apps/api/tsconfig.json` strict; `npm run typecheck` exits 0 with `typescript-eslint` `no-unsafe-*` on and `--max-warnings 0`                                                                  |
-| 1c-i   | Repository pattern         | met    | Ports `modules/rates/domain/rates-repository.port.ts`, `modules/history/domain/history-repository.port.ts`; adapters `modules/rates/infrastructure/redis-rates.repository.ts`, `modules/history/infrastructure/mongo-history.repository.ts`. Bound by token; no service imports an adapter |
-| 1c-ii  | Dependency injection       | met    | Tokens `RATES_PROVIDER`, `RATES_REPOSITORY`, `HISTORY_REPOSITORY`, `CONVERSION_STRATEGIES`, `HEALTH_INDICATORS`, `MONOBANK_CIRCUIT_BREAKER`, `REDIS_CLIENT`. Every unit spec substitutes a fake through the same token the runtime uses |
+| 1c-i   | Repository pattern         | met    | Ports `modules/rates/domain/ports.ts` (`RatesRepository`), `modules/history/domain/history-repository.port.ts`; adapters `modules/rates/infrastructure/redis-rates.repository.ts`, `modules/history/infrastructure/mongo-history.repository.ts`. Bound by token; no service imports an adapter |
+| 1c-ii  | Dependency injection       | met    | Tokens `RATES_PROVIDER`, `RATES_REPOSITORY`, `HISTORY_REPOSITORY`, `CONVERSION_STRATEGIES`, `HEALTH_INDICATORS`, `MONOBANK_CIRCUIT_BREAKER`, `REDIS_CLIENT`, each declared in the file that declares the contract it injects. Every unit spec substitutes a fake through the same token the runtime uses |
 | 1c-iii | Strategy pattern           | met    | `modules/conversion/strategies/` — `conversion-strategy.ts`, `identity`, `direct-pair`, `cross-rate`, `conversion-strategy.resolver.ts`; order declared in `conversion.module.ts`. Tests: “takes the first strategy that prices the pair”, “falls through the ones that decline”, “fails when no registered strategy prices the pair”, “resolves the chain in the order §5 gives it” |
 
 ### 2. POST conversion route
@@ -644,7 +690,7 @@ test name, or a live URL; every row was re-verified against this commit.
 
 | #  | Requirement                     | Status | Evidence                                                                                                                             |
 | -- | ------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 4a | Cache rates for a set duration  | met    | `redis-rates.repository.ts` `save()` writes `rates:latest` with `EX RATES_CACHE_TTL_SECONDS`. Tests: “writes both keys with the configured expiries”, “answers the second call from the cache without calling out again” |
+| 4a | Cache rates for a set duration  | met    | `redis-rates.repository.ts` `save()` writes `rates:latest` with `EX RATES_CACHE_TTL_SECONDS`. Tests: “writes both keys with the configured expiries”, “answers the second call from the cache without calling out again”, and against a real Redis “writes both keys with their TTLs” (`test/integration/`) |
 | 4b | Use Redis                       | met    | `infrastructure/redis/create-redis-client.ts` (ioredis), `redis.module.ts`, `redis-connection.ts`; `docker-compose.yml` `redis:7.4-alpine`; managed Redis on Railway. Live: `/health` → `"redis":{"status":"up"}` |
 | 4c | Configurable expiry             | met    | `RATES_CACHE_TTL_SECONDS` (300) and `RATES_STALE_TTL_SECONDS` (86400) in `env.schema.ts`, both in the table above and in `.env.example` |
 | 4d | Cache-aside pattern             | met    | `rates.service.ts` `getSnapshot()`: `getFresh()` → miss → `fetchRates()` → `save()`. Tests: “answers from the cache without reaching the upstream”, “fetches, caches and reports the provider as the source”, “serves concurrent callers from one upstream call” (single-flight) |
@@ -656,7 +702,7 @@ test name, or a live URL; every row was re-verified against this commit.
 | -- | ---------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | 5a | Use the fetched rates              | met    | `conversion.service.ts` reads one snapshot via `RatesService`, so two legs cannot straddle a cache expiry. Test: “prices the whole conversion from one snapshot”. The response carries `source` and `ratesTimestamp` |
 | 5b | Convert source → target            | met    | `conversion.service.ts` + `common/money/money.ts` (`big.js`, DP 30) + `round-half-up.ts`. Tests: “rounds the money half-up to two decimals”, “computes the result from the unrounded rate”, “rounds a tie up rather than to the nearest float”. No float arithmetic on money |
-| 5c | Cross-currency conversion via UAH  | met    | `strategies/cross-rate.strategy.ts` + `directional-rate.ts`, hub `domain/base-currency.ts`. Tests: “composes the leg into the base currency with the leg out of it”, “is not the reciprocal of itself across a spread”, “crosses two currencies that only share the hryvnia”, “takes the published pair over the path through the hryvnia”. Live: EUR→GBP → `"strategy":"cross"` |
+| 5c | Cross-currency conversion via UAH  | met    | `strategies/cross-rate.strategy.ts` + `directional-rate.ts`, hub `BASE_CURRENCY` in `domain/exchange-rate.ts`. Tests: “composes the leg into the base currency with the leg out of it”, “is not the reciprocal of itself across a spread”, “crosses two currencies that only share the hryvnia”, “takes the published pair over the path through the hryvnia”. Live: EUR→GBP → `"strategy":"cross"` |
 
 ### 6. Error handling
 
@@ -664,7 +710,7 @@ test name, or a live URL; every row was re-verified against this commit.
 | -- | ------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
 | 6a | Graceful, informative responses      | met    | One envelope in `common/filters/error-response.dto.ts`. Tests: “answers with the documented error envelope”, “reports the same request id in the envelope and the header” |
 | 6b | Global exception filters             | met    | `common/filters/global-exception.filter.ts` (`@Catch()`, `APP_FILTER`) and `modules/health/health-exception.filter.ts`. Test: “does not leak the message of a 5xx HttpException” |
-| 6c | Meaningful message — invalid request | met    | `common/validation/` (`validation-exception-factory.ts`, `flatten-validation-errors.ts`, `validation-pipe.options.ts` with `whitelist`, `forbidNonWhitelisted`, no implicit conversion). Tests: “rejects an amount sent as a string”, “reports a code of the wrong length once”. Live: one message per field |
+| 6c | Meaningful message — invalid request | met    | `common/validation/` (`validation-exception-factory.ts`, which flattens the nested errors, and `validation-pipe.options.ts` with `whitelist`, `forbidNonWhitelisted`, no implicit conversion). Tests: “rejects an amount sent as a string”, “reports a code of the wrong length once”. Live: one message per field |
 | 6d | Meaningful message — conversion      | met    | `UnsupportedCurrencyError` (422) and `RateNotAvailableError` (422), split in `conversion-strategy.resolver.ts`. Tests: “reports a code the snapshot never mentions as unsupported”, “reports two quoted currencies with no path between them”. Live: `422 UNSUPPORTED_CURRENCY` with `details.currency` |
 | 6e | Meaningful message — API unavailable | met    | `RatesUnavailableError` (`503 RATES_UNAVAILABLE`) from `rates.service.ts`, `HistoryUnavailableError` (`503 HISTORY_UNAVAILABLE`). Tests: “answers 503 in the documented envelope with nothing cached”, “answers 503 with its own code rather than a 500”, “falls back to the stale copy once the fresh key has expired” |
 | 6f | Meaningful message — cache failure   | met    | Two answers for two situations. On a read path the request still succeeds and carries a `CACHE_UNAVAILABLE` warning (`common/warnings/collect-warnings.ts`, `RatesLookup.cacheDegraded`); on `DELETE /rates/cache` it answers `503 CACHE_UNAVAILABLE`. Tests: “prices the conversion from the upstream and warns”, “answers the snapshot from the upstream and warns”, “lists the currencies and warns on the same terms”, “refuses to report an invalidation it could not perform”. Also `/health` → `redis: down` with a sanitised reason |
@@ -681,7 +727,7 @@ test name, or a live URL; every row was re-verified against this commit.
 | #  | Requirement                              | Status | Evidence                                                                                                                    |
 | -- | ---------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | 8a | Comprehensive README with start instructions | met | This file: quick start in three forms, every root script, the full configuration table, the API reference above, real test numbers, the Railway deploy. Per-app READMEs add scripts and internals |
-| 8b | API documentation                        | met    | Swagger UI at `/docs`, OpenAPI at `/docs-json` (7 operations, 10 schemas, an `admin` scheme) generated from the code; `docs/architecture.md` §3 is the written contract. `test/e2e/swagger.e2e-spec.ts` keeps them in step — “documents no route that the API does not serve” |
+| 8b | API documentation                        | met    | Swagger UI at `/docs`, OpenAPI at `/docs-json` (7 operations, 10 schemas, an `admin` scheme) generated from the code and committed as `docs/openapi.json`; `docs/architecture.md` §3 is the written contract. `test/e2e/swagger.e2e-spec.ts` keeps them in step — “documents no route that the API does not serve” — and `openapi-contract.e2e-spec.ts` fails when the committed document drifts from the decorators (`npm run openapi:write` regenerates it) |
 | 8c | Environment configuration                | met    | `apps/api/src/config/env.schema.ts` (zod, fails fast), `apps/api/.env.example` and root `.env.example`; the configuration table above lists all 23 variables |
 
 ### Beyond the task
@@ -692,11 +738,13 @@ is implemented and covered:
 | Requirement | Where |
 | ----------- | ----- |
 | Production readiness | helmet, CORS allowlist, `trust proxy`, `@nestjs/throttler`, graceful shutdown, non-root multi-stage image, `ADMIN_API_KEY` required in production. `test/e2e/http-hardening.e2e-spec.ts`, `test/e2e/throttling.e2e-spec.ts` |
-| Structured logging | `common/logging/` — nestjs-pino, request-id middleware, serializers, level resolver, once-per-outage reporter. Credentials and connection strings never reach a client or a log line |
+| Structured logging | `common/logging/` — nestjs-pino, `request-id.ts` (header, sanitiser, assigner, middleware), `serializers.ts`, level resolver, once-per-outage reporter. Credentials and connection strings never reach a client or a log line |
 | React frontend | `apps/web/` — React 19 + Vite + TanStack Query + React Router, converter and `/about` pages |
 | MongoDB history | `infrastructure/mongo/`, `modules/history/`, TTL index from `HISTORY_TTL_DAYS`, `GET /api/v1/history` |
-| Repository pattern on the web | `apps/web/src/api/repositories/` — five interfaces, HTTP factories, `RepositoriesProvider` / `useRepositories`; tests inject fakes through the same provider |
-| Offline fallback | `features/converter/lib/convertOffline.ts` + `api/persistence/` — a persisted snapshot re-priced in the browser, labelled `offline-estimate` and never written to history |
+| Repository pattern on the web | `apps/web/src/api/repositories/` — five interfaces in `repositories.ts`, their HTTP implementations in `createHttpRepositories.ts`, `RepositoriesProvider` / `useRepositories`; tests inject fakes through the same provider |
+| Offline fallback | `features/converter/lib/convertOffline.ts` + `api/persistence/` — a persisted snapshot re-priced in the browser, labelled `offline-estimate` and never written to history. Priced against the same `fixtures/golden-conversions.json` the API's e2e suite asserts |
+| Container-backed integration tests | `apps/api/test/integration/` — the Redis and Mongo adapters against real servers, run by CI's `orchestration` job against the stack it starts |
+| Client/contract check | `docs/openapi.json` committed and regenerated by an e2e test; the web suite validates every sample response it renders against those schemas with `ajv` |
 | i18n-ready strings | `apps/web/src/i18n/` — every string in `en.json`, keys type-checked; `messageKeys.test.ts` proves every envelope and warning code has a sentence |
 | Strict typing | `tsc --noEmit` / `tsc -b` clean, `no-unsafe-*` on, `ConfigService<AppConfig, true>` so an unknown config key is a compile error |
 | Multi-commit history through PRs | Conventional-commit subjects, a branch per feature, and every change merged into `main` through a reviewed pull request with CI green |

@@ -3,11 +3,11 @@ import { INestApplication } from '@nestjs/common';
 import { OpenAPIObject } from '@nestjs/swagger';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { API_KEY_HEADER } from '../../src/common/guards/api-key.constant';
+import { API_KEY_HEADER } from '../../src/common/guards/api-key.guard';
 import { ADMIN_SECURITY_SCHEME } from '../../src/common/swagger/build-swagger-config';
 import { WARNING_CODES } from '../../src/common/warnings/response-warning';
 import { CONVERSION_STRATEGY_NAMES } from '../../src/common/conversion/conversion-strategy-name';
-import { RATES_SOURCES } from '../../src/modules/rates/domain/rates-source';
+import { RATES_SOURCES } from '../../src/modules/rates/domain/exchange-rate';
 import { createE2eApp } from './create-e2e-app';
 
 // Every route the API serves, with the method it answers. A route that is

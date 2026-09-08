@@ -132,10 +132,21 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: package-lock.json
+          # The API's lockfile too: the integration suite below runs from
+          # apps/api, so its dependencies are installed in this job as well.
+          cache-dependency-path: |
+            package-lock.json
+            apps/api/package-lock.json
 
       - name: Install
         run: npm ci
+
+      # The golden fixtures are read by two suites in two apps and belong to
+      # neither, so this is the job that owns them. Cheap, and it runs before
+      # anything is built: a vector against a currency the snapshot does not
+      # quote would otherwise fail as eight identical assertions in two jobs.
+      - name: Shared fixtures
+        run: npm run check:fixtures
 
       - name: Compose config
         run: docker compose -f docker-compose.yml config -q
@@ -152,8 +163,16 @@ jobs:
       # what has to carry a stack the API runs as NODE_ENV=production, where the
       # schema refuses to start without one. Setting it here would hide exactly
       # the regression this step exists to catch.
+      #
+      # The dev overlay is layered on so Redis and Mongo publish on the host
+      # loopback, which is what lets the integration suite below reach them.
+      # `--profile containers` comes with it: the overlay moves api and web
+      # behind that profile for the run-the-apps-from-npm case, and without it
+      # the stack this job exists to start would be two backing services.
       - name: Start the stack
-        run: docker compose up --build -d --wait
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+            --profile containers up --build -d --wait
 
       # The deploy gate and the container healthcheck both probe this one, so a
       # route that stopped existing has to fail here rather than at rollout.
@@ -177,10 +196,31 @@ jobs:
             }
           ' "$report"
 
+      # The one seam the unit and e2e suites cannot take: every other test of
+      # the Redis and Mongo adapters runs against a hand-written fake, which
+      # can only confirm the assumption its author had. These run the same two
+      # adapters against the real servers the stack just started — the TTLs the
+      # cache is actually written with, the index Mongo actually holds, the
+      # order the page actually comes back in. They skip visibly anywhere the
+      # two URLs are not set, so a laptop and the `api` job stay unaffected.
+      - name: Install the API for the integration suite
+        run: npm ci --prefix apps/api
+
+      - name: Integration tests against the running stack
+        working-directory: apps/api
+        env:
+          INTEGRATION_REDIS_URL: redis://127.0.0.1:6379
+          INTEGRATION_MONGO_URL: mongodb://127.0.0.1:27017/currency_converter_integration
+        run: npm run test:integration
+
       - name: Stack logs
         if: failure()
-        run: docker compose logs --no-color
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+            --profile containers logs --no-color
 
       - name: Stop the stack
         if: always()
-        run: docker compose down -v
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+            --profile containers down -v

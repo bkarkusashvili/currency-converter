@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CONVERSION_PROPERTIES } from '../../../common/conversion/conversion-api-properties';
 import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
-import { RATES_SOURCES } from '../../rates/domain/rates-source';
-import type { RatesSource } from '../../rates/domain/rates-source';
+import { RATES_SOURCES } from '../../rates/domain/exchange-rate';
+import type { RatesSource } from '../../rates/domain/exchange-rate';
 import { ConversionRecord } from '../domain/conversion-record';
 
 // A record is the conversion that was answered plus the two fields the store

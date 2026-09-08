@@ -1,4 +1,4 @@
-import { API_KEY_HEADER } from '../../guards/api-key.constant';
+import { API_KEY_HEADER } from '../../guards/api-key.guard';
 import {
   ADMIN_SECURITY_SCHEME,
   buildSwaggerConfig,

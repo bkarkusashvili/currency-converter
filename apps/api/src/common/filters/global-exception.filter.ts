@@ -9,12 +9,13 @@ import { Request, Response } from 'express';
 import { PinoLogger } from 'nestjs-pino';
 import { AppError } from '../errors/app-error';
 import { ErrorCode } from '../errors/error-code.enum';
-import { getRequestId } from '../logging/get-request-id';
+import { getRequestId } from '../logging/request-id';
 import { isValidationErrorPayload } from '../validation/validation-error-payload';
-import { deriveErrorCode } from './derive-error-code';
+import {
+  deriveErrorCode,
+  extractHttpExceptionMessage,
+} from './http-exception-mapping';
 import { ErrorResponseDto } from './error-response.dto';
-import { extractHttpExceptionMessage } from './extract-http-exception-message';
-
 const INTERNAL_ERROR_MESSAGE = 'An unexpected error occurred';
 
 // Widened to number so comparing it against HttpException.getStatus(), which is

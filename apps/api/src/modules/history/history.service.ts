@@ -3,8 +3,8 @@ import { PinoLogger } from 'nestjs-pino';
 import { HistoryUnavailableError } from '../../common/errors/history-unavailable.error';
 import { ConversionRecord } from './domain/conversion-record';
 import type { NewConversionRecord } from './domain/conversion-record';
+import { HISTORY_REPOSITORY } from './domain/history-repository.port';
 import type { HistoryRepository } from './domain/history-repository.port';
-import { HISTORY_REPOSITORY } from './domain/history-repository.token';
 
 @Injectable()
 export class HistoryService {

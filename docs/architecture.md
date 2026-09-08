@@ -377,7 +377,7 @@ interface RatesProvider { fetchRates(): Promise<RatesSnapshot>; }
 
 const RATES_REPOSITORY = Symbol('RATES_REPOSITORY');
 
-// domain/cache-outcome.ts — what a cache operation did, and whether the cache
+// domain/ports.ts — what a cache operation did, and whether the cache
 // was there to do it. A read that answers `null` alone cannot tell a miss from
 // an outage, and the two are different answers on the response.
 interface CachedSnapshot { snapshot: RatesSnapshot | null; degraded: boolean; }
@@ -697,19 +697,21 @@ apps/api
 │   │   ├── currency/            CurrencyCode, Currency and the ISO 4217 table, read by the
 │   │   │                        Monobank mapper and the currencies projection alike
 │   │   ├── errors/              AppError, ErrorCode, concrete errors
-│   │   ├── filters/             GlobalExceptionFilter, ErrorResponseDto, status → code mapping
-│   │   ├── guards/              ApiKeyGuard
-│   │   ├── logging/             nestjs-pino setup, request id middleware, log level, serializers,
-│   │   │                        createOutageReporter for the once-per-outage lines, and
-│   │   │                        errorStack for the two bootstrap paths pino cannot serve
-│   │   ├── validation/          ValidationPipe options, error flattening, the upper-case transform
+│   │   ├── filters/             GlobalExceptionFilter and ErrorResponseDto, with the status → code
+│   │   │                        and payload → message mapping beside them in http-exception-mapping.ts
+│   │   ├── guards/              ApiKeyGuard and the x-api-key header it reads
+│   │   ├── logging/             nestjs-pino setup, log level, request-id.ts (the header, the
+│   │   │                        sanitiser, the assigner, the middleware), serializers.ts (what
+│   │   │                        reaches a log line, errorStack included) and createOutageReporter
+│   │   ├── validation/          ValidationPipe options and the exception factory that flattens
 │   │   ├── throttling/          buildThrottlerOptions and the global guard
 │   │   ├── swagger/             OpenAPI document, ApiErrorResponses decorator
 │   │   ├── resilience/          retry, CircuitBreaker, CircuitOpenError
 │   │   ├── money/               the Money constructor, roundHalfUp and the decimal scales §3 publishes (big.js)
-│   │   └── utils/               constant-time compare, withTimeout, TimeoutError, upperSnakeCase
+│   │   └── utils/               constant-time compare, withTimeout, TimeoutError
 │   ├── infrastructure/
-│   │   ├── redis/               REDIS_CLIENT (ioredis) and the RedisConnection lifecycle
+│   │   ├── redis/               create-redis-client.ts (the ioredis client and its REDIS_CLIENT
+│   │   │                        token) and the RedisConnection lifecycle
 │   │   └── mongo/               MongooseModule.forRootAsync, the connect options
 │   │                             and the MongoConnection lifecycle
 │   └── modules/
@@ -719,9 +721,10 @@ apps/api
 │       │   ├── currencies.controller.ts  GET /currencies
 │       │   └── currencies.module.ts
 │       ├── rates/
-│       │   ├── domain/          ExchangeRate, RatesSnapshot, RatesSource, BASE_CURRENCY,
-│       │   │                    CachedSnapshot / CacheWrite, the RatesLookup a caller reads
-│       │   │                    `cacheDegraded` off, ports + tokens
+│       │   ├── domain/          exchange-rate.ts — ExchangeRate, RatesSnapshot, RatesSource,
+│       │   │                    BASE_CURRENCY and the RatesLookup a caller reads `cacheDegraded`
+│       │   │                    off; ports.ts — the provider and cache seams with their tokens
+│       │   │                    and CachedSnapshot / CacheWrite
 │       │   ├── dto/             ExchangeRateDto, RatesSnapshotResponseDto
 │       │   ├── infrastructure/
 │       │   │   ├── monobank/    provider, zod payload schema, mapper, retry predicate
@@ -735,14 +738,15 @@ apps/api
 │       │   ├── domain/          ConversionRequest, ConversionResult and the ConversionOutcome that
 │       │   │                    carries it out of the service with what degraded beside it
 │       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
-│       │   ├── strategies/      interface, identity, direct, cross, resolver + token,
-│       │   │                    findRate and directionalRate, which is the §5
+│       │   ├── strategies/      conversion-strategy.ts (the interface and its
+│       │   │                    CONVERSION_STRATEGIES token), identity, direct, cross,
+│       │   │                    the resolver, findRate and directionalRate, which is the §5
 │       │   │                    table in one function
 │       │   ├── conversion.service.ts
 │       │   ├── conversion.controller.ts  POST /convert
 │       │   └── conversion.module.ts
 │       ├── history/
-│       │   ├── domain/          ConversionRecord, HistoryRepository port + token
+│       │   ├── domain/          ConversionRecord, the HistoryRepository port and its token
 │       │   ├── schemas/         the Mongoose schema and its TTL index, built
 │       │   │                    per deployment from HISTORY_TTL_DAYS
 │       │   ├── infrastructure/  MongoHistoryRepository, HistoryIndexes
@@ -750,18 +754,28 @@ apps/api
 │       │   ├── history.service.ts
 │       │   ├── history.controller.ts  GET /history
 │       │   └── history.module.ts
-│       └── health/              controller, HealthExceptionFilter, HEALTH_INDICATORS,
-│                             pingIndicator with the probe budget,
-│                             HealthIndicatorPort + Redis / Mongo / Monobank indicators
+│       └── health/              controller, HealthExceptionFilter, pingIndicator with the probe
+│                             budget, HealthIndicatorPort and its HEALTH_INDICATORS token,
+│                             Redis / Mongo / Monobank indicators
 └── test
     ├── e2e/                     supertest suites over the real HTTP surface
     │   ├── create-e2e-app.ts    boots through the same configureHttp and setupSwagger main.ts uses
     │   ├── override-*.ts        swaps Redis, the Mongo connection and the history repository for fakes
     │   ├── setup-e2e-env.ts     the environment every suite starts from
     │   ├── env/                 per-suite environment, imported before AppModule
-    │   └── fixtures/            snapshots the suites assert against
-    └── jest-e2e.json
+    │   └── fixtures/            reads the shared snapshot and golden vectors at the repo root
+    ├── integration/             the two adapters against a real Redis and Mongo; skipped, visibly, unless
+    │                            INTEGRATION_REDIS_URL / INTEGRATION_MONGO_URL are set
+    ├── openapi-document.ts      generates and serialises the document docs/openapi.json holds
+    ├── write-openapi.ts         `npm run openapi:write`
+    ├── jest-e2e.json
+    └── jest-integration.json
 ```
+
+Two things the API is tested against live outside it, because a second app reads
+them too: `fixtures/rates-snapshot.json` and `fixtures/golden-conversions.json`
+at the repository root (§11), and `docs/openapi.json`, the committed contract
+the web suite validates its own fixtures against.
 
 The dependencies between the feature modules run one way, and these are all of
 them:
@@ -842,10 +856,12 @@ newest-first page and the retention ride on the same key rather than on two.
   the Docker image regenerates it from `API_URL` at container start so the same
   image runs locally and on Railway. The value is JSON-escaped as it is written,
   so a quote in the URL cannot break the file.
-- **Ports and adapters, client side.** `src/api/repositories` declares one
-  interface per resource (`ConversionRepository`, `CurrenciesRepository`,
-  `RatesRepository`, `HistoryRepository`, `HealthRepository`) with an HTTP
-  implementation factory each, bound through a React context
+- **Ports and adapters, client side.** `src/api/repositories/repositories.ts`
+  declares one interface per resource (`ConversionRepository`,
+  `CurrenciesRepository`, `RatesRepository`, `HistoryRepository`,
+  `HealthRepository`) and the `Repositories` aggregate;
+  `createHttpRepositories.ts` holds an HTTP implementation factory each, bound
+  through a React context
   (`RepositoriesProvider` / `useRepositories`). `src/api/hooks` wraps them in
   TanStack Query hooks (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
   `useHistory`, `useHealth`) that depend only on the interfaces. `src/api/http` is the only place that knows about `fetch`; a
@@ -869,7 +885,7 @@ newest-first page and the retention ride on the same key rather than on two.
   other envelope code is left as the API answered it, and an estimate is never
   added to the history. The currency selects fall back the same way: the API's
   list, then the persisted copy, then the two defaults.
-- **The amount field.** `formatAmountInput(raw, caret)` is the one rule for what
+- **The amount field** (`features/converter/lib/amount/`). `formatAmountInput(raw, caret)` is the one rule for what
   the field may hold: everything that is not a digit or the locale's decimal
   separator is dropped — letters, signs, a second separator, a third decimal —
   the integer part is capped at the width of `MAX_AMOUNT`, thousands are grouped
@@ -889,7 +905,9 @@ newest-first page and the retention ride on the same key rather than on two.
   not blur, parses as nothing at all. Blur still trims a dangling separator, but
   only so the field looks finished; correctness does not depend on it.
 - **Provenance in the client.** The result card prints the rate in both
-  directions — the API publishes one, and `inverseRate` computes the other on
+  directions — the API publishes one, and `inverseRate` (in
+  `features/converter/lib/money.ts`, beside the scoped `big.js` constructor and
+  the decimal scales) computes the other on
   the same `big.js` constructor, rounded half-up to the six places §3 uses — and
   draws the hops the strategy took. The history panel shows each entry's
   `source` for the same reason §3 stores it.
@@ -922,8 +940,10 @@ newest-first page and the retention ride on the same key rather than on two.
 | Layer                | Tool                         | What is covered                                   |
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
-| E2E (api)            | Jest + supertest             | seven suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger` |
+| E2E (api)            | Jest + supertest             | eight suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger`, `openapi-contract` |
 | Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, error display, history list and its loading and empty states, health rendering, every HTTP repository |
+| Integration (api)    | Jest against real servers    | the two adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp. Each suite runs on its own database — Redis 15, a Mongo database of its own — so a URL pointed at a running stack is never flushed. Skipped, with a `SKIPPED:` line naming the variable, unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI`, whose `orchestration` job points them at the stack it already starts |
+| Contract             | Jest (api) + ajv (web)       | `docs/openapi.json` regenerated from the application's decorators and compared with the committed file; on the web side every sample response the suite renders validated against the schema that document publishes for its route |
 
 A `*.module.ts` is wiring and is excluded from coverage, so anything a module
 *decides* lives in a file of its own beside it — `buildMonobankHttpOptions`,
@@ -947,6 +967,27 @@ history repository for in-process fakes, and the environment points every url
 at a dead host, so a suite that forgets an override fails instead of passing
 against whatever a developer happens to be running.
 
+The integration suites are the deliberate exception, and the reason they exist:
+a fake can only confirm the assumption its author had about the driver. They are
+opt-in by environment variable, so nothing about the two paragraphs above
+changes for anyone who has not started a Redis and a Mongo.
+
+**One set of numbers for two implementations of §5.** `convertOffline` in the
+browser and the conversion route on the server price the same rule, and each
+used to be tested against its own hand-copied rates table — which had already
+drifted on two of the five pairs. Both now read
+`fixtures/rates-snapshot.json` and assert every row of
+`fixtures/golden-conversions.json`: twelve vectors computed once from §5,
+covering identity, both directions of a spread pair, both directions of a
+cross, a result below half a cent, and the million-hryvnia case that only
+passes if the money is computed from the unrounded rate. `npm run
+check:fixtures` at the root validates both files, cross-references every
+vector's currencies against the pairs the snapshot publishes, and re-prices all
+twelve from the snapshot in exact integer arithmetic. That re-pricing is a third
+derivation of the rule above rather than a copy of either implementation: with
+only the two, a transcription slip in the table is something both suites would
+agree on and both would have wrong.
+
 ## 12. Conventions
 
 - Conventional Commits (`feat(api): …`, `fix(web): …`, `refactor(api): …`,
@@ -960,7 +1001,12 @@ against whatever a developer happens to be running.
   is in the history rather than in a footnote.
 - ESLint + Prettier, `noImplicitAny`, `strictNullChecks`, no `any`, no
   non-null assertions outside tests.
-- Files are small and named after the single thing they export.
+- A file holds one **reason to change**, which is usually but not always one
+  export. A DI token lives in the file that declares the port it injects, a
+  helper used by exactly one caller lives in that caller, and a group of types
+  that change together — the rates domain's `exchange-rate.ts` and `ports.ts`,
+  the web's `repositories.ts` — is one file rather than one per declaration. A
+  file is not free: every one of them is a name to know and a hop to follow.
 
 ### Tests
 
@@ -969,6 +1015,13 @@ against whatever a developer happens to be running.
 - End-to-end tests live in `apps/api/test/e2e` and boot through `createE2eApp`,
   which applies the same `configureHttp` and `setupSwagger` that `main.ts` does,
   so the surface under test is the one the process serves.
+- Integration tests live in `apps/api/test/integration` and are the only ones
+  that reach a real Redis or MongoDB. They run when
+  `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` point at one; otherwise each
+  writes a `SKIPPED: … set <VARIABLE> …` line to stdout, because Jest reports
+  nothing per suite for a file whose every suite is skipped. Under `CI` a
+  missing variable throws instead, so deleting the workflow's env block fails
+  rather than silently stopping.
 - A test asserts behaviour, not the literal it imported. A spec that reads a
   configuration object back cannot fail when the wiring around it is wrong,
   which is how a Redis client that could never serve its first command passed
@@ -998,10 +1051,12 @@ extends it:
   component.
 - Data access is layered and each layer is the only one that knows its concern:
   `src/api/http` is the fetch client (base url, headers, decoding the error
-  envelope), `src/api/repositories` holds one interface per resource with its
-  implementation (`ConversionRepository`, `CurrenciesRepository`,
-  `RatesRepository`, `HistoryRepository`, `HealthRepository`) handed to the
-  tree through a provider, and `src/api/hooks` exposes the TanStack Query hooks
+  envelope), `src/api/repositories` holds one interface per resource
+  (`ConversionRepository`, `CurrenciesRepository`, `RatesRepository`,
+  `HistoryRepository`, `HealthRepository` — together in `repositories.ts`, since
+  a route added to the API is one method in each) with the HTTP implementations
+  in `createHttpRepositories.ts`, handed to the tree through a provider, and
+  `src/api/hooks` exposes the TanStack Query hooks
   components consume (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
   `useHistory`, `useHealth`). A component never fetches.
 - Tests inject a fake repository through that same provider rather than mocking
@@ -1071,8 +1126,12 @@ project were taken further.
   web tests are component-level with repository fakes injected through the real
   provider, and the API e2e suites stop at supertest. The one thing nothing
   covers automatically is the two running together in a browser — that path is
-  exercised by CI's `orchestration` job only as far as `/health`, and by hand
-  otherwise.
+  exercised by CI's `orchestration` job as far as `/health` and the two
+  container-backed integration suites, and by hand otherwise.
+- **The integration suites cover the two adapters, not the two modules.** They
+  exercise `RedisRatesRepository` and `MongoHistoryRepository` directly rather
+  than through a booted app, so what they check is the driver behaviour the
+  fakes stand in for. The wiring above them is still e2e's job, against fakes.
 - **E2E coverage is not merged into the unit report.** `test:e2e` runs
   uninstrumented, so `configure-http.ts` and `setup-swagger.ts` read 0% in a
   report whose gate they are not the subject of (§11). Merging the two reports
@@ -1095,12 +1154,21 @@ project were taken further.
   reimplements the pricing rules in the browser on a `big.js` constructor
   configured like the API's `Money`. That is what makes an estimate possible
   with the API unreachable, and it is also a rule in two places that can drift.
-  Both are unit-tested against the same cases, which is the mitigation, not a
-  guarantee.
+  Both now assert the same golden vectors from one shared fixture set (§11), so
+  a number that moves on one side fails on both — but the *rule* is still
+  written twice, and only the cases in that table are pinned. Extracting it to a
+  package both apps consume is the fix; the fixtures are the mitigation.
 
 **Documentation**
 
 - **This document and the code are kept in step by review, not by a test.**
-  Only the API surface has a mechanical check (`swagger.e2e-spec.ts` fails on a
-  route documented but not served, or served but not documented). Everything
-  else here is prose a reviewer has to keep true.
+  Only the API surface has mechanical checks: `swagger.e2e-spec.ts` fails on a
+  route documented but not served, or served but not documented, and
+  `openapi-contract.e2e-spec.ts` fails when `docs/openapi.json` no longer
+  matches what the decorators generate. Everything else here is prose a reviewer
+  has to keep true.
+- **The web's types are checked against the contract, not generated from it.**
+  `apps/web/src/api/types.ts` is still hand-written; what the ajv test proves is
+  that the bodies the suite renders would be accepted by the published schemas,
+  not that every field of every type is right. Generating the types from
+  `docs/openapi.json` would close the remaining half.

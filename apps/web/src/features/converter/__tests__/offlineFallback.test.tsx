@@ -7,6 +7,7 @@ import { queryKeys } from '../../../api/queryKeys';
 import type { ConvertResponse, RatesSnapshotResponse } from '../../../api/types';
 import {
   createFakeRepositories,
+  FAKE_RESPONSES,
   type FakeRepositoriesOptions,
 } from '../../../test/fakes/createFakeRepositories';
 import { createTestQueryClient, renderWithProviders } from '../../../test/renderWithProviders';
@@ -14,16 +15,19 @@ import { ConverterPage } from '../components/ConverterPage';
 
 const QUOTED_AT = '2026-09-08T11:00:00.000Z';
 
-const snapshot: RatesSnapshotResponse = {
-  source: 'cache',
-  fetchedAt: '2026-09-08T12:00:00.000Z',
-  rates: [
-    { base: 'USD', quote: 'UAH', buy: 44.35, sell: 44.831, date: QUOTED_AT },
-    { base: 'GBP', quote: 'UAH', cross: 60.7562, date: QUOTED_AT },
-  ],
-};
+/**
+ * Both bodies come from the table `openapiContract.test.ts` validates against
+ * `docs/openapi.json`, so the rendered response is the checked one: the
+ * snapshot the estimate is priced from as published, and the API's own answer
+ * narrowed to the pair this suite converts.
+ */
+const snapshot: RatesSnapshotResponse = FAKE_RESPONSES.rates;
 
+// `warnings` is removed rather than set to `undefined`: §3 leaves it absent
+// when nothing degraded, and what these cases are about is whether the API
+// answered at all.
 const converted: ConvertResponse = {
+  ...FAKE_RESPONSES.convert,
   from: 'USD',
   to: 'UAH',
   amount: 100,
@@ -33,6 +37,7 @@ const converted: ConvertResponse = {
   source: 'cache',
   ratesTimestamp: snapshot.fetchedAt,
 };
+delete converted.warnings;
 
 function unreachable(): ApiError {
   return ApiError.network('https://api.test/api/v1/convert', new TypeError('Failed to fetch'));

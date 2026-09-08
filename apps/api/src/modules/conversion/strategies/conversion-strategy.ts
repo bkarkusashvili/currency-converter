@@ -22,3 +22,7 @@ export interface ConversionStrategy {
     rates: readonly ExchangeRate[],
   ): Big | undefined;
 }
+
+// The token the resolver injects the registered strategies as an ordered array
+// of; the order is the §5 precedence and the module declares it.
+export const CONVERSION_STRATEGIES = Symbol('CONVERSION_STRATEGIES');

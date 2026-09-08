@@ -1,4 +1,4 @@
-import { RatesSource } from '../../rates/domain/rates-source';
+import { RatesSource } from '../../rates/domain/exchange-rate';
 import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
 import { ConversionRequest } from './conversion-request';
 

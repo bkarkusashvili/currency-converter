@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../http/ApiError';
 import type { ConvertResponse, HealthResponse, RatesSnapshotResponse } from '../../types';
-import { createHttpConversionRepository } from '../createHttpConversionRepository';
-import { createHttpCurrenciesRepository } from '../createHttpCurrenciesRepository';
-import { createHttpHealthRepository } from '../createHttpHealthRepository';
-import { createHttpHistoryRepository } from '../createHttpHistoryRepository';
-import { createHttpRatesRepository } from '../createHttpRatesRepository';
-import { createHttpRepositories } from '../createHttpRepositories';
+import {
+  createHttpConversionRepository,
+  createHttpCurrenciesRepository,
+  createHttpHealthRepository,
+  createHttpHistoryRepository,
+  createHttpRatesRepository,
+  createHttpRepositories,
+} from '../createHttpRepositories';
 
 const fetchMock = vi.fn<typeof fetch>();
 

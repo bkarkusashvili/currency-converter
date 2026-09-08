@@ -4,11 +4,12 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
 import { FakeRedisClient } from '../../src/infrastructure/redis/__tests__/fake-redis-client';
-import { RATES_PROVIDER } from '../../src/modules/rates/domain/rates-provider.token';
+import { RATES_PROVIDER } from '../../src/modules/rates/domain/ports';
 import { RATES_CACHE_KEYS } from '../../src/modules/rates/infrastructure/rates-cache-keys';
 import { createE2eApp } from './create-e2e-app';
 import {
   DETACHED_RATES_SNAPSHOT,
+  GOLDEN_CONVERSIONS,
   RATES_SNAPSHOT,
 } from './fixtures/rates-snapshot';
 import { overrideRedis } from './override-redis';
@@ -89,103 +90,31 @@ describe('conversion (e2e)', () => {
     });
   });
 
+  // The rule §5 states, priced over HTTP against the shared snapshot. The
+  // vectors live in fixtures/golden-conversions.json and the web app's offline
+  // estimate asserts the same table against the same rates, so a change to one
+  // implementation that moves a number fails on both sides rather than on
+  // neither: the two used to keep hand-copied fixtures and two of the five
+  // pairs had silently drifted apart.
+  describe('the golden vectors', () => {
+    it.each(GOLDEN_CONVERSIONS)(
+      'prices $amount $from to $to at $rate ($strategy)',
+      async ({ from, to, amount, rate, result, strategy }) => {
+        const response = await convert({ from, to, amount }).expect(200);
+
+        expect(response.body).toMatchObject({
+          from,
+          to,
+          amount,
+          rate,
+          result,
+          strategy,
+        });
+      },
+    );
+  });
+
   describe('pricing', () => {
-    it('pays the buy rate converting the base of a pair into its quote', async () => {
-      const response = await convert({
-        from: 'USD',
-        to: 'UAH',
-        amount: 100,
-      }).expect(200);
-
-      expect(response.body).toMatchObject({
-        rate: 44.35,
-        result: 4435,
-        strategy: 'direct',
-      });
-    });
-
-    it('pays the sell rate converting the quote of a pair back into its base', async () => {
-      const response = await convert({
-        from: 'UAH',
-        to: 'USD',
-        amount: 1000,
-      }).expect(200);
-
-      expect(response.body).toMatchObject({
-        rate: 0.022306,
-        result: 22.31,
-        strategy: 'direct',
-      });
-    });
-
-    // Crossing EUR through the hryvnia would answer 1.15322 and lose a second
-    // spread; the published pair is the better price and the one it takes.
-    it('takes the published pair over the path through the hryvnia', async () => {
-      const response = await convert({
-        from: 'EUR',
-        to: 'USD',
-        amount: 100,
-      }).expect(200);
-
-      expect(response.body).toMatchObject({
-        rate: 1.1655,
-        result: 116.55,
-        strategy: 'direct',
-      });
-    });
-
-    // Both legs of the §5 table on mid rates: 60.7562 hryvnia to the pound out,
-    // 1 / 12.1834 zloty to the hryvnia back. The rate is 4.98680171380731…,
-    // published as 4.986802, and 250 of them is 1246.70042…, so the cent is
-    // 1246.70. Rounding the rate first would agree here; the million-pound
-    // case in the service spec is where the two answers part.
-    it('crosses two currencies that only share the hryvnia', async () => {
-      const response = await convert({
-        from: 'GBP',
-        to: 'PLN',
-        amount: 250,
-      }).expect(200);
-
-      expect(response.body).toMatchObject({
-        rate: 4.986802,
-        result: 1246.7,
-        strategy: 'cross',
-      });
-    });
-
-    // The other end of the scale: 0.01 hryvnia is 0.000223 dollars, less than
-    // half a cent, so the money rounds to nothing. It is a 200 rather than an
-    // error — the conversion succeeded and that is what it is worth — and
-    // `rate` is what makes the zero readable. §5 records the choice.
-    it('answers zero for an amount worth less than half a cent', async () => {
-      const response = await convert({
-        from: 'UAH',
-        to: 'USD',
-        amount: 0.01,
-      }).expect(200);
-
-      expect(response.body).toMatchObject({
-        amount: 0.01,
-        result: 0,
-        rate: 0.022306,
-        strategy: 'direct',
-      });
-    });
-
-    it('converts a currency to itself at one', async () => {
-      const response = await convert({
-        from: 'USD',
-        to: 'USD',
-        amount: 33.33,
-      }).expect(200);
-
-      expect(response.body).toMatchObject({
-        rate: 1,
-        result: 33.33,
-        strategy: 'identity',
-      });
-    });
-
     it('normalises lower-case codes and echoes them upper-cased', async () => {
       const response = await convert({
         from: 'usd',

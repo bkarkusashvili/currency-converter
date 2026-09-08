@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { LoggingModule } from '../../common/logging/logging.module';
 import { RedisModule } from '../../infrastructure/redis/redis.module';
 import { RatesService } from './application/rates.service';
-import { RATES_REPOSITORY } from './domain/rates-repository.token';
+import { RATES_REPOSITORY } from './domain/ports';
 import { MonobankModule } from './infrastructure/monobank/monobank.module';
 import { RedisRatesRepository } from './infrastructure/redis-rates.repository';
 import { RatesController } from './rates.controller';

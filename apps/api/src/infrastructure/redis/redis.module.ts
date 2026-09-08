@@ -2,8 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import { LoggingModule } from '../../common/logging/logging.module';
-import { createRedisClient } from './create-redis-client';
-import { REDIS_CLIENT } from './redis-client.token';
+import { createRedisClient, REDIS_CLIENT } from './create-redis-client';
 import { RedisConnection } from './redis-connection';
 
 @Module({

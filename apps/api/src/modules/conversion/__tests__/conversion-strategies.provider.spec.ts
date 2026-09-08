@@ -1,7 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { conversionStrategiesProvider } from '../conversion.module';
-import type { ConversionStrategy } from '../strategies/conversion-strategy';
-import { CONVERSION_STRATEGIES } from '../strategies/conversion-strategies.token';
+import {
+  ConversionStrategy,
+  CONVERSION_STRATEGIES,
+} from '../strategies/conversion-strategy';
 import { CrossRateStrategy } from '../strategies/cross-rate.strategy';
 import { DirectPairStrategy } from '../strategies/direct-pair.strategy';
 import { IdentityStrategy } from '../strategies/identity.strategy';

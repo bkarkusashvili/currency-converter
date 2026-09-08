@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { RepositoriesContext } from './RepositoriesContext';
-import type { Repositories } from './Repositories';
+import type { Repositories } from './repositories';
 
 interface RepositoriesProviderProps {
   repositories: Repositories;

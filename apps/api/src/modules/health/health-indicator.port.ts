@@ -16,3 +16,6 @@ import { HealthIndicatorResult } from '@nestjs/terminus';
 export interface HealthIndicatorPort {
   check(): Promise<HealthIndicatorResult>;
 }
+
+// The token the controller injects the registered indicators as an array of.
+export const HEALTH_INDICATORS = Symbol('HEALTH_INDICATORS');

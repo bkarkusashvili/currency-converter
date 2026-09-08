@@ -9,7 +9,7 @@ import {
   COMMAND_TIMED_OUT,
   FakeRedisClient,
 } from '../../../../infrastructure/redis/__tests__/fake-redis-client';
-import { RatesSnapshot } from '../../domain/rates-snapshot';
+import { RatesSnapshot } from '../../domain/exchange-rate';
 import { RATES_CACHE_KEYS } from '../rates-cache-keys';
 import { RedisRatesRepository } from '../redis-rates.repository';
 

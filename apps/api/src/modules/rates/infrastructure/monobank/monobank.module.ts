@@ -2,9 +2,11 @@ import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggingModule } from '../../../../common/logging/logging.module';
-import { MONOBANK_CIRCUIT_BREAKER } from '../../domain/monobank-circuit-breaker.token';
-import { RATES_PROVIDER } from '../../domain/rates-provider.token';
-import { buildMonobankCircuitBreaker } from './monobank-circuit-breaker.factory';
+import {
+  MONOBANK_CIRCUIT_BREAKER,
+  buildMonobankCircuitBreaker,
+} from './monobank-circuit-breaker.factory';
+import { RATES_PROVIDER } from '../../domain/ports';
 import { buildMonobankHttpOptions } from './monobank-http.options';
 import { MonobankRatesProvider } from './monobank-rates.provider';
 

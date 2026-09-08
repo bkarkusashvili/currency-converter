@@ -1,5 +1,5 @@
 import { DocumentBuilder, OpenAPIObject } from '@nestjs/swagger';
-import { API_KEY_HEADER } from '../guards/api-key.constant';
+import { API_KEY_HEADER } from '../guards/api-key.guard';
 import { PackageMetadata } from './read-package-metadata';
 
 // The security scheme name routes refer to with @ApiSecurity.

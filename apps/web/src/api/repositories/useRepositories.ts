@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { RepositoriesContext } from './RepositoriesContext';
-import type { Repositories } from './Repositories';
+import type { Repositories } from './repositories';
 
 export function useRepositories(): Repositories {
   const repositories = useContext(RepositoriesContext);

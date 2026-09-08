@@ -4,10 +4,9 @@ import Redis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
 import { CacheUnavailableError } from '../../../common/errors/cache-unavailable.error';
 import type { TypedConfigService } from '../../../config/typed-config.service';
-import { REDIS_CLIENT } from '../../../infrastructure/redis/redis-client.token';
-import { CachedSnapshot, CacheWrite } from '../domain/cache-outcome';
-import { RatesRepository } from '../domain/rates-repository.port';
-import { RatesSnapshot } from '../domain/rates-snapshot';
+import { REDIS_CLIENT } from '../../../infrastructure/redis/create-redis-client';
+import { CachedSnapshot, CacheWrite, RatesRepository } from '../domain/ports';
+import { RatesSnapshot } from '../domain/exchange-rate';
 import { cachedRatesSnapshotSchema } from './cached-rates-snapshot.schema';
 import { RATES_CACHE_KEYS } from './rates-cache-keys';
 
