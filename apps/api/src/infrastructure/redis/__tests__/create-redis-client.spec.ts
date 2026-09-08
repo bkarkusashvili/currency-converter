@@ -34,6 +34,17 @@ describe('createRedisClient', () => {
     expect(client.options).toMatchObject({ host: 'localhost', port: 6379 });
   });
 
+  // The three options the module's design rests on: RedisConnection opens the
+  // socket itself, so the client must not, and a command issued while Redis is
+  // down has to fail rather than queue behind an outage that may not end.
+  it('is lazy, fails a command fast and never buffers one', () => {
+    expect(client.options).toMatchObject({
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+    });
+  });
+
   it('reports a connection error as a warning instead of letting it escape', () => {
     expect(() => client.emit('error', new Error('ECONNREFUSED'))).not.toThrow();
 
