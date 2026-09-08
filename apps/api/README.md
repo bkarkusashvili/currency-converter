@@ -185,8 +185,10 @@ A 4xx that has no documented code of its own is named after the failure, so a
 generic message and keeps the detail in the log.
 
 `/health` is the one exception to the envelope: it answers with the Terminus
-report so a failing indicator stays visible to monitoring, and it is exempt from
-the rate limit so a probe cannot throttle itself into a restart loop.
+report so a failing indicator stays visible to monitoring. It carries a limit of
+its own — 60 requests a minute, above any poll rate and still a bound on a route
+that pings Redis and Mongo for whoever asks; `/health/live` is the exempt one,
+so a probe cannot throttle itself into a restart loop.
 
 `/health/live` is the liveness probe, and it is the one Railway's
 `healthcheckPath`, the Dockerfile's `HEALTHCHECK` and the Compose healthcheck

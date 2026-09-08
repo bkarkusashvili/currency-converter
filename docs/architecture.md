@@ -205,11 +205,14 @@ neither is a reason to fail a rollout or restart the container. Sending the
 probes here and monitoring there is what keeps `/health` free to report `503`
 honestly.
 
-Both routes are exempt from the throttler (`@SkipThrottle()` on the controller).
-A probe runs far more often than a client, and sharing a bucket with one would
-let the rate limit restart a healthy process. Both are excluded from the
-versioned prefix, and a successful probe of either is dropped from the request
-log (§7); a failing one is not.
+`/health/live` is exempt from the throttler (`@SkipThrottle()`): a probe runs
+far more often than a client, and sharing a bucket with one would let the rate
+limit restart a healthy process. `/health` is not exempt but generous — 60
+requests a minute per client, well above any monitoring poll rate — because it
+issues a Redis `PING` and a Mongo ping per request, and an unauthenticated
+route with no limit at all is an amplifier pointed at both. Both routes are
+excluded from the versioned prefix, and a successful probe of either is dropped
+from the request log (§7); a failing one is not.
 
 ### Error envelope
 
