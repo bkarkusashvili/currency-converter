@@ -34,6 +34,9 @@ In review:
 - **Conversion history** — the record every conversion writes on its way out,
   `GET /api/v1/history` over MongoDB and the `mongodb` health indicator:
   [#7](https://github.com/bkarkusashvili/currency-converter/pull/7).
+- **Web offline fallback** — a persisted rates snapshot and a client-side
+  estimate for when the API is unreachable:
+  [#6](https://github.com/bkarkusashvili/currency-converter/pull/6).
 
 With it the API serves every endpoint
 [`docs/architecture.md`](docs/architecture.md) §3 describes, and the web app
