@@ -4,6 +4,7 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../../common/logging/__tests__/fake-pino-logger';
+import { fakeConfig } from '../../../../config/__tests__/fake-config';
 import { FakeMongoConnection } from '../../../../infrastructure/mongo/__tests__/fake-mongo-connection';
 import { NewConversionRecord } from '../../domain/conversion-record';
 import { ConversionRecordDocument } from '../../schemas/conversion-record.schema';
@@ -24,6 +25,19 @@ const STORED_ID = new Types.ObjectId('6f0000000000000000000001');
 const CREATED_AT = new Date('2026-09-08T12:00:05.000Z');
 
 const STORED = { ...ENTRY, _id: STORED_ID, createdAt: CREATED_AT };
+
+// Short enough that the suite waits it out in real time rather than mocking the
+// clock the helper reads, and long enough that a machine under load does not
+// expire it on a path meant to resolve first.
+const OPERATION_TIMEOUT_MS = 20;
+
+const config = fakeConfig({
+  HISTORY_OPERATION_TIMEOUT_MS: OPERATION_TIMEOUT_MS,
+});
+
+// The stall the guard cannot see: the connection is up as far as mongoose
+// knows, so only the deadline ever ends the wait.
+const NEVER_ANSWERS = new Promise<never>(() => undefined);
 
 // Declared as properties rather than by extending the mongoose types: a
 // jest.Mock read off a method signature is what the unbound-method rule exists
@@ -67,6 +81,7 @@ describe('MongoHistoryRepository', () => {
     repository = new MongoHistoryRepository(
       model as unknown as Model<ConversionRecordDocument>,
       connection.asConnection(),
+      config,
       logger.asPinoLogger(),
     );
   }
@@ -135,6 +150,62 @@ describe('MongoHistoryRepository', () => {
       await expect(repository.findRecent(10)).rejects.toThrow(
         'connection timed out',
       );
+    });
+
+    // `readyState` reports the topology mongoose last observed, so a server
+    // that has gone away or merely slowed down still passes the guard. Without
+    // a deadline the write would sit there for the server-selection budget, or
+    // for as long as the server takes, holding the conversion open behind it.
+    describe('against a server that stops answering', () => {
+      it('drops the write rather than waiting the driver out', async () => {
+        model.create.mockReturnValue(NEVER_ANSWERS);
+
+        await expect(repository.record(ENTRY)).resolves.toBeUndefined();
+      });
+
+      // The same outage as a disconnected store, so the same one line: a hung
+      // Mongo would otherwise warn once per conversion for as long as it hangs.
+      it('reports the outage once rather than once per conversion', async () => {
+        model.create.mockReturnValue(NEVER_ANSWERS);
+
+        await repository.record(ENTRY);
+        await repository.record(ENTRY);
+
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+        expect(logger.warn).toHaveBeenCalledWith(
+          'MongoDB is not connected, conversions are answered but not recorded',
+        );
+      });
+
+      it('answers a read with the documented outage', async () => {
+        query.exec.mockReturnValue(NEVER_ANSWERS);
+
+        await expect(repository.findRecent(10)).rejects.toBeInstanceOf(
+          HistoryUnavailableError,
+        );
+      });
+
+      it('names the deadline as the reason', async () => {
+        query.exec.mockReturnValue(NEVER_ANSWERS);
+
+        await expect(repository.findRecent(10)).rejects.toMatchObject({
+          details: { reason: 'timeout' },
+        });
+      });
+
+      // The store coming back is what closes the outage, and the write is what
+      // proves it: the deadline must not leave the flag stuck.
+      it('records again once the server answers', async () => {
+        model.create.mockReturnValue(NEVER_ANSWERS);
+        await repository.record(ENTRY);
+
+        model.create.mockResolvedValue(STORED);
+        await repository.record(ENTRY);
+
+        expect(logger.info).toHaveBeenCalledWith(
+          'MongoDB is reachable again, conversions are being recorded',
+        );
+      });
     });
   });
 

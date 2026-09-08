@@ -459,6 +459,7 @@ reads.
 | `REDIS_COMMAND_TIMEOUT_MS`          | `300`                                     |
 | `MONGO_URL`                         | `mongodb://localhost:27017/currency_converter` |
 | `MONGO_SERVER_SELECTION_TIMEOUT_MS` | `3000`                                    |
+| `HISTORY_OPERATION_TIMEOUT_MS`      | `1000`                                    |
 | `HISTORY_TTL_DAYS`                  | `30`                                      |
 | `MONOBANK_API_URL`                  | `https://api.monobank.ua/bank/currency`   |
 | `MONOBANK_TIMEOUT_MS`               | `5000`                                    |
@@ -498,9 +499,18 @@ leaving it `false` collapses every client into the proxy's address.
 
 `MONGO_SERVER_SELECTION_TIMEOUT_MS` is deliberately far below the driver's own
 30 seconds: it is a bound on time a conversion would spend looking for a
-database it does no more than write a record to. `HISTORY_TTL_DAYS` drives the
-TTL index on that collection — a log nobody prunes grows without bound, and
-nothing reads a conversion from a month ago.
+database it does no more than write a record to.
+
+`HISTORY_OPERATION_TIMEOUT_MS` bounds the command itself, which server selection
+does not. Mongoose's `readyState` reports the topology it last observed, so for
+up to two heartbeats after a server disappears the connection still reads as
+`connected` — and a server that answers slowly never leaves that state at all.
+The deadline is what makes both cases degrade exactly like a disconnected store:
+the write is dropped with the same one-per-outage warning, and the read answers
+`503 HISTORY_UNAVAILABLE` with `reason: "timeout"`.
+
+`HISTORY_TTL_DAYS` drives the TTL index on that collection — a log nobody prunes
+grows without bound, and nothing reads a conversion from a month ago.
 
 ## 9. API module layout
 

@@ -47,6 +47,12 @@ export const envSchema = z
     // default of 30s is a deadline for a conversion that only writes a history
     // record; §2 keeps that request answering while Mongo is down.
     MONGO_SERVER_SELECTION_TIMEOUT_MS: positiveInt.default(3000),
+    // Deadline for a single history query. Server selection bounds looking for
+    // a server, not a server that answers slowly or stops answering mid
+    // command, and `readyState` stays `connected` until mongoose notices the
+    // topology is gone. This is what makes a hung Mongo degrade like an absent
+    // one instead of holding a conversion open.
+    HISTORY_OPERATION_TIMEOUT_MS: positiveInt.default(1000),
     // How long a conversion record is kept. A demo collection nobody prunes
     // grows without bound, and nothing in the product reads a month-old
     // conversion; the TTL index is what enforces it.

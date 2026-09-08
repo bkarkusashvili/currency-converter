@@ -13,6 +13,7 @@ describe('validateEnv', () => {
         REDIS_COMMAND_TIMEOUT_MS: 300,
         MONGO_URL: 'mongodb://localhost:27017/currency_converter',
         MONGO_SERVER_SELECTION_TIMEOUT_MS: 3000,
+        HISTORY_OPERATION_TIMEOUT_MS: 1000,
         HISTORY_TTL_DAYS: 30,
         MONOBANK_API_URL: 'https://api.monobank.ua/bank/currency',
         MONOBANK_TIMEOUT_MS: 5000,

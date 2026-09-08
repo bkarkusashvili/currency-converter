@@ -1,8 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, ConnectionStates, Model, Types } from 'mongoose';
 import { PinoLogger } from 'nestjs-pino';
 import { HistoryUnavailableError } from '../../../common/errors/history-unavailable.error';
+import { TimeoutError } from '../../../common/utils/timeout.error';
+import { withTimeout } from '../../../common/utils/with-timeout';
+import type { TypedConfigService } from '../../../config/typed-config.service';
 import { ConversionRecord } from '../domain/conversion-record';
 import type { NewConversionRecord } from '../domain/conversion-record';
 import { HistoryRepository } from '../domain/history-repository.port';
@@ -23,6 +27,7 @@ export class MongoHistoryRepository implements HistoryRepository {
     @InjectModel(CONVERSION_RECORD_MODEL)
     private readonly model: Model<ConversionRecordDocument>,
     @InjectConnection() private readonly connection: Connection,
+    @Inject(ConfigService) private readonly config: TypedConfigService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(MongoHistoryRepository.name);
@@ -32,6 +37,13 @@ export class MongoHistoryRepository implements HistoryRepository {
   // driver would still spend the server-selection budget looking for a replica
   // set member before failing, and that budget is time a conversion the client
   // is waiting for would spend on a record it does not read back.
+  //
+  // The deadline is the other half of it. `readyState` reports the topology
+  // mongoose last observed, so for up to two heartbeats after a server goes
+  // away the guard passes and the write pays server selection anyway — and a
+  // server that answers slowly is never disconnected at all. Past the deadline
+  // this is the same outage as a connection that is down, reported the same
+  // once-per-outage way rather than once per conversion.
   async record(entry: NewConversionRecord): Promise<void> {
     if (!this.isConnected()) {
       this.reportDroppedRecords();
@@ -40,12 +52,16 @@ export class MongoHistoryRepository implements HistoryRepository {
     }
 
     try {
-      await this.model.create(entry);
+      await withTimeout(this.model.create(entry), this.operationTimeoutMs());
     } catch (error) {
-      this.logger.warn(
-        { err: error },
-        'Conversion history write failed, dropping the record',
-      );
+      if (error instanceof TimeoutError) {
+        this.reportDroppedRecords();
+      } else {
+        this.logger.warn(
+          { err: error },
+          'Conversion history write failed, dropping the record',
+        );
+      }
 
       return;
     }
@@ -61,14 +77,37 @@ export class MongoHistoryRepository implements HistoryRepository {
       throw new HistoryUnavailableError({ reason: 'connection not ready' });
     }
 
-    const documents = await this.model
-      .find()
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean<StoredConversionRecord[]>()
-      .exec();
+    const documents = await this.read(limit);
 
     return documents.map((document) => this.toRecord(document));
+  }
+
+  // A read that outlives the deadline is the same answer as a store that is
+  // down, and it is the documented one: letting a TimeoutError through would
+  // make the service log an unexpected failure at error level once per request
+  // for as long as the database is slow.
+  private async read(limit: number): Promise<StoredConversionRecord[]> {
+    try {
+      return await withTimeout(
+        this.model
+          .find()
+          .sort({ createdAt: -1 })
+          .limit(limit)
+          .lean<StoredConversionRecord[]>()
+          .exec(),
+        this.operationTimeoutMs(),
+      );
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        throw new HistoryUnavailableError({ reason: 'timeout' });
+      }
+
+      throw error;
+    }
+  }
+
+  private operationTimeoutMs(): number {
+    return this.config.get('HISTORY_OPERATION_TIMEOUT_MS', { infer: true });
   }
 
   private isConnected(): boolean {
