@@ -6,13 +6,18 @@ import { InfoBadge } from '../../../components/InfoBadge';
 import { Skeleton } from '../../../components/Skeleton';
 import { Timestamp } from '../../../components/Timestamp';
 import { WarningIcon } from '../../../components/WarningIcon';
+import { useApiErrorMessage } from '../../../lib/useApiErrorMessage';
 import { useFormatters } from '../../../lib/useFormatters';
 import { sourceCopy, strategyCopy } from '../lib/provenance';
 
 export const HISTORY_LIMIT = 10;
 
+/** The strategy's treatment, which every source that needs no warning shares. */
+const TAG_CLASS = 'text-faint font-mono text-[0.6875rem] tracking-[0.1em] uppercase';
+
 export function HistoryPanel() {
   const { t } = useTranslation();
+  const messageOf = useApiErrorMessage();
   const { data, isPending, error } = useHistory(HISTORY_LIMIT);
 
   return (
@@ -31,7 +36,9 @@ export function HistoryPanel() {
           <WarningIcon className="text-warn mt-0.5 h-4 w-4 shrink-0" />
           <span>
             {t('converter.history.unavailable')}
-            <span className="text-faint mt-1 block font-mono text-xs">{error.message}</span>
+            {/* The same reading of the envelope every other failure gets, so
+                "Cannot GET /api/v1/history" cannot reach the page. */}
+            <span className="text-faint mt-1 block text-xs">{messageOf(error)}</span>
           </span>
         </div>
       )}
@@ -55,6 +62,10 @@ function HistoryRow({ item }: { item: HistoryItem }) {
   // The same copy the result card uses, so one strategy never reads two ways.
   const strategy = strategyCopy(item.strategy);
   const source = sourceCopy(item.source);
+  // A badge on every row makes the heaviest element in the column carry the
+  // least information. Only a source that needs explaining wears one, and only
+  // that row says how old the rate behind it was.
+  const needsExplaining = source.tone === 'warn';
 
   return (
     <li className="border-line grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-1.5 border-b py-3.5">
@@ -73,14 +84,27 @@ function HistoryRow({ item }: { item: HistoryItem }) {
         })}
       </span>
       <span className="flex items-center justify-end gap-2">
-        <span className="text-faint font-mono text-[0.6875rem] tracking-[0.1em] uppercase">
+        <span className={TAG_CLASS}>
           {strategy.valueKey === null ? item.strategy : t(strategy.valueKey)}
         </span>
-        <InfoBadge
-          value={source.valueKey === null ? item.source : t(source.valueKey)}
-          tone={source.tone}
-        />
+        {needsExplaining ? (
+          <InfoBadge
+            value={source.valueKey === null ? item.source : t(source.valueKey)}
+            tone={source.tone}
+          />
+        ) : (
+          <span className={TAG_CLASS}>
+            {source.valueKey === null ? item.source : t(source.valueKey)}
+          </span>
+        )}
       </span>
+      {needsExplaining && (
+        <p className="text-warn numeric col-span-2 font-mono text-xs">
+          {/* The same sentence the result card uses for the same fact. */}
+          {t('converter.result.ratesFetched')}{' '}
+          <Timestamp value={item.ratesTimestamp} withPreposition />
+        </p>
+      )}
     </li>
   );
 }

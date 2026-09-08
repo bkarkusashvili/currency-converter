@@ -45,6 +45,12 @@ describe('timestamp formatting', () => {
     expect(formatters.timestamp(daysBefore(2), now)?.text).toBe('2 days ago');
   });
 
+  it('names the shape it produced, so a sentence can pick its preposition', () => {
+    expect(formatters.timestamp(daysBefore(0), now)?.kind).toBe('clock');
+    expect(formatters.timestamp(daysBefore(1), now)?.kind).toBe('relative');
+    expect(formatters.timestamp(daysBefore(30), now)?.kind).toBe('calendar');
+  });
+
   it('shows date and time once the value is older than a week', () => {
     const stamp = formatters.timestamp('2024-03-05T12:00:00.000Z', now);
 

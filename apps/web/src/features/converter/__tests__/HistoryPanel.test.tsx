@@ -46,6 +46,28 @@ describe('HistoryPanel', () => {
     expect(within(fresh as HTMLElement).getByText('provider')).toBeInTheDocument();
   });
 
+  it('badges only the source that needs explaining and leaves the rest as text', async () => {
+    renderWithItems([entry, { ...entry, id: '2', source: 'cache' }]);
+
+    const [stale, cached] = await screen.findAllByRole('listitem');
+    // The badge is the chip class; a neutral source gets the strategy's treatment.
+    expect(within(stale as HTMLElement).getByText('stale cache')).toHaveClass('badge');
+    expect(within(cached as HTMLElement).getByText('cache')).not.toHaveClass('badge');
+    expect(within(cached as HTMLElement).getByText('direct')).not.toHaveClass('badge');
+  });
+
+  it('says how old the rate was on the rows that need it, and only those', async () => {
+    renderWithItems([entry, { ...entry, id: '2', source: 'cache' }]);
+
+    const [stale, cached] = await screen.findAllByRole('listitem');
+    const age = within(stale as HTMLElement).getByText(/Rates fetched/);
+    expect(age).toHaveTextContent('Rates fetched on');
+    // The rate's own timestamp, not the row's: those are the two different
+    // moments the entry records.
+    expect(age.querySelector('time')).toHaveAttribute('dateTime', '2024-03-05T11:00:00.000Z');
+    expect(within(cached as HTMLElement).queryByText(/Rates fetched/)).not.toBeInTheDocument();
+  });
+
   it('shows a strategy or a source it has no copy for exactly as the API returned it', async () => {
     renderWithItems([
       {
@@ -76,15 +98,32 @@ describe('HistoryPanel', () => {
   it('says the panel is unavailable without blocking the converter', async () => {
     const fake = createFakeRepositories({
       history: new ApiError({
-        statusCode: 503,
-        code: 'INTERNAL_ERROR',
-        message: 'History storage is unavailable.',
+        statusCode: 404,
+        code: 'NOT_FOUND',
+        message: 'Cannot GET /api/v1/history',
       }),
     });
 
     renderWithProviders(<HistoryPanel />, { repositories: fake.repositories });
 
     expect(await screen.findByText(/Recent conversions are unavailable/i)).toBeInTheDocument();
-    expect(screen.getByText('History storage is unavailable.')).toBeInTheDocument();
+    // Translated through the envelope, as every other failure is: the server's
+    // own sentence is not a sentence for a reader.
+    expect(screen.getByText('The API does not have that endpoint.')).toBeInTheDocument();
+    expect(screen.queryByText(/Cannot GET/)).not.toBeInTheDocument();
+  });
+
+  it('falls back to the server sentence for a code it does not know', async () => {
+    const fake = createFakeRepositories({
+      history: new ApiError({
+        statusCode: 503,
+        code: 'HISTORY_ASLEEP',
+        message: 'The history store is having a lie-down.',
+      }),
+    });
+
+    renderWithProviders(<HistoryPanel />, { repositories: fake.repositories });
+
+    expect(await screen.findByText('The history store is having a lie-down.')).toBeInTheDocument();
   });
 });

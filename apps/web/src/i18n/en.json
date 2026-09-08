@@ -14,7 +14,10 @@
     }
   },
   "common": {
-    "unknownTime": "—"
+    "unknownTime": "—",
+    "timeAt": "at {{time}}",
+    "timeOn": "on {{time}}",
+    "timeWhen": "{{time}}"
   },
   "converter": {
     "eyebrow": "Monobank rates",

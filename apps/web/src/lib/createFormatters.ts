@@ -7,10 +7,18 @@ const SIGNIFICANT_RATE_DECIMALS = 2;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RELATIVE_DAY_LIMIT = 7;
 
+/**
+ * Which shape `text` took. A sentence in front of it needs a preposition for a
+ * clock time and a date and none at all for "yesterday", and only the formatter
+ * knows which one it produced.
+ */
+export type TimestampKind = 'clock' | 'relative' | 'calendar';
+
 export interface FormattedTimestamp {
   iso: string;
   text: string;
   title: string;
+  kind: TimestampKind;
 }
 
 export interface Formatters {
@@ -68,14 +76,16 @@ export function createFormatters(locale: string): Formatters {
       }
 
       const days = calendarDaysBetween(now, date);
+      const kind: TimestampKind =
+        days === 0 ? 'clock' : Math.abs(days) < RELATIVE_DAY_LIMIT ? 'relative' : 'calendar';
       const text =
-        days === 0
+        kind === 'clock'
           ? timeOnly.format(date)
-          : Math.abs(days) < RELATIVE_DAY_LIMIT
+          : kind === 'relative'
             ? relative.format(days, 'day')
             : dateAndTime.format(date);
 
-      return { iso: date.toISOString(), text, title: full.format(date) };
+      return { iso: date.toISOString(), text, title: full.format(date), kind };
     },
 
     separators: separatorsOf(integer),

@@ -100,7 +100,7 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
               {isEstimate && (
                 <>
                   {' '}
-                  <Timestamp value={result.ratesTimestamp} />
+                  <Timestamp value={result.ratesTimestamp} withPreposition />
                 </>
               )}
             </dd>
@@ -109,7 +109,8 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
 
         {!isEstimate && (
           <p className="eyebrow mt-4">
-            {t('converter.result.ratesFetched')} <Timestamp value={result.ratesTimestamp} />
+            {t('converter.result.ratesFetched')}{' '}
+            <Timestamp value={result.ratesTimestamp} withPreposition />
           </p>
         )}
       </div>
