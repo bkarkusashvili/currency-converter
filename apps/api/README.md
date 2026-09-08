@@ -8,9 +8,10 @@ is built and deployed on its own, without a root workspace.
 
 ## Requirements
 
-Node 24 (see `.nvmrc`). Redis backs the rates cache; the API starts and serves
-without it, reporting the cache as down on `/health` and paying an upstream call
-per request. MongoDB is only needed once the history module lands.
+Node 24 (see `.nvmrc`). Redis backs the rates cache and MongoDB stores the
+conversion history; the API starts and serves without either. Without Redis the
+cache reports down on `/health` and every request pays an upstream call; without
+Mongo conversions are answered but not recorded, and `/history` answers `503`.
 
 ## Getting started
 
@@ -33,7 +34,8 @@ npm run start:dev
 | `GET` | `/api/v1/rates` | The current exchange rate snapshot, with the `source` it was served from: `cache`, `provider` or `stale-cache` |
 | `DELETE` | `/api/v1/rates/cache` | Drops both cache keys so the next read refetches. `204`; needs `x-api-key` when `ADMIN_API_KEY` is set |
 | `GET` | `/api/v1/currencies` | The currencies of the current snapshot, with ISO 4217 names and numeric codes, sorted by code |
-| `GET` | `/health` | Terminus report with the `redis` and `monobank` indicators |
+| `GET` | `/api/v1/history` | The most recent conversions, newest first. `?limit=` is `1..50`, default `10` |
+| `GET` | `/health` | Terminus report with the `redis`, `mongodb` and `monobank` indicators |
 
 `source` is worth reading: `stale-cache` is a `200` served from the fallback key
 because the upstream could not be reached, so the rates are older than the cache
@@ -83,6 +85,45 @@ the zero.
 A pair the current snapshot cannot price answers `422`: `UNSUPPORTED_CURRENCY`
 when a code is not in the snapshot at all, `RATE_NOT_AVAILABLE` when both codes
 are quoted and there is no path between them.
+
+## History
+
+Every conversion is recorded on its way out and read back newest first:
+
+```bash
+curl -s 'http://localhost:3000/api/v1/history?limit=2'
+```
+
+```json
+{
+  "items": [
+    {
+      "id": "6f0000000000000000000001",
+      "from": "EUR",
+      "to": "GBP",
+      "amount": 100,
+      "result": 85.09,
+      "rate": 0.850942,
+      "strategy": "cross",
+      "source": "cache",
+      "ratesTimestamp": "2026-09-08T12:00:00.000Z",
+      "createdAt": "2026-09-08T12:00:05.000Z"
+    }
+  ]
+}
+```
+
+An entry keeps the provenance the conversion was answered with, so a rate that
+does not match the ones published around it is explained by its `source` rather
+than by guesswork. Records expire after `HISTORY_TTL_DAYS` (30 by default),
+enforced by a TTL index on the collection.
+
+The write never delays or fails a conversion. When Mongo is not connected the
+record is skipped and the response is returned as usual, with one warning per
+outage rather than one per request; `GET /history` is the only route that then
+changes its answer, to `503 HISTORY_UNAVAILABLE`. `?limit=0`, `?limit=51` and
+`?limit=abc` answer `400` naming the field — the API validates the page size
+rather than clamping it.
 
 ## Configuration
 
@@ -156,13 +197,25 @@ docker run --rm -p 3000:3000 currency-api:local
 The image is multi-stage, installs production dependencies only, and runs as the
 unprivileged `node` user. CI builds it on every pull request.
 
-With a Redis to talk to:
+With a Redis and a Mongo to talk to:
 
 ```bash
 docker run -d --name cc-redis -p 6379:6379 redis:7-alpine
-docker run --rm -p 3000:3000 -e REDIS_URL=redis://host.docker.internal:6379 currency-api:local
+docker run -d --name cc-mongo -p 27017:27017 mongo:7
+docker run --rm -p 3000:3000 \
+  -e REDIS_URL=redis://host.docker.internal:6379 \
+  -e MONGO_URL=mongodb://host.docker.internal:27017/currency_converter \
+  currency-api:local
 ```
 
-The client connects on module init, so the first cache read of the process
-reaches a live Redis; a Redis that is down is logged and leaves the API
-serving.
+The Redis client connects on module init, so the first cache read of the process
+reaches a live Redis. The Mongo connection is opened without being waited for,
+so a database that is down delays nothing and the API boots and converts
+regardless; both are logged and reported on `/health`.
+
+On Railway the database variable is a reference to the Mongo service, with the
+database name and the auth source the plugin's root user needs:
+
+```
+MONGO_URL=${{MongoDB.MONGO_URL}}/currency_converter?authSource=admin
+```

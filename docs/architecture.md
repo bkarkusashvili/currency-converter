@@ -116,11 +116,39 @@ Currencies present in the current snapshot plus `UAH`, sorted by code:
 
 ### GET `/api/v1/history?limit=10`
 
-Most recent conversions, newest first. `limit` is `1..50`, default `10`.
+Most recent conversions, newest first. `limit` is `1..50`, default `10`, and it
+is validated rather than clamped: `?limit=0`, `?limit=51` and `?limit=abc` each
+answer `400` naming the field.
 
 ```json
-{ "items": [{ "id": "…", "from": "EUR", "to": "GBP", "amount": 100, "result": 84.73, "rate": 0.847312, "strategy": "cross", "createdAt": "…" }] }
+{
+  "items": [
+    {
+      "id": "6f0000000000000000000001",
+      "from": "EUR",
+      "to": "GBP",
+      "amount": 100,
+      "result": 84.73,
+      "rate": 0.847312,
+      "strategy": "cross",
+      "source": "cache",
+      "ratesTimestamp": "2026-09-08T12:00:00.000Z",
+      "createdAt": "2026-09-08T12:00:05.000Z"
+    }
+  ]
+}
 ```
+
+An entry carries the provenance a conversion was answered with as well as its
+numbers. `source` and `ratesTimestamp` are what explain a stored rate that does
+not match the ones published around it; without them a result priced from the
+stale fallback cannot be reconciled after the fact.
+
+While MongoDB is unreachable this route answers `503 HISTORY_UNAVAILABLE` with a
+`details.reason`, never an empty page — "nothing recorded yet" and "the store is
+down" are different answers — and never a driver message, which carries the
+connection string with the credentials in it. Conversions keep being served
+meanwhile: the record is skipped, the response is not (§2).
 
 ### GET `/health`
 
@@ -128,9 +156,11 @@ Most recent conversions, newest first. `limit` is `1..50`, default `10`.
 
 - `redis` — `PING` under a short budget of its own. `up`, or `down` with the
   reason `ping failed` or `timeout`.
-- `mongodb` — not registered yet. It lands with the history module, which is
-  what introduces Mongo; until then the response carries `redis` and `monobank`
-  only.
+- `mongodb` — the connection state, then a `ping` under the same kind of budget.
+  `up`, or `down` with the reason `not connected`, `ping failed` or `timeout`.
+  The state is checked first: a command issued while nothing is connected
+  reports the driver's complaint rather than the fact that there is nothing to
+  command.
 - `monobank` — the circuit-breaker state; it does **not** call the upstream,
   which allows one request per minute and would be starved by a probe running
   every few seconds. `CLOSED` is `up`, `HALF_OPEN` is `up` with the reason
@@ -178,6 +208,7 @@ Every non-2xx response has this shape:
 | 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                |
 | 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                          |
 | 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists          |
+| 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read        |
 | 500  | `INTERNAL_ERROR`       | Anything unexpected; message is generic           |
 
 Any other 4xx keeps its status and takes its `code` from the name the exception
@@ -427,6 +458,8 @@ reads.
 | `REDIS_URL`                         | `redis://localhost:6379`                  |
 | `REDIS_COMMAND_TIMEOUT_MS`          | `300`                                     |
 | `MONGO_URL`                         | `mongodb://localhost:27017/currency_converter` |
+| `MONGO_SERVER_SELECTION_TIMEOUT_MS` | `3000`                                    |
+| `HISTORY_TTL_DAYS`                  | `30`                                      |
 | `MONOBANK_API_URL`                  | `https://api.monobank.ua/bank/currency`   |
 | `MONOBANK_TIMEOUT_MS`               | `5000`                                    |
 | `MONOBANK_RETRY_ATTEMPTS`           | `3`                                       |
@@ -463,6 +496,12 @@ decides whether the client address comes from `X-Forwarded-For`, which both the
 rate-limit buckets and the request log depend on — behind nginx or on Railway,
 leaving it `false` collapses every client into the proxy's address.
 
+`MONGO_SERVER_SELECTION_TIMEOUT_MS` is deliberately far below the driver's own
+30 seconds: it is a bound on time a conversion would spend looking for a
+database it does no more than write a record to. `HISTORY_TTL_DAYS` drives the
+TTL index on that collection — a log nobody prunes grows without bound, and
+nothing reads a conversion from a month ago.
+
 ## 9. API module layout
 
 ```
@@ -486,7 +525,8 @@ apps/api
 │   │   └── utils/               constant-time compare, withTimeout
 │   ├── infrastructure/
 │   │   ├── redis/               REDIS_CLIENT (ioredis) and the RedisConnection lifecycle
-│   │   └── mongo/               MongoModule (MongooseModule.forRootAsync)
+│   │   └── mongo/               MongooseModule.forRootAsync, the connect options
+│   │                             and the MongoConnection lifecycle
 │   └── modules/
 │       ├── currencies/
 │       │   ├── dto/             CurrencyDto, CurrenciesResponseDto
@@ -516,8 +556,11 @@ apps/api
 │       │   ├── conversion.controller.ts  POST /convert
 │       │   └── conversion.module.ts
 │       ├── history/
-│       │   ├── schemas/         ConversionRecord (Mongoose)
-│       │   ├── history.repository.ts  port + MongoHistoryRepository
+│       │   ├── domain/          ConversionRecord, HistoryRepository port + token
+│       │   ├── schemas/         the Mongoose schema and its TTL index, built
+│       │   │                    per deployment from HISTORY_TTL_DAYS
+│       │   ├── infrastructure/  MongoHistoryRepository, HistoryIndexes
+│       │   ├── dto/             HistoryQueryDto, ConversionRecordDto, HistoryResponseDto
 │       │   ├── history.service.ts
 │       │   ├── history.controller.ts  GET /history
 │       │   └── history.module.ts
@@ -534,8 +577,34 @@ the code it covers, so `src/common/filters/global-exception.filter.ts` is tested
 by `src/common/filters/__tests__/global-exception.filter.spec.ts`.
 
 Conversion persists a `ConversionRecord` after a successful conversion. The
-write is awaited but wrapped: a Mongo failure is logged and the response is
-still returned.
+write is awaited, so a client that reads `/history` straight after a conversion
+finds it there, and wrapped: a Mongo failure is logged and the response is still
+returned.
+
+Awaiting is only safe because nothing on that path waits for a database that is
+down, which is what the Mongo module is built for:
+
+- the connection is opened without being awaited (`lazyConnection`), so the API
+  boots and converts with Mongo unreachable;
+- `bufferCommands: false` and a short `MONGO_SERVER_SELECTION_TIMEOUT_MS` keep a
+  command from queueing or from spending the driver's default 30 seconds;
+- the repository checks the connection state before issuing one at all, because
+  even a fast failure costs the server-selection budget. A skipped record warns
+  once per outage rather than once per conversion;
+- `MongoConnection` logs the state on change and retries an initial connection
+  that never opened. The driver restores a connection it has opened before but
+  not one that failed first, so without the retry the history would stay down
+  until the next deploy because Mongo happened to be starting when the API did;
+- index creation is explicit (`autoIndex: false`). With buffering disabled
+  mongoose's automatic build runs against a connection that is still opening,
+  fails, and swallows the rejection, which would leave the TTL index quietly
+  missing. `HistoryIndexes` reconciles with `syncIndexes` once the connection is
+  open — the expiry is configuration, and a changed `HISTORY_TTL_DAYS` is an
+  options conflict for `createIndexes`.
+
+The collection is `conversions`, with one index: `{ createdAt: -1 }` carrying
+`expireAfterSeconds`. A single-field index is read in either direction, so the
+newest-first page and the retention ride on the same key rather than on two.
 
 ## 10. Web app
 
@@ -583,13 +652,17 @@ still returned.
 | Layer                | Tool                         | What is covered                                   |
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
-| E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history`, `/health` |
+| E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history` with a store that is up and one that is down, `/health` |
 | Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
 
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
 90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
 runs the coverage script, not the plain one, plus `format:check`.
-Unit tests never touch the network, Redis or Mongo.
+Unit tests never touch the network, Redis or Mongo. The e2e suites do not
+either: the shared factory swaps the Redis client, the Mongo connection and the
+history repository for in-process fakes, and the environment points every url
+at a dead host, so a suite that forgets an override fails instead of passing
+against whatever a developer happens to be running.
 
 ## 12. Conventions
 
