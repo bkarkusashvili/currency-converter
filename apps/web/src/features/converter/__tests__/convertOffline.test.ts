@@ -76,6 +76,12 @@ describe('convertOffline', () => {
     });
   });
 
+  // The server settles membership before the chain runs, so a code it never
+  // quotes is UNSUPPORTED_CURRENCY rather than a rate of one against itself.
+  it('has no answer for a code it does not quote, even converted to itself', () => {
+    expect(convertOffline({ from: 'XYZ', to: 'XYZ', amount: 10 }, snapshot)).toBeUndefined();
+  });
+
   it('has no answer for a currency the snapshot does not price', () => {
     expect(convertOffline({ from: 'XYZ', to: 'UAH', amount: 10 }, snapshot)).toBeUndefined();
     expect(convertOffline({ from: 'UAH', to: 'XYZ', amount: 10 }, snapshot)).toBeUndefined();

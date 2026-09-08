@@ -72,12 +72,23 @@ export function convertOffline(
   };
 }
 
-/** Identity, then the published pair, then the hub — the order §5 gives, and for its reasons. */
+/**
+ * Identity, then the published pair, then the hub — the order §5 gives, and for
+ * its reasons. Membership is settled before any of them, as the server's
+ * resolver does: identity prices a code against itself whatever the rates say,
+ * so a chain asked first would answer `XYZ → XYZ` with 1 for a code the
+ * snapshot never quotes and `/currencies` does not list, which is the row §3
+ * reserves for UNSUPPORTED_CURRENCY.
+ */
 function priceConversion(
   from: string,
   to: string,
   rates: readonly ExchangeRate[],
 ): PricedConversion | undefined {
+  if (!quotes(rates, from) || !quotes(rates, to)) {
+    return undefined;
+  }
+
   if (from === to) {
     return { rate: new Money(1), strategy: 'identity' };
   }
@@ -91,6 +102,11 @@ function priceConversion(
   const cross = crossRate(from, to, rates);
 
   return cross === undefined ? undefined : { rate: cross, strategy: 'cross' };
+}
+
+/** Whether the snapshot quotes a code at all, on either side of any pair: what `GET /currencies` lists. */
+function quotes(rates: readonly ExchangeRate[], code: string): boolean {
+  return rates.some((rate) => rate.base === code || rate.quote === code);
 }
 
 /**
