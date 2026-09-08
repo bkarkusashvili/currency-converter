@@ -549,11 +549,11 @@ still returned.
   so a quote in the URL cannot break the file.
 - **Ports and adapters, client side.** `src/api/repositories` declares one
   interface per resource (`ConversionRepository`, `CurrenciesRepository`,
-  `HistoryRepository`, `HealthRepository`) with an HTTP implementation factory
-  each, bound through a React context (`RepositoriesProvider` /
-  `useRepositories`). `src/api/hooks` wraps them in TanStack Query hooks
-  (`useConvert`, `useCurrencies`, `useHistory`, `useHealth`) that depend only on
-  the interfaces. `src/api/http` is the only place that knows about `fetch`; a
+  `RatesRepository`, `HistoryRepository`, `HealthRepository`) with an HTTP
+  implementation factory each, bound through a React context
+  (`RepositoriesProvider` / `useRepositories`). `src/api/hooks` wraps them in
+  TanStack Query hooks (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
+  `useHistory`, `useHealth`) that depend only on the interfaces. `src/api/http` is the only place that knows about `fetch`; a
   component imports nothing from it but the `ApiError` and field-error types it
   renders.
 - `GET /health` goes through that same transport, with `[200, 503]` passed as
@@ -649,9 +649,13 @@ extends it:
   `src/api/http` is the fetch client (base url, headers, decoding the error
   envelope), `src/api/repositories` holds one interface per resource with its
   implementation (`ConversionRepository`, `CurrenciesRepository`,
-  `HistoryRepository`, `HealthRepository`) handed to the tree through a
-  provider, and `src/api/hooks` exposes the TanStack Query hooks components
-  consume (`useConvert`, `useCurrencies`, `useHistory`, `useHealth`). A
-  component never fetches.
+  `RatesRepository`, `HistoryRepository`, `HealthRepository`) handed to the
+  tree through a provider, and `src/api/hooks` exposes the TanStack Query hooks
+  components consume (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
+  `useHistory`, `useHealth`). A component never fetches.
 - Tests inject a fake repository through that same provider rather than mocking
   `fetch` or the network, so a component test never depends on the transport.
+- The persisted query cache is busted by the version in `apps/web/package.json`,
+  which is what discards copies written against an older API contract: a release
+  that changes a persisted response shape has to bump that version, or browsers
+  hydrate the previous shape into code that no longer reads it.
