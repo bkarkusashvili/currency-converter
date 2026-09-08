@@ -37,6 +37,7 @@ describe('API (e2e)', () => {
         status: 'ok',
         details: {
           redis: { status: 'up' },
+          mongodb: { status: 'up' },
           monobank: { status: 'up' },
         },
       });
