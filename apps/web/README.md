@@ -81,7 +81,12 @@ The image builds with `node:24-alpine` and serves the bundle with
 from `API_URL` (default `http://localhost:3000`, JSON-escaped so a quote in the
 URL cannot break the file) and nginx renders its config from a template
 listening on `PORT` (default `80`), with SPA fallback, gzip, long-lived caching
-for hashed assets and no caching for `index.html` and `config.js`.
+for hashed assets and no caching for `index.html` and `config.js`. Every
+location includes `nginx/security-headers.conf`, which sends
+`X-Content-Type-Options: nosniff`, `Referrer-Policy:
+strict-origin-when-cross-origin` and `X-Frame-Options: DENY`; nginx replaces
+inherited `add_header` directives instead of merging them, so the set lives in
+one file that each location includes.
 
 The image declares no `EXPOSE`: the listening port is whatever `PORT` is set
 to, so publish that port (`-p 8080:8080` above).

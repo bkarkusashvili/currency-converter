@@ -5,7 +5,7 @@ server {
     root  /usr/share/nginx/html;
     index index.html;
 
-    add_header X-Content-Type-Options nosniff;
+    include /etc/nginx/snippets/security-headers.conf;
 
     gzip            on;
     gzip_comp_level 5;
@@ -14,22 +14,23 @@ server {
     gzip_types      text/plain text/css application/javascript application/json image/svg+xml font/woff2;
 
     location = /config.js {
+        include /etc/nginx/snippets/security-headers.conf;
         add_header Cache-Control "no-store";
-        add_header X-Content-Type-Options nosniff;
     }
 
     location = /index.html {
+        include /etc/nginx/snippets/security-headers.conf;
         add_header Cache-Control "no-store";
-        add_header X-Content-Type-Options nosniff;
     }
 
     location /assets/ {
+        include /etc/nginx/snippets/security-headers.conf;
         add_header Cache-Control "public, max-age=31536000, immutable";
-        add_header X-Content-Type-Options nosniff;
         try_files $uri =404;
     }
 
     location / {
+        include /etc/nginx/snippets/security-headers.conf;
         try_files $uri $uri/ /index.html;
     }
 }
