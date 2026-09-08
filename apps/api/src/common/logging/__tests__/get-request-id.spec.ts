@@ -1,5 +1,5 @@
 import { IncomingMessage } from 'node:http';
-import { getRequestId } from './get-request-id';
+import { getRequestId } from '../get-request-id';
 
 function createRequest(id: unknown): IncomingMessage {
   return { id } as unknown as IncomingMessage;

@@ -69,13 +69,13 @@
       "ts"
     ],
     "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
+    "testRegex": "__tests__/.*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
       "**/*.ts",
-      "!**/*.spec.ts",
+      "!**/__tests__/**",
       "!main.ts",
       "!**/*.module.ts"
     ],
@@ -86,7 +86,10 @@
         "branches": 85
       }
     },
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>"
+    ]
   },
   "engines": {
     "node": ">=24"

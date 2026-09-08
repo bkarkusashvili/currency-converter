@@ -1,5 +1,5 @@
-import { validationPipeOptions } from './validation-pipe.options';
-import { validationExceptionFactory } from './validation-exception-factory';
+import { validationPipeOptions } from '../validation-pipe.options';
+import { validationExceptionFactory } from '../validation-exception-factory';
 
 describe('validationPipeOptions', () => {
   it('strips unknown properties and rejects the request that sent them', () => {

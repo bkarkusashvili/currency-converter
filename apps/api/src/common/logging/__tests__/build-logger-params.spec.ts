@@ -1,7 +1,7 @@
-import { AppConfig } from '../../config/app-config';
-import type { TypedConfigService } from '../../config/typed-config.service';
-import { assignRequestId } from './assign-request-id';
-import { buildLoggerParams } from './build-logger-params';
+import { AppConfig } from '../../../config/app-config';
+import type { TypedConfigService } from '../../../config/typed-config.service';
+import { assignRequestId } from '../assign-request-id';
+import { buildLoggerParams } from '../build-logger-params';
 
 function createConfig(values: Partial<AppConfig>): TypedConfigService {
   return {

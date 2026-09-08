@@ -1,4 +1,4 @@
-import { timingSafeCompare } from './timing-safe-compare';
+import { timingSafeCompare } from '../timing-safe-compare';
 
 describe('timingSafeCompare', () => {
   it('accepts identical strings', () => {

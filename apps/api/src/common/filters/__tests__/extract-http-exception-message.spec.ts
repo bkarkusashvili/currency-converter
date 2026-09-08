@@ -1,4 +1,4 @@
-import { extractHttpExceptionMessage } from './extract-http-exception-message';
+import { extractHttpExceptionMessage } from '../extract-http-exception-message';
 
 const FALLBACK = 'fallback message';
 

@@ -1,6 +1,6 @@
 import { BadRequestException, HttpStatus } from '@nestjs/common';
-import { ErrorCode } from '../errors/error-code.enum';
-import { validationExceptionFactory } from './validation-exception-factory';
+import { ErrorCode } from '../../errors/error-code.enum';
+import { validationExceptionFactory } from '../validation-exception-factory';
 
 describe('validationExceptionFactory', () => {
   const exception = validationExceptionFactory([

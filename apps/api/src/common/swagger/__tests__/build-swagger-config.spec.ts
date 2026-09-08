@@ -1,4 +1,4 @@
-import { buildSwaggerConfig } from './build-swagger-config';
+import { buildSwaggerConfig } from '../build-swagger-config';
 
 describe('buildSwaggerConfig', () => {
   const config = buildSwaggerConfig({

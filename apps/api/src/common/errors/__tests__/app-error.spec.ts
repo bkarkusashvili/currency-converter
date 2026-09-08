@@ -1,10 +1,10 @@
 import { HttpStatus } from '@nestjs/common';
-import { AppError } from './app-error';
-import { ErrorCode } from './error-code.enum';
-import { RateNotAvailableError } from './rate-not-available.error';
-import { RatesUnavailableError } from './rates-unavailable.error';
-import { UnauthorizedError } from './unauthorized.error';
-import { UnsupportedCurrencyError } from './unsupported-currency.error';
+import { AppError } from '../app-error';
+import { ErrorCode } from '../error-code.enum';
+import { RateNotAvailableError } from '../rate-not-available.error';
+import { RatesUnavailableError } from '../rates-unavailable.error';
+import { UnauthorizedError } from '../unauthorized.error';
+import { UnsupportedCurrencyError } from '../unsupported-currency.error';
 
 describe('AppError', () => {
   it.each([

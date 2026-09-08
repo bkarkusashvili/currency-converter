@@ -1,5 +1,5 @@
 import { ValidationError } from '@nestjs/common';
-import { flattenValidationErrors } from './flatten-validation-errors';
+import { flattenValidationErrors } from '../flatten-validation-errors';
 
 function error(partial: Partial<ValidationError>): ValidationError {
   return { property: 'unknown', ...partial };

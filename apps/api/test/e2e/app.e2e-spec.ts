@@ -4,10 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { Logger } from 'nestjs-pino';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { ErrorCode } from '../src/common/errors/error-code.enum';
-import type { TypedConfigService } from '../src/config/typed-config.service';
-import { configureHttp } from '../src/configure-http';
+import { AppModule } from '../../src/app.module';
+import { ErrorCode } from '../../src/common/errors/error-code.enum';
+import type { TypedConfigService } from '../../src/config/typed-config.service';
+import { configureHttp } from '../../src/configure-http';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const UUID_PATTERN =

@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
-import { assignRequestId } from './assign-request-id';
-import { REQUEST_ID_HEADER } from './request-id.constant';
+import { assignRequestId } from '../assign-request-id';
+import { REQUEST_ID_HEADER } from '../request-id.constant';
 
 function createRequest(headerValue?: string | string[]): IncomingMessage {
   return {

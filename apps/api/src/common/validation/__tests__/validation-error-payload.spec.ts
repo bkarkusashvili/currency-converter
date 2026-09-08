@@ -1,4 +1,4 @@
-import { isValidationErrorPayload } from './validation-error-payload';
+import { isValidationErrorPayload } from '../validation-error-payload';
 
 describe('isValidationErrorPayload', () => {
   it('accepts the payload the validation factory builds', () => {

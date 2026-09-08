@@ -1,7 +1,7 @@
 import { ExecutionContext } from '@nestjs/common';
-import { UnauthorizedError } from '../errors/unauthorized.error';
-import { ApiKeyGuard } from './api-key.guard';
-import type { TypedConfigService } from '../../config/typed-config.service';
+import { UnauthorizedError } from '../../errors/unauthorized.error';
+import { ApiKeyGuard } from '../api-key.guard';
+import type { TypedConfigService } from '../../../config/typed-config.service';
 
 function createConfig(adminApiKey: string | null): TypedConfigService {
   return { get: () => adminApiKey } as unknown as TypedConfigService;

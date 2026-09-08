@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
-import type { TypedConfigService } from '../../config/typed-config.service';
-import { createRedisClient } from './create-redis-client';
+import type { TypedConfigService } from '../../../config/typed-config.service';
+import { createRedisClient } from '../create-redis-client';
 
 function createConfig(redisUrl: string): TypedConfigService {
   return { get: () => redisUrl } as unknown as TypedConfigService;

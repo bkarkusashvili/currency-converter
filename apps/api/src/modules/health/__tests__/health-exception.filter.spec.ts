@@ -3,7 +3,7 @@ import {
   HttpStatus,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { HealthExceptionFilter } from './health-exception.filter';
+import { HealthExceptionFilter } from '../health-exception.filter';
 
 describe('HealthExceptionFilter', () => {
   it('answers with the terminus report verbatim instead of the error envelope', () => {

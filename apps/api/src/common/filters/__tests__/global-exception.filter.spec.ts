@@ -10,11 +10,11 @@ import {
 } from '@nestjs/common';
 import { ThrottlerException } from '@nestjs/throttler';
 import { PinoLogger } from 'nestjs-pino';
-import { ErrorCode } from '../errors/error-code.enum';
-import { RatesUnavailableError } from '../errors/rates-unavailable.error';
-import { UnsupportedCurrencyError } from '../errors/unsupported-currency.error';
-import { ErrorResponse } from './error-response';
-import { GlobalExceptionFilter } from './global-exception.filter';
+import { ErrorCode } from '../../errors/error-code.enum';
+import { RatesUnavailableError } from '../../errors/rates-unavailable.error';
+import { UnsupportedCurrencyError } from '../../errors/unsupported-currency.error';
+import { ErrorResponse } from '../error-response';
+import { GlobalExceptionFilter } from '../global-exception.filter';
 
 const PATH = '/api/v1/convert';
 const REQUEST_ID = 'request-id-1';
