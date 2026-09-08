@@ -4,11 +4,10 @@ import { ExchangeRate } from '../rates/domain/exchange-rate';
 import { Currency } from './currency';
 import { describeCurrency } from './iso-4217';
 
+// The codes come out of a Set, so there are no ties to break. Comparing the
+// strings directly rather than with localeCompare keeps the order identical
+// whatever locale the container's ICU data resolves to.
 function byCode(first: Currency, second: Currency): number {
-  if (first.code === second.code) {
-    return 0;
-  }
-
   return first.code < second.code ? -1 : 1;
 }
 
