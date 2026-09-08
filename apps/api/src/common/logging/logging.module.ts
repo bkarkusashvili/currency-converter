@@ -10,5 +10,8 @@ import { buildLoggerParams } from './build-logger-params';
       useFactory: buildLoggerParams,
     }),
   ],
+  // Re-exported so PinoLogger can be injected by app-level providers such as
+  // GlobalExceptionFilter.
+  exports: [LoggerModule],
 })
 export class LoggingModule {}
