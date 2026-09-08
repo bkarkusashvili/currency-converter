@@ -19,6 +19,7 @@ const EXPECTED_PATHS: ReadonlyArray<readonly [string, string]> = [
   ['/api/v1/convert', 'post'],
   ['/api/v1/rates/cache', 'delete'],
   ['/api/v1/currencies', 'get'],
+  ['/api/v1/history', 'get'],
 ];
 
 // Every schema the document has to describe by name.
@@ -30,6 +31,8 @@ const EXPECTED_SCHEMAS: readonly string[] = [
   'CurrenciesResponseDto',
   'ConvertRequestDto',
   'ConvertResponseDto',
+  'ConversionRecordDto',
+  'HistoryResponseDto',
 ];
 
 describe('OpenAPI document (e2e)', () => {
@@ -163,6 +166,48 @@ describe('OpenAPI document (e2e)', () => {
         amount: { minimum: 0, exclusiveMinimum: true, maximum: 1000000000000 },
       },
       required: ['from', 'to', 'amount'],
+    });
+  });
+
+  it('declares every failure the history can answer with', () => {
+    expect(
+      Object.keys(
+        document.paths['/api/v1/history']?.get?.responses ?? {},
+      ).sort(),
+    ).toStrictEqual(['200', '400', '429', '500', '503']);
+  });
+
+  // The bounds are the contract a client writes its paging against, and they
+  // only exist in the document if the DTO carries them.
+  it('documents the history page size with its bounds and default', () => {
+    const [limit] = document.paths['/api/v1/history']?.get?.parameters ?? [];
+
+    expect(limit).toMatchObject({
+      name: 'limit',
+      in: 'query',
+      required: false,
+      schema: { minimum: 1, maximum: 50, default: 10 },
+    });
+  });
+
+  it('describes a recorded conversion with the provenance it was priced from', () => {
+    expect(document.components?.schemas?.ConversionRecordDto).toMatchObject({
+      properties: {
+        strategy: { type: 'string', enum: [...CONVERSION_STRATEGY_NAMES] },
+        source: { type: 'string', enum: [...RATES_SOURCES] },
+      },
+      required: expect.arrayContaining([
+        'id',
+        'from',
+        'to',
+        'amount',
+        'result',
+        'rate',
+        'strategy',
+        'source',
+        'ratesTimestamp',
+        'createdAt',
+      ]) as string[],
     });
   });
 

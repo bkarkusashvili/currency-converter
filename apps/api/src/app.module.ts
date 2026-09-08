@@ -10,6 +10,7 @@ import { RedisModule } from './infrastructure/redis/redis.module';
 import { ConversionModule } from './modules/conversion/conversion.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { HealthModule } from './modules/health/health.module';
+import { HistoryModule } from './modules/history/history.module';
 import { RatesModule } from './modules/rates/rates.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { RatesModule } from './modules/rates/rates.module';
     RatesModule,
     ConversionModule,
     CurrenciesModule,
+    HistoryModule,
     HealthModule,
   ],
   providers: [
