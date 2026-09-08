@@ -11,3 +11,8 @@ export function swaggerUrl(): string {
 export function healthUrl(): string {
   return `${getApiUrl()}/health`;
 }
+
+/** The liveness probe, which answers a different question from `/health` — see §3. */
+export function livenessUrl(): string {
+  return `${getApiUrl()}/health/live`;
+}

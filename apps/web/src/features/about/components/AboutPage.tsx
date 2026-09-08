@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { README_URL, REPO_URL, healthUrl, swaggerUrl } from '../../../lib/links';
+import { README_URL, REPO_URL, healthUrl, livenessUrl, swaggerUrl } from '../../../lib/links';
 import { BulletList } from './BulletList';
 import { CommandBlock } from './CommandBlock';
 import { ContentSection } from './ContentSection';
@@ -16,8 +16,10 @@ export function AboutPage() {
   const builtPoints = t('about.whatWasBuilt.points', { returnObjects: true });
   const fallback = t('about.fallback.paragraphs', { returnObjects: true });
   const whyPoints = t('about.whyTheseDecisions.points', { returnObjects: true });
+  const tracePoints = t('about.traceability.points', { returnObjects: true });
   const runBlocks = t('about.howToRun.blocks', { returnObjects: true });
   const runNotes = t('about.howToRun.notes', { returnObjects: true });
+  const builtParagraphs = t('about.howItWasBuilt.paragraphs', { returnObjects: true });
 
   return (
     <div className="shell pt-10 pb-4 sm:pt-16">
@@ -50,6 +52,13 @@ export function AboutPage() {
             <li>
               <ExternalLink href={healthUrl()} label={t('about.live.health')} hint={healthUrl()} />
             </li>
+            <li>
+              <ExternalLink
+                href={livenessUrl()}
+                label={t('about.live.liveness')}
+                hint={livenessUrl()}
+              />
+            </li>
           </ul>
           <div className="border-line border-t pt-5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-10">
             <HealthStatus />
@@ -63,6 +72,14 @@ export function AboutPage() {
 
       <ContentSection id="what-was-built" title={t('about.whatWasBuilt.title')}>
         <PointList points={builtPoints} />
+      </ContentSection>
+
+      <ContentSection id="requirements" title={t('about.traceability.title')}>
+        <p className="text-muted mt-5 max-w-2xl text-sm">
+          {t('about.traceability.intro')}{' '}
+          <ExternalLink href={README_URL} label={t('about.traceability.readmeLabel')} />
+        </p>
+        <PointList points={tracePoints} />
       </ContentSection>
 
       <ContentSection id="two-layer-fallback" title={t('about.fallback.title')}>
@@ -88,6 +105,10 @@ export function AboutPage() {
             {note}
           </p>
         ))}
+      </ContentSection>
+
+      <ContentSection id="how-this-was-built" title={t('about.howItWasBuilt.title')}>
+        <ParagraphList paragraphs={builtParagraphs} />
       </ContentSection>
     </div>
   );

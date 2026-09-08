@@ -114,22 +114,24 @@
     "heading": "A currency converter, built as a service.",
     "purpose": [
       "Currency Converter turns an amount in one currency into another using Monobank’s published exchange rates. It exists to show a small service built the way a production service is built: a domain that does not know what a database is, a cache that can fail without taking the request down with it, one error shape for every failure, and a client that tells you where each number came from.",
-      "The design was written down first, in docs/architecture.md, and the code landed against it one pull request at a time. That document is the contract: a change to behaviour changes it in the same pull request."
+      "The design was written down first, in docs/architecture.md, and that document is the contract: a change to behaviour changes it in the same pull request."
     ],
     "live": {
       "heading": "Live",
       "repository": "Source on GitHub",
       "repositoryHint": "bkarkusashvili/currency-converter",
       "apiDocs": "API documentation",
-      "health": "Health endpoint"
+      "health": "Health endpoint",
+      "liveness": "Liveness probe"
     },
     "status": {
       "title": "Where it stands",
       "items": [
-        "Every module the architecture describes has merged: rates, conversion through three strategies, currencies, history, the health endpoint and this client.",
-        "The API and this client are two independent images, built by one CI workflow that runs lint, formatting, typecheck, tests with coverage thresholds, the build and the image build per app.",
+        "Everything below is merged on main and deployed. Nine pull requests, each reviewed with CI green before it merged; there is nothing outstanding and no branch waiting.",
+        "Every module the architecture describes is in: rates, conversion through three strategies, currencies, history, the health endpoints and this client.",
+        "The API and this client are two independent images, built by one CI workflow that runs lint, formatting, typecheck, tests with coverage thresholds, the build and the image build per app — plus a job that boots the whole Docker Compose stack and probes it.",
         "Both run on Railway behind the platform edge, each on its own hostname; the panel above reads the live health endpoint every 30 seconds.",
-        "Docker Compose runs the whole set — api, web, Redis and Mongo — from the repository root."
+        "998 tests pass: 661 API unit, 117 API end-to-end and 220 in this client, with coverage gates of 85% on the API and 90% here."
       ]
     },
     "whatWasBuilt": {
@@ -196,6 +198,18 @@
           "description": "Monobank rate-limits to one request a minute and does go down. An hour-old snapshot is more useful than a 503, as long as the response admits which one you are looking at. That is what the source badge is for."
         },
         {
+          "term": "Two layers of fallback, not one",
+          "description": "Monobank being down and the API being down are different outages with different answers. The API keeps a stale snapshot in Redis; the browser keeps a persisted one of its own. Each says which it used rather than pretending the number is fresh — the section above walks through both."
+        },
+        {
+          "term": "A warning is not an error",
+          "description": "When the cache cannot be reached, or a conversion cannot be recorded, the request still has an answer — so it gets one, with a warnings entry saying what it cost. The field is absent rather than empty when nothing degraded, so it exists to be noticed. Before this, that cost was visible only in the logs."
+        },
+        {
+          "term": "Liveness and readiness are different questions",
+          "description": "/health is the dependency report and answers 503 the moment an indicator is down, which is what monitoring needs. /health/live has no indicators at all, and it is what the deploy gate, the container healthcheck and Compose probe. Pointing a rollout at /health would make Redis a hard dependency of a service that converts perfectly well without it."
+        },
+        {
           "term": "No gateway in front",
           "description": "nginx serves the SPA and nothing else — it proxies no API route. Each service is published by the platform edge under its own hostname, and the API restricts CORS to the web origin, which is the check a gateway would have been added to perform. One hop fewer to configure, secure and debug, and the browser talks to the API it is told about at runtime rather than to a path that happens to be rewritten."
         },
@@ -215,28 +229,74 @@
     },
     "howToRun": {
       "title": "How to run it",
-      "intro": "The README in the repository has the full instructions, including Docker Compose for the whole set. These two commands run this app on its own.",
+      "intro": "Two commands from the repository root bring up the whole thing. The README has the rest — per-app scripts, port overrides and the deploy.",
       "readmeLabel": "Open the README",
       "blocks": [
         {
-          "caption": "From source",
+          "caption": "Backing services in Docker, both apps from npm",
           "commands": [
             "git clone https://github.com/bkarkusashvili/currency-converter",
-            "cd currency-converter/apps/web",
-            "npm ci && npm run dev"
+            "cd currency-converter",
+            "npm ci && npm run setup",
+            "npm run dev"
           ]
         },
         {
-          "caption": "As a container",
-          "commands": [
-            "docker build -t currency-web:local .",
-            "docker run --rm -e API_URL=https://api.example.com -e PORT=8080 -p 8080:8080 currency-web:local"
-          ]
+          "caption": "Everything in Docker",
+          "commands": ["cd currency-converter", "docker compose up --build"]
         }
       ],
       "notes": [
-        "The dev server listens on :5173 and the container on the port given by PORT.",
-        "The web app reads its API URL from public/config.js at runtime, so pointing it at another API needs no rebuild — the container rewrites that file from API_URL at start."
+        "npm run dev waits for Redis and MongoDB to report healthy, then runs the API on :3000 and the Vite dev server on :5173 side by side. docker compose up --build serves the built client on :8080 instead, with the API still on :3000.",
+        "Neither needs a secret or an account: every environment variable has a default, and the one the production schema insists on — the admin key for cache invalidation — has a local placeholder in the Compose file.",
+        "This client reads its API URL from public/config.js at runtime, so pointing it at another API needs no rebuild — the container rewrites that file from API_URL at start."
+      ]
+    },
+    "traceability": {
+      "title": "Requirements, and where each one is",
+      "intro": "The task was eight numbered sections. Each is met; the README carries the full table, one row per atom with the file, the test name and the live URL behind it.",
+      "readmeLabel": "Open the traceability table",
+      "points": [
+        {
+          "term": "1. Node backend, NestJS, design patterns",
+          "description": "NestJS 11 on Node 24, TypeScript strict. Repository: two ports with adapters for Redis and Mongo, bound by DI token. Dependency injection: seven tokens, and every unit test substitutes a fake through the one the runtime uses. Strategy: identity, direct pair and cross via UAH, ordered as data in the module and picked by a resolver that contains no per-strategy branch."
+        },
+        {
+          "term": "2. POST conversion route",
+          "description": "POST /api/v1/convert takes from, to and amount. Codes are case-insensitive and echoed upper-cased; amount has to be a JSON number, so \"100\" is a 400 naming the field rather than a value quietly reinterpreted."
+        },
+        {
+          "term": "3. Fetching from Monobank, with error handling",
+          "description": "A provider that validates the upstream payload with zod at the boundary, retries network errors and 5xx with exponential backoff and full jitter, never retries a 429, and runs inside a hand-written circuit breaker under a total time budget. No upstream URL, status text or body ever reaches a client."
+        },
+        {
+          "term": "4. Caching layer",
+          "description": "Redis cache-aside: a fresh key on a configurable TTL and a long-lived fallback key, written together, with concurrent misses sharing one upstream call. Invalidation is both the TTL and DELETE /api/v1/rates/cache behind an API key."
+        },
+        {
+          "term": "5. Conversion logic",
+          "description": "One snapshot per conversion, so two legs cannot straddle a cache expiry. Cross rates compose the leg into the hryvnia with the leg out of it and pay the spread twice. All arithmetic is big.js on a private constructor; the rate is published rounded to six decimals while the result is computed from the unrounded one."
+        },
+        {
+          "term": "6. Error handling",
+          "description": "One envelope for every failure, produced by a global exception filter, with a request id echoed on the response and on every log line for it. Validation reports one message per field. Unsupported currency and no-rate-path are distinct codes. Rates, history and cache each have their own 503. A cache failure on a read is reported as a warning on the answer that still succeeded, and on the invalidation route as a 503, because there success would be a lie."
+        },
+        {
+          "term": "7. Docker",
+          "description": "One Compose file for api, web, Redis and Mongo, healthchecks on all four and the API waiting on the other two. A dev overlay runs the backing services alone for the npm path. CI boots the full stack on every pull request and probes it."
+        },
+        {
+          "term": "8. Documentation",
+          "description": "A README with three ways to run it, the whole configuration surface and one curl per endpoint with the response it actually returns; Swagger generated from the code and kept in step by a test that fails on a route documented but not served; the architecture document behind both."
+        }
+      ]
+    },
+    "howItWasBuilt": {
+      "title": "How this was built",
+      "paragraphs": [
+        "Specification first. docs/architecture.md was written before the code and describes the module layout, the API contract, the caching and resilience model, the error envelope and the testing strategy. Every pull request was reviewed against it, and behaviour that changed changed the document in the same pull request.",
+        "Then one reviewed pull request at a time — nine of them, 206 commits — each with CI green before merge: lint, formatting, typecheck, build, unit tests against coverage thresholds, the API end-to-end suite, both Docker images, and a job that starts the whole Compose stack and probes it. Nothing was pushed to main directly.",
+        "The implementation was AI-assisted, under human direction and review: the architecture, the scope of each pull request and the decisions listed above were set and reviewed by a person, and a coding assistant wrote much of the code against them. The commits carry a Co-Authored-By trailer saying so, so the record is in the git history rather than in a claim on this page."
       ]
     }
   },
