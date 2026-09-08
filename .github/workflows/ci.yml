@@ -38,6 +38,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Format
+        run: npm run format:check
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -49,3 +52,8 @@ jobs:
 
       - name: E2E tests
         run: npm run test:e2e
+
+      # The image is a deliverable of this package, so a Dockerfile that no
+      # longer builds has to fail here rather than at deploy time.
+      - name: Docker image
+        run: docker build -t currency-api:ci .
