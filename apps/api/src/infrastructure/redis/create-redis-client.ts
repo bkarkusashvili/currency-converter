@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
+import { createOutageReporter } from '../../common/logging/outage-reporter';
 import type { TypedConfigService } from '../../config/typed-config.service';
 
 export function createRedisClient(
@@ -28,26 +29,18 @@ export function createRedisClient(
   // ioredis reconnects on its own and emits an error for every failed attempt,
   // so only the first failure of an outage is worth a warning; repeating it
   // once a second would drown the log for as long as Redis stays down.
-  let outageReported = false;
+  const outage = createOutageReporter(logger, {
+    down: 'Redis connection error',
+    stillDown: 'Redis reconnect attempt failed',
+    restored: 'Redis connection restored',
+  });
 
-  // The error travels as a pino field rather than interpolated into the
-  // sentence: that is what puts a serialised stack in the JSON line instead of
-  // one message with the rest of the failure thrown away.
   client.on('error', (error: Error) => {
-    if (outageReported) {
-      logger.debug({ err: error }, 'Redis reconnect attempt failed');
-      return;
-    }
-
-    outageReported = true;
-    logger.warn({ err: error }, 'Redis connection error');
+    outage.report(error);
   });
 
   client.on('ready', () => {
-    if (outageReported) {
-      outageReported = false;
-      logger.info('Redis connection restored');
-    }
+    outage.clear();
   });
 
   return client;

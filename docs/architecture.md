@@ -540,6 +540,12 @@ Concrete: `UnsupportedCurrencyError`, `RateNotAvailableError`,
   envelope with the codes from §3.
 - Anything else → `500 INTERNAL_ERROR`, generic message, full stack logged.
 
+Something that is down is observed again on every attempt, so the three places
+that watch a dependency — the Redis client's reconnect loop, the Mongo
+connection's state changes and the history writes being dropped — report
+through one `createOutageReporter`: a warning when the outage starts, a debug
+line for the repeats or nothing at all, and one line when it ends.
+
 A failure is logged as pino's `err` field rather than interpolated into the
 message, which is what serialises the stack into the JSON line; the two
 bootstrap paths that log before or during the logger's own flush use the Nest
@@ -654,6 +660,7 @@ apps/api
 │   │   ├── filters/             GlobalExceptionFilter, ErrorResponseDto, status → code mapping
 │   │   ├── guards/              ApiKeyGuard
 │   │   ├── logging/             nestjs-pino setup, request id middleware, log level, serializers,
+│   │   │                        createOutageReporter for the once-per-outage lines, and
 │   │   │                        errorStack for the two bootstrap paths pino cannot serve
 │   │   ├── validation/          ValidationPipe options, error flattening, the upper-case transform
 │   │   ├── throttling/          buildThrottlerOptions and the global guard

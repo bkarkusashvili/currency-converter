@@ -8,6 +8,10 @@ import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, ConnectionStates } from 'mongoose';
 import { PinoLogger } from 'nestjs-pino';
+import {
+  createOutageReporter,
+  OutageReporter,
+} from '../../common/logging/outage-reporter';
 import type { TypedConfigService } from '../../config/typed-config.service';
 import { buildMongoConnectOptions } from './mongo-connect.options';
 
@@ -22,8 +26,11 @@ const RECONNECT_DELAY_MS = 5000;
 export class MongoConnection implements OnModuleInit, OnApplicationShutdown {
   private retryTimer: NodeJS.Timeout | undefined;
   private established = false;
-  private outageReported = false;
   private stopping = false;
+  // No `restored` message: what to say about a connection coming back depends
+  // on whether it had ever been up, which this class knows and the reporter
+  // does not.
+  private readonly outage: OutageReporter;
 
   constructor(
     @InjectConnection() private readonly connection: Connection,
@@ -31,6 +38,11 @@ export class MongoConnection implements OnModuleInit, OnApplicationShutdown {
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(MongoConnection.name);
+    this.outage = createOutageReporter(this.logger, {
+      down: 'MongoDB is unavailable, the conversion history is degraded',
+      stillDown:
+        'MongoDB is still unreachable, the conversion history stays degraded',
+    });
   }
 
   onModuleInit(): void {
@@ -79,14 +91,14 @@ export class MongoConnection implements OnModuleInit, OnApplicationShutdown {
     clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
 
-    if (this.established) {
-      this.logger.info('MongoDB connection restored');
-    } else {
-      this.logger.info('MongoDB connection established');
-    }
+    this.outage.clear();
+    this.logger.info(
+      this.established
+        ? 'MongoDB connection restored'
+        : 'MongoDB connection established',
+    );
 
     this.established = true;
-    this.outageReported = false;
   }
 
   private reportDown(error?: Error): void {
@@ -94,19 +106,7 @@ export class MongoConnection implements OnModuleInit, OnApplicationShutdown {
       return;
     }
 
-    if (this.outageReported) {
-      this.logger.debug(
-        { err: error },
-        'MongoDB is still unreachable, the conversion history stays degraded',
-      );
-    } else {
-      this.outageReported = true;
-      this.logger.warn(
-        { err: error },
-        'MongoDB is unavailable, the conversion history is degraded',
-      );
-    }
-
+    this.outage.report(error);
     this.scheduleRetry();
   }
 
