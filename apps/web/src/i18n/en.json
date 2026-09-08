@@ -79,9 +79,16 @@
         "value": "stale cache",
         "note": "Monobank was unreachable, so the last good snapshot was used. This rate may be out of date."
       },
+      "offline-estimate": {
+        "value": "offline estimate",
+        "note": "API unreachable; estimated from rates fetched"
+      },
       "unknown": {
         "note": "This client does not recognise the source the API reported, so it is shown exactly as it was returned."
       }
+    },
+    "offline": {
+      "withoutSnapshot": "No rates have been cached in this browser yet, so there is nothing to estimate from."
     },
     "history": {
       "heading": "Recent conversions",

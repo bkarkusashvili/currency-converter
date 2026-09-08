@@ -2,6 +2,9 @@ import type { BadgeTone } from '../../../components/InfoBadge';
 
 export const HUB_CURRENCY = 'UAH';
 
+/** The one source that is not the API's: this client priced it from a stored snapshot. */
+export const OFFLINE_ESTIMATE = 'offline-estimate';
+
 interface Copy {
   valueKey: string | null;
   noteKey: string;
@@ -46,6 +49,11 @@ const SOURCE_COPY = {
   'stale-cache': {
     valueKey: 'converter.source.stale-cache.value',
     noteKey: 'converter.source.stale-cache.note',
+    tone: 'warn',
+  },
+  [OFFLINE_ESTIMATE]: {
+    valueKey: 'converter.source.offline-estimate.value',
+    noteKey: 'converter.source.offline-estimate.note',
     tone: 'warn',
   },
 } as const satisfies Record<string, Copy>;
