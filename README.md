@@ -54,12 +54,11 @@ npm run dev               # Redis and MongoDB in Docker, both apps from npm
 and the Vite dev server side by side with prefixed output. Ctrl-C stops both.
 `npm run infra:down` stops the two containers afterwards.
 
-| What          | URL                          |
-| ------------- | ---------------------------- |
-| Web           | http://localhost:5173        |
-| API base path | http://localhost:3000/api/v1 |
-| Swagger       | http://localhost:3000/docs   |
-| Health        | http://localhost:3000/health |
+| What    | URL                          |
+| ------- | ---------------------------- |
+| Web     | http://localhost:5173        |
+| Swagger | http://localhost:3000/docs   |
+| Health  | http://localhost:3000/health |
 
 ### Or the whole stack in Docker
 
@@ -69,12 +68,14 @@ Nothing but Docker — no Node install, no local Redis:
 docker compose up --build   # or: npm run up, detached and waiting for health
 ```
 
-| What          | URL                          |
-| ------------- | ---------------------------- |
-| Web           | http://localhost:8080        |
-| API base path | http://localhost:3000/api/v1 |
-| Swagger       | http://localhost:3000/docs   |
-| Health        | http://localhost:3000/health |
+| What    | URL                          |
+| ------- | ---------------------------- |
+| Web     | http://localhost:8080        |
+| Swagger | http://localhost:3000/docs   |
+| Health  | http://localhost:3000/health |
+
+`http://localhost:3000/api/v1` joins these once
+[#3](https://github.com/bkarkusashvili/currency-converter/pull/3) lands.
 
 Here Redis and MongoDB stay inside the network and are not published, and the
 API waits for both to report healthy before it starts.
@@ -205,7 +206,7 @@ apps/
 docs/architecture.md    the design contract
 package.json            root scripts + `concurrently`; not a workspace
 docker-compose.yml      api, web, redis, mongo
-docker-compose.dev.yml  overlay: backing services only, ports published
+docker-compose.dev.yml  overlay: backing services only, published on loopback
 .github/workflows/ci.yml
 ```
 
@@ -242,10 +243,15 @@ provider the real implementations use.
 Hosted on [Railway](https://railway.com) in project `currency-converter`: two
 services built from these Dockerfiles (`api`, `web`) plus managed `Redis` and
 `MongoDB`. `railway.json` in each app sets the builder, the health check and the
-restart policy, so a deploy that never becomes healthy is rolled back instead of
-going live.
+restart policy, so a deploy that never becomes healthy is never promoted — the
+previous deploy keeps serving.
+
+There is deliberately no gateway in front of the two: Railway's edge exposes
+each service on its own domain, the API's `CORS_ORIGINS` is restricted to the
+web origin, and nginx in the web image exists only to serve the built SPA.
 
 ```bash
+railway link -p currency-converter   # once per clone; `up` also takes -p <project-id>
 railway up apps/api --path-as-root -s api --ci
 railway up apps/web --path-as-root -s web --ci
 ```
