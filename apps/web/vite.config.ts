@@ -8,7 +8,9 @@ const COVERAGE_THRESHOLD = 90;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { port: 5173 },
+  // strictPort: 5173 is one of the origins the API allows, so a silent fall
+  // back to 5174 would turn a port clash into an opaque CORS failure.
+  server: { port: 5173, strictPort: true },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
