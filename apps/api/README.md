@@ -1,98 +1,81 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# currency-converter-api
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS REST API for the currency converter. See
+[`docs/architecture.md`](../../docs/architecture.md) for the design contract.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+This package is self-contained: it has its own `package.json` and lockfile and
+is built and deployed on its own, without a root workspace.
 
-## Description
+## Requirements
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Node 24 (see `.nvmrc`). Redis and MongoDB are only needed once the rates and
+history modules land; the API starts and answers `/health` without them.
 
-## Project setup
+## Getting started
 
 ```bash
-$ npm install
+npm ci
+cp .env.example .env   # optional, every variable has a default
+npm run start:dev
 ```
 
-## Compile and run the project
+- API: `http://localhost:3000/api/v1`
+- Swagger UI: `http://localhost:3000/docs`
+- OpenAPI JSON: `http://localhost:3000/docs-json`
+- Health: `http://localhost:3000/health`
+
+## Configuration
+
+Every variable is optional and validated by a zod schema at startup; an invalid
+value fails the process immediately with a list of what is wrong. `.env.example`
+documents each one with its default.
+
+Reads go through `ConfigService<AppConfig, true>` (aliased as
+`TypedConfigService`), so a key that is not in the schema is a compile error and
+a validated value is never typed as possibly undefined.
+
+## Scripts
+
+| Script | What it does |
+| ------ | ------------ |
+| `npm run start:dev` | Watch mode |
+| `npm run build` | Compile to `dist/` |
+| `npm run lint` | ESLint, fails on any warning |
+| `npm run format` | Prettier over `src` and `test` |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Unit tests |
+| `npm run test:cov` | Unit tests with the 85% line and branch gate |
+| `npm run test:e2e` | End-to-end tests over the real HTTP surface |
+
+## Errors
+
+Every non-2xx response uses one envelope:
+
+```json
+{
+  "statusCode": 422,
+  "code": "UNSUPPORTED_CURRENCY",
+  "message": "Currency 'XYZ' is not supported",
+  "details": { "currency": "XYZ" },
+  "timestamp": "2026-09-08T12:00:00.000Z",
+  "path": "/api/v1/convert",
+  "requestId": "..."
+}
+```
+
+`requestId` is the id from the `x-request-id` header when the caller sends one
+and a generated UUID otherwise. It is echoed back on the response and tags every
+log line for that request, so a report can be traced to its logs.
+
+`/health` is the one exception: it answers with the Terminus report so a failing
+indicator stays visible to monitoring.
+
+## Docker
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker build -t currency-api:local .
+docker run --rm -p 3000:3000 currency-api:local
 ```
 
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+The image is multi-stage, installs production dependencies only, and runs as the
+unprivileged `node` user.

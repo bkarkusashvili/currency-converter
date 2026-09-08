@@ -126,6 +126,12 @@ Most recent conversions, newest first. `limit` is `1..50`, default `10`.
 The Monobank indicator reports the circuit-breaker state and does **not** call
 the upstream (Monobank allows one request per minute).
 
+Indicators are injected through the `HEALTH_INDICATORS` token as
+`HealthIndicatorPort`s, so adding one does not touch the controller. This route
+is the one exception to the error envelope below: a failing indicator answers
+`503` with the Terminus report itself, because collapsing it into the envelope
+would hide which dependency is down.
+
 ### Error envelope
 
 Every non-2xx response has this shape:
@@ -320,15 +326,20 @@ reads.
 
 ```
 apps/api/src
-├── main.ts                      bootstrap: pino logger, helmet, cors, validation pipe, swagger, shutdown hooks
+├── main.ts                      bootstrap: pino logger, swagger, shutdown hooks
+├── configure-http.ts            helmet, CORS and the api/v1 prefix, shared with the e2e suite
 ├── app.module.ts
 ├── config/                      zod schema, typed AppConfig, ConfigModule setup
 ├── common/
 │   ├── errors/                  AppError, ErrorCode, concrete errors
 │   ├── filters/                 GlobalExceptionFilter
 │   ├── guards/                  ApiKeyGuard
+│   ├── logging/                 nestjs-pino setup, request id generation
+│   ├── validation/              ValidationPipe options, validation error flattening
+│   ├── throttling/              ThrottlerModule setup and the global guard
+│   ├── swagger/                 OpenAPI document built from package.json
 │   ├── resilience/              retry, CircuitBreaker, CircuitOpenError
-│   └── utils/                   money rounding helpers (big.js)
+│   └── utils/                   money rounding helpers (big.js), constant-time compare
 ├── infrastructure/
 │   ├── redis/                   RedisModule → REDIS_CLIENT (ioredis) with lifecycle hooks
 │   └── mongo/                   MongoModule (MongooseModule.forRootAsync)
@@ -354,7 +365,7 @@ apps/api/src
 │   │   ├── history.service.ts
 │   │   ├── history.controller.ts  GET /history
 │   │   └── history.module.ts
-│   └── health/                  controller + Redis / Mongo / Monobank indicators
+│   └── health/                  controller, HealthIndicatorPort + Redis / Mongo / Monobank indicators
 └── test/                        e2e (supertest, ioredis-mock, stubbed provider & history repo)
 ```
 
