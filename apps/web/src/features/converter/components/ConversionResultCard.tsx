@@ -75,7 +75,12 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
               ].join(' ')}
             >
               {t(source.noteKey)}
-              {isEstimate && <Timestamp value={result.ratesTimestamp} className="ml-1" />}
+              {isEstimate && (
+                <>
+                  {' '}
+                  <Timestamp value={result.ratesTimestamp} />
+                </>
+              )}
             </dd>
           </div>
         </dl>
