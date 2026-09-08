@@ -1,5 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { README_URL, REPO_URL, healthUrl, livenessUrl, swaggerUrl } from '../../../lib/links';
+import {
+  README_URL,
+  REPO_URL,
+  TRACEABILITY_URL,
+  healthUrl,
+  livenessUrl,
+  swaggerUrl,
+} from '../../../lib/links';
 import { BulletList } from './BulletList';
 import { CommandBlock } from './CommandBlock';
 import { ContentSection } from './ContentSection';
@@ -77,7 +84,7 @@ export function AboutPage() {
       <ContentSection id="requirements" title={t('about.traceability.title')}>
         <p className="text-muted mt-5 max-w-2xl text-sm">
           {t('about.traceability.intro')}{' '}
-          <ExternalLink href={README_URL} label={t('about.traceability.readmeLabel')} />
+          <ExternalLink href={TRACEABILITY_URL} label={t('about.traceability.readmeLabel')} />
         </p>
         <PointList points={tracePoints} />
       </ContentSection>

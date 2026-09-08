@@ -140,7 +140,7 @@ describe('AboutPage', () => {
     expect(screen.getByText(/8\. Documentation/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Open the traceability table/i })).toHaveAttribute(
       'href',
-      'https://github.com/bkarkusashvili/currency-converter#readme',
+      'https://github.com/bkarkusashvili/currency-converter#requirements-traceability',
     );
   });
 
