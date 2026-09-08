@@ -568,7 +568,8 @@ still returned.
   (`@tanstack/query-sync-storage-persister`, 7-day `maxAge`, busted by the
   package version, and skipped entirely when storage is unavailable). A
   conversion that fails with `NETWORK_ERROR` or a 5xx is re-priced from that
-  snapshot by `convertOffline` — §5 rule for rule, in `big.js` — and shown with
+  snapshot by `convertOffline` — §5 rule for rule, on a `big.js` constructor
+  configured like the API's `Money` — and shown with
   a warning-tone `offline-estimate` source badge and the age of the rates; every
   other envelope code is left as the API answered it, and an estimate is never
   added to the history. The currency selects fall back the same way: the API's

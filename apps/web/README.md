@@ -68,9 +68,10 @@ loses only the fallback.
 
 When a conversion fails with `NETWORK_ERROR` or a 5xx, `useConvertWithFallback`
 re-prices it from the persisted snapshot with `features/converter/lib/convertOffline.ts`,
-a pure implementation of the conversion rules in `docs/architecture.md` §5 using
-`big.js`, so the number matches what the API would have answered from the same
-rates. The result card badges it `offline estimate` and says how old the rates
+a pure implementation of the conversion rules in `docs/architecture.md` §5 on a
+`big.js` constructor configured like the API's `Money` — its own `DP`, so a
+global that something else set cannot change a rate — and the number matches
+what the API would have answered from the same rates. The result card badges it `offline estimate` and says how old the rates
 are. Everything the API can answer — validation, an unsupported currency, no
 rate path, 401, 404, 429 — is shown as the API answered it, and an estimate is
 never added to the history, which is the API's record of what it converted. To

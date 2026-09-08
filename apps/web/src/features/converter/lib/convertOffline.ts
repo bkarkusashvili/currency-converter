@@ -1,10 +1,11 @@
-import Big from 'big.js';
+import type Big from 'big.js';
 import type {
   ConversionStrategy,
   ConvertRequest,
   ExchangeRate,
   RatesSnapshotResponse,
 } from '../../../api/types';
+import { Money } from './money';
 import { HUB_CURRENCY } from './provenance';
 
 /**
@@ -64,7 +65,7 @@ export function convertOffline(
     from,
     to,
     amount: request.amount,
-    result: roundHalfUp(new Big(request.amount).times(priced.rate), RESULT_DECIMALS),
+    result: roundHalfUp(new Money(request.amount).times(priced.rate), RESULT_DECIMALS),
     rate: roundHalfUp(priced.rate, RATE_DECIMALS),
     strategy: priced.strategy,
     ratesTimestamp: snapshot.fetchedAt,
@@ -78,7 +79,7 @@ function priceConversion(
   rates: readonly ExchangeRate[],
 ): PricedConversion | undefined {
   if (from === to) {
-    return { rate: new Big(1), strategy: 'identity' };
+    return { rate: new Money(1), strategy: 'identity' };
   }
 
   const direct = directionalRate(from, to, rates);
@@ -106,13 +107,13 @@ function directionalRate(
   const buy = usable(forward?.buy) ?? usable(forward?.cross);
 
   if (buy !== undefined) {
-    return new Big(buy);
+    return new Money(buy);
   }
 
   const reverse = findPair(rates, to, from);
   const sell = usable(reverse?.sell) ?? usable(reverse?.cross);
 
-  return sell === undefined ? undefined : new Big(1).div(sell);
+  return sell === undefined ? undefined : new Money(1).div(sell);
 }
 
 /** Two legs through the currency every published pair has in common, so the spread is paid twice. */
@@ -139,7 +140,7 @@ function usable(rate: number | undefined): number | undefined {
   return rate !== undefined && rate > 0 ? rate : undefined;
 }
 
-/** Half away from zero, the rounding a price list uses; the mode is passed rather than left to Big.RM. */
+/** Half away from zero, the rounding a price list uses; the mode is passed rather than left to a default. */
 function roundHalfUp(value: Big, decimals: number): number {
-  return value.round(decimals, Big.roundHalfUp).toNumber();
+  return value.round(decimals, Money.roundHalfUp).toNumber();
 }
