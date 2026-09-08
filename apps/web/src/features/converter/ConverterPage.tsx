@@ -3,6 +3,7 @@ import { useConvert } from '../../api/useConvert';
 import { useCurrencies } from '../../api/useCurrencies';
 import { ConversionResultCard } from './ConversionResultCard';
 import { ConverterForm } from './ConverterForm';
+import { HistoryPanel } from './HistoryPanel';
 
 export function ConverterPage() {
   const currencies = useCurrencies();
@@ -33,6 +34,7 @@ export function ConverterPage() {
         {conversion.data !== undefined && <ConversionResultCard result={conversion.data} />}
       </div>
 
+      <HistoryPanel />
     </div>
   );
 }
