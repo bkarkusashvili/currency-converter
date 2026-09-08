@@ -77,7 +77,7 @@ describe('RedisRatesRepository', () => {
     // error, so an unchecked exec would call a lost write a success.
     it('warns when a queued command comes back with an error', async () => {
       const rejected = {
-        pipeline: () => {
+        multi: () => {
           const chain = {
             set: () => chain,
             exec: () => Promise.resolve([[new Error('OOM'), null]]),
@@ -88,6 +88,27 @@ describe('RedisRatesRepository', () => {
       } as unknown as Redis;
 
       await build(rejected).save(SNAPSHOT);
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('save failed'),
+      );
+    });
+
+    // exec resolves null on an aborted transaction rather than rejecting, so a
+    // check that only looks at the entries calls a lost write a success.
+    it('warns when the transaction was aborted', async () => {
+      const aborted = {
+        multi: () => {
+          const chain = {
+            set: () => chain,
+            exec: () => Promise.resolve(null),
+          };
+
+          return chain;
+        },
+      } as unknown as Redis;
+
+      await build(aborted).save(SNAPSHOT);
 
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining('save failed'),

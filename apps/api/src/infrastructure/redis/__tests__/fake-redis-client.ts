@@ -21,11 +21,11 @@ interface FakeRedisOptions {
   commandsTimeOut?: boolean;
 }
 
-// A pipeline queues commands and runs them on exec. ioredis reports a command
-// that failed on a live connection as an entry error rather than a rejection,
-// and rejects the whole exec only when the socket is unusable, which is what
-// the queued command's own rejection reproduces here.
-class FakeRedisPipeline {
+// A transaction queues commands and runs them on exec. ioredis reports a
+// command that failed on a live connection as an entry error rather than a
+// rejection, and rejects the whole exec only when the socket is unusable, which
+// is what the queued command's own rejection reproduces here.
+class FakeRedisTransaction {
   private readonly queued: (() => Promise<unknown>)[] = [];
 
   constructor(private readonly client: FakeRedisClient) {}
@@ -35,7 +35,7 @@ class FakeRedisPipeline {
     value: string,
     mode?: 'EX',
     ttlSeconds?: number,
-  ): FakeRedisPipeline {
+  ): FakeRedisTransaction {
     this.queued.push(() => this.client.set(key, value, mode, ttlSeconds));
 
     return this;
@@ -143,8 +143,8 @@ export class FakeRedisClient extends EventEmitter {
     return refusal ? Promise.reject(refusal) : Promise.resolve('PONG');
   }
 
-  pipeline(): FakeRedisPipeline {
-    return new FakeRedisPipeline(this);
+  multi(): FakeRedisTransaction {
+    return new FakeRedisTransaction(this);
   }
 
   quit(): Promise<'OK'> {
