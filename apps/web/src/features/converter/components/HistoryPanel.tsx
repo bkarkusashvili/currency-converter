@@ -3,6 +3,7 @@ import { useHistory } from '../../../api/hooks/useHistory';
 import type { HistoryItem } from '../../../api/types';
 import { Timestamp } from '../../../components/Timestamp';
 import { useFormatters } from '../../../lib/useFormatters';
+import { strategyCopy } from '../lib/provenance';
 
 export const HISTORY_LIMIT = 10;
 
@@ -48,6 +49,8 @@ export function HistoryPanel() {
 function HistoryRow({ item }: { item: HistoryItem }) {
   const { t } = useTranslation();
   const formatters = useFormatters();
+  // The same copy the result card uses, so one strategy never reads two ways.
+  const strategy = strategyCopy(item.strategy);
 
   return (
     <li className="border-line grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-1 border-b py-3">
@@ -66,7 +69,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
         })}
       </span>
       <span className="text-faint font-mono text-[0.625rem] tracking-[0.1em] uppercase">
-        {item.strategy}
+        {strategy.valueKey === null ? item.strategy : t(strategy.valueKey)}
       </span>
     </li>
   );

@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../../api/http/ApiError';
+import type { HistoryItem } from '../../../api/types';
 import { createFakeRepositories } from '../../../test/fakes/createFakeRepositories';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { HISTORY_LIMIT, HistoryPanel } from '../components/HistoryPanel';
@@ -33,6 +34,29 @@ describe('HistoryPanel', () => {
     expect(row).toHaveTextContent('direct');
     expect(row.querySelector('time')).toHaveAttribute('dateTime', '2024-03-05T12:00:00.000Z');
     expect(fake.historyLimits).toEqual([HISTORY_LIMIT]);
+  });
+
+  it('shows a strategy it has no copy for exactly as the API returned it', async () => {
+    const fake = createFakeRepositories({
+      history: {
+        items: [
+          {
+            id: '1',
+            from: 'USD',
+            to: 'UAH',
+            amount: 100,
+            result: 4143.5,
+            rate: 41.435,
+            strategy: 'triangular' as HistoryItem['strategy'],
+            createdAt: '2024-03-05T12:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    renderWithProviders(<HistoryPanel />, { repositories: fake.repositories });
+
+    expect(await screen.findByText('triangular')).toBeInTheDocument();
   });
 
   it('invites a first conversion when the list is empty', async () => {
