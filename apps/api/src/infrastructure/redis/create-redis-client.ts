@@ -15,6 +15,12 @@ export function createRedisClient(
     lazyConnect: true,
     maxRetriesPerRequest: 1,
     enableOfflineQueue: false,
+    // The deadline the other two options do not give: they bound what happens
+    // after a socket error, while a command already written to a socket that
+    // stops answering has nothing to time it out. The cache sits on the request
+    // path, so without this a stalled Redis hangs GET /rates rather than
+    // degrading it to an upstream call.
+    commandTimeout: config.get('REDIS_COMMAND_TIMEOUT_MS', { infer: true }),
   });
 
   // Redis is a cache, not a hard dependency: a connection problem degrades the

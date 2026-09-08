@@ -363,6 +363,7 @@ reads.
 | `CORS_ORIGINS`                      | `http://localhost:5173,http://localhost:8080` |
 | `TRUST_PROXY`                       | `false`                                   |
 | `REDIS_URL`                         | `redis://localhost:6379`                  |
+| `REDIS_COMMAND_TIMEOUT_MS`          | `300`                                     |
 | `MONGO_URL`                         | `mongodb://localhost:27017/currency_converter` |
 | `MONOBANK_API_URL`                  | `https://api.monobank.ua/bank/currency`   |
 | `MONOBANK_TIMEOUT_MS`               | `5000`                                    |
@@ -375,6 +376,14 @@ reads.
 | `THROTTLE_TTL_SECONDS`              | `60`                                      |
 | `THROTTLE_LIMIT`                    | `60`                                      |
 | `ADMIN_API_KEY`                     | *(unset → cache invalidation is open)*    |
+
+`REDIS_COMMAND_TIMEOUT_MS` is the deadline on a single Redis command.
+`maxRetriesPerRequest` bounds the reconnects that follow a socket error and
+`enableOfflineQueue: false` refuses a command issued while the socket is down,
+but neither ends a command already written to a socket that stops answering.
+The cache is on the request path, so without a deadline `GET /rates` waits on it
+indefinitely; with one, the command rejects and `RedisRatesRepository` degrades
+it to a miss and an upstream call.
 
 `TRUST_PROXY` feeds Express's `trust proxy`: `false` trusts nobody, `true` trusts
 every hop, and a number is how many proxies sit in front of the process. It

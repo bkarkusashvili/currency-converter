@@ -8,9 +8,17 @@ export const OFFLINE_QUEUE_REJECTION =
 
 export const CONNECT_REFUSED = 'connect ECONNREFUSED 127.0.0.1:6379';
 
+// What ioredis rejects a command with once it outlives `commandTimeout`. The
+// socket is up and the command was written, so the deadline is the only thing
+// that ever ends the wait.
+export const COMMAND_TIMED_OUT = 'Command timed out';
+
 interface FakeRedisOptions {
   unreachable?: boolean;
   quitFails?: boolean;
+  // Connected, but no command ever comes back: the stall `unreachable` cannot
+  // model and the one the command deadline exists for.
+  commandsTimeOut?: boolean;
 }
 
 // A pipeline queues commands and runs them on exec. ioredis reports a command
@@ -71,10 +79,25 @@ export class FakeRedisClient extends EventEmitter {
     return Promise.resolve();
   }
 
-  get(key: string): Promise<string | null> {
+  // Every command goes through the same two ways a live-looking client refuses
+  // to answer, so a spec picks which one it is testing by the option it built
+  // the fake with rather than by the command it happens to call.
+  private refusal(): Error | undefined {
+    if (this.options.commandsTimeOut === true) {
+      return new Error(COMMAND_TIMED_OUT);
+    }
+
     return this.status === 'ready'
-      ? Promise.resolve(this.store.get(key) ?? null)
-      : Promise.reject(new Error(OFFLINE_QUEUE_REJECTION));
+      ? undefined
+      : new Error(OFFLINE_QUEUE_REJECTION);
+  }
+
+  get(key: string): Promise<string | null> {
+    const refusal = this.refusal();
+
+    return refusal
+      ? Promise.reject(refusal)
+      : Promise.resolve(this.store.get(key) ?? null);
   }
 
   set(
@@ -83,8 +106,10 @@ export class FakeRedisClient extends EventEmitter {
     mode?: 'EX',
     ttlSeconds?: number,
   ): Promise<'OK'> {
-    if (this.status !== 'ready') {
-      return Promise.reject(new Error(OFFLINE_QUEUE_REJECTION));
+    const refusal = this.refusal();
+
+    if (refusal) {
+      return Promise.reject(refusal);
     }
 
     this.store.set(key, value);
@@ -97,8 +122,10 @@ export class FakeRedisClient extends EventEmitter {
   }
 
   del(...keys: string[]): Promise<number> {
-    if (this.status !== 'ready') {
-      return Promise.reject(new Error(OFFLINE_QUEUE_REJECTION));
+    const refusal = this.refusal();
+
+    if (refusal) {
+      return Promise.reject(refusal);
     }
 
     const removed = keys.filter((key) => this.store.delete(key)).length;
@@ -111,9 +138,9 @@ export class FakeRedisClient extends EventEmitter {
   }
 
   ping(): Promise<'PONG'> {
-    return this.status === 'ready'
-      ? Promise.resolve('PONG')
-      : Promise.reject(new Error(OFFLINE_QUEUE_REJECTION));
+    const refusal = this.refusal();
+
+    return refusal ? Promise.reject(refusal) : Promise.resolve('PONG');
   }
 
   pipeline(): FakeRedisPipeline {

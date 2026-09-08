@@ -3,8 +3,11 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../../common/logging/__tests__/fake-pino-logger';
-import type { TypedConfigService } from '../../../../config/typed-config.service';
-import { FakeRedisClient } from '../../../../infrastructure/redis/__tests__/fake-redis-client';
+import { fakeConfig } from '../../../../config/__tests__/fake-config';
+import {
+  COMMAND_TIMED_OUT,
+  FakeRedisClient,
+} from '../../../../infrastructure/redis/__tests__/fake-redis-client';
 import { RatesSnapshot } from '../../domain/rates-snapshot';
 import { RATES_CACHE_KEYS } from '../rates-cache-keys';
 import { RedisRatesRepository } from '../redis-rates.repository';
@@ -25,13 +28,10 @@ const SNAPSHOT: RatesSnapshot = {
   ],
 };
 
-const config = {
-  get: (key: string): unknown =>
-    ({
-      RATES_CACHE_TTL_SECONDS: FRESH_TTL_SECONDS,
-      RATES_STALE_TTL_SECONDS: STALE_TTL_SECONDS,
-    })[key],
-} as unknown as TypedConfigService;
+const config = fakeConfig({
+  RATES_CACHE_TTL_SECONDS: FRESH_TTL_SECONDS,
+  RATES_STALE_TTL_SECONDS: STALE_TTL_SECONDS,
+});
 
 describe('RedisRatesRepository', () => {
   let client: FakeRedisClient;
@@ -143,6 +143,20 @@ describe('RedisRatesRepository', () => {
 
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining(`read of ${RATES_CACHE_KEYS.fresh}`),
+      );
+    });
+
+    // A connected client whose command never comes back is the case the socket
+    // options cannot catch: only `commandTimeout` turns it into the rejection
+    // the repository degrades on, and without it GET /rates waits forever.
+    it('degrades to a miss when a command outlives its deadline', async () => {
+      const stalled = new FakeRedisClient({ commandsTimeOut: true });
+      await stalled.connect();
+
+      await expect(build(stalled.asRedis()).getFresh()).resolves.toBeNull();
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining(COMMAND_TIMED_OUT),
       );
     });
   });

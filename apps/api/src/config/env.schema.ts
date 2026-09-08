@@ -37,6 +37,10 @@ export const envSchema = z.object({
     'http://localhost:8080',
   ]),
   REDIS_URL: z.url().default('redis://localhost:6379'),
+  // Deadline for a single Redis command. `maxRetriesPerRequest` bounds the
+  // reconnects that follow a socket error, not a command sitting on a socket
+  // that never answers, and the cache is on the request path.
+  REDIS_COMMAND_TIMEOUT_MS: positiveInt.default(300),
   MONGO_URL: z.url().default('mongodb://localhost:27017/currency_converter'),
   MONOBANK_API_URL: z.url().default('https://api.monobank.ua/bank/currency'),
   MONOBANK_TIMEOUT_MS: positiveInt.default(5000),
