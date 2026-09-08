@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import helmet from 'helmet';
+import { requestIdMiddleware } from './common/logging/request-id.middleware';
 import type { TypedConfigService } from './config/typed-config.service';
 
 export const GLOBAL_PREFIX = 'api/v1';
@@ -12,6 +13,11 @@ export function configureHttp(
   app: INestApplication,
   config: TypedConfigService,
 ): void {
+  // First in the chain: Nest's body parser is registered after everything here
+  // and before the pino middleware, so a request that dies in the parser still
+  // has an id to report and to log under.
+  app.use(requestIdMiddleware);
+
   app.use(
     helmet({
       // Swagger UI is the only HTML this service serves and it boots from an

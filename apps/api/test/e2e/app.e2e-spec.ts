@@ -97,6 +97,22 @@ describe('API (e2e)', () => {
       expect(response.headers[REQUEST_ID_HEADER]).toMatch(UUID_PATTERN);
     });
 
+    it('replaces an inbound id too long to be a trace id', async () => {
+      const response = await request(server)
+        .get('/health')
+        .set(REQUEST_ID_HEADER, 'a'.repeat(129));
+
+      expect(response.headers[REQUEST_ID_HEADER]).toMatch(UUID_PATTERN);
+    });
+
+    it('replaces an inbound id carrying characters a log line cannot hold', async () => {
+      const response = await request(server)
+        .get('/health')
+        .set(REQUEST_ID_HEADER, 'trace injected');
+
+      expect(response.headers[REQUEST_ID_HEADER]).toMatch(UUID_PATTERN);
+    });
+
     it('generates a distinct id per request', async () => {
       const first = await request(server).get('/health');
       const second = await request(server).get('/health');
@@ -104,6 +120,53 @@ describe('API (e2e)', () => {
       expect(first.headers[REQUEST_ID_HEADER]).not.toBe(
         second.headers[REQUEST_ID_HEADER],
       );
+    });
+  });
+
+  // Nest installs its body parser after everything configureHttp registers and
+  // before any module middleware, so a body that dies in the parser never
+  // reaches pino: the id has to come from the middleware registered first.
+  describe('a body the parser cannot read', () => {
+    function postMalformedJson(inboundRequestId?: string): request.Test {
+      const pending = request(server)
+        .post('/api/v1/does-not-exist')
+        .set('Content-Type', 'application/json');
+
+      if (inboundRequestId !== undefined) {
+        pending.set(REQUEST_ID_HEADER, inboundRequestId);
+      }
+
+      return pending.send('{bad');
+    }
+
+    it('answers with the error envelope', async () => {
+      const response = await postMalformedJson();
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        statusCode: 400,
+        code: ErrorCode.VALIDATION_ERROR,
+        path: '/api/v1/does-not-exist',
+      });
+    });
+
+    it('still reports a request id in the envelope and the header', async () => {
+      const response = await postMalformedJson();
+      const requestId = response.headers[REQUEST_ID_HEADER];
+
+      expect(requestId).toMatch(UUID_PATTERN);
+      expect(response.body).toMatchObject({ requestId });
+    });
+
+    it('keeps the trace id the caller sent', async () => {
+      const response = await postMalformedJson('trace-from-the-gateway');
+
+      expect(response.headers[REQUEST_ID_HEADER]).toBe(
+        'trace-from-the-gateway',
+      );
+      expect(response.body).toMatchObject({
+        requestId: 'trace-from-the-gateway',
+      });
     });
   });
 });
