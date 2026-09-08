@@ -503,6 +503,9 @@ float.
   wait out the same sum — for a stale copy that was already in Redis when the
   first one arrived. The budget sits inside the breaker so an expiry counts as
   an upstream failure rather than passing through unnoticed.
+- **A response ceiling** on the upstream client (`maxContentLength` /
+  `maxBodyLength`, 2 MB against a ~30 KB payload): the timeout bounds how long
+  a response may take and nothing bounded how large it may be.
 - **Throttling** via `@nestjs/throttler` on every route but the liveness
   probe, which is exempt, and `/health`, which carries a generous limit of its
   own (§3). The buckets live in the throttler's default in-process storage, so

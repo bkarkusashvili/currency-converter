@@ -1,19 +1,25 @@
 # syntax=docker/dockerfile:1
 
+# The base is pinned by digest as well as by tag: `node:24-alpine` moves, so two
+# builds of the same commit are otherwise two different images, and which one is
+# running is not something the commit can answer. The tag is kept beside it
+# because it is what says which base this is.
+ARG NODE_IMAGE=node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf
+
 # Full dependency tree, including the devDependencies the build needs.
-FROM node:24-alpine AS deps
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:24-alpine AS build
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json nest-cli.json tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN npm run build
 
-FROM node:24-alpine AS runtime
+FROM ${NODE_IMAGE} AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
