@@ -1,4 +1,5 @@
-import Big from 'big.js';
+import type Big from 'big.js';
+import { Money } from '../../../common/money/money';
 import { CurrencyCode } from '../../rates/domain/currency-code';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
 import { findRate } from './find-rate';
@@ -28,8 +29,10 @@ function reverseRate(pair: ExchangeRate | undefined): number | undefined {
 // holds both, which Monobank's never does; picking one is what makes the answer
 // independent of the order the upstream listed its pairs in.
 //
-// A division carries big.js's default of 20 decimal places, far more than the
-// six a rate is published to, so composing two of them cannot move the answer.
+// The reciprocal is the one division on the money path, so it is built with
+// `Money` rather than the global constructor: thirty decimal places, out of
+// reach of whatever `Big.DP` happens to be, and far more than the six a rate is
+// published to, so composing two of them cannot move the answer.
 export function directionalRate(
   from: CurrencyCode,
   to: CurrencyCode,
@@ -38,10 +41,10 @@ export function directionalRate(
   const forward = forwardRate(findRate(rates, from, to));
 
   if (forward !== undefined) {
-    return new Big(forward);
+    return new Money(forward);
   }
 
   const reverse = reverseRate(findRate(rates, to, from));
 
-  return reverse === undefined ? undefined : new Big(1).div(reverse);
+  return reverse === undefined ? undefined : new Money(1).div(reverse);
 }

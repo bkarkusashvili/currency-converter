@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import Big from 'big.js';
+import type Big from 'big.js';
 import { BASE_CURRENCY } from '../../rates/domain/base-currency';
 import { CurrencyCode } from '../../rates/domain/currency-code';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
@@ -13,6 +13,10 @@ import { requireRate } from './require-rate';
 // buy the target with it. Both legs are the §5 rule, so the spread is paid
 // twice and the answer is worse than a published pair — which is why this is
 // the last strategy tried rather than the general case.
+//
+// Both legs come back from `directionalRate` as `Money` values and big.js
+// carries the constructor through an operation, so the product is one too and
+// the composition never touches the global precision either.
 function crossRate(
   from: CurrencyCode,
   to: CurrencyCode,

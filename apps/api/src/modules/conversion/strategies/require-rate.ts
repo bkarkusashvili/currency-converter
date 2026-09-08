@@ -1,4 +1,4 @@
-import Big from 'big.js';
+import type Big from 'big.js';
 import { RateNotAvailableError } from '../../../common/errors/rate-not-available.error';
 import { CurrencyCode } from '../../rates/domain/currency-code';
 

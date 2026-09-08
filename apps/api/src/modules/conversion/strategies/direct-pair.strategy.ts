@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import Big from 'big.js';
+import type Big from 'big.js';
 import { CurrencyCode } from '../../rates/domain/currency-code';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
 import { ConversionStrategy } from './conversion-strategy';

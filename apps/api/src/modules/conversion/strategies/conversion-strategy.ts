@@ -1,4 +1,4 @@
-import Big from 'big.js';
+import type Big from 'big.js';
 import { CurrencyCode } from '../../rates/domain/currency-code';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
 import { ConversionStrategyName } from './conversion-strategy-name';

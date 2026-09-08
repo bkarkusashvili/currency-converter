@@ -1,3 +1,4 @@
+import Big from 'big.js';
 import { RATE_DECIMALS } from '../../../../common/money/money-decimals';
 import { roundHalfUp } from '../../../../common/money/round-half-up';
 import { ExchangeRate } from '../../../rates/domain/exchange-rate';
@@ -106,6 +107,24 @@ describe('directionalRate', () => {
           { base: 'USD', quote: 'UAH', buy: -1, date: QUOTED_AT },
         ]),
       ).toBeUndefined();
+    });
+  });
+
+  // The quote → base rate is the one division on the money path. It is built
+  // with `Money`, so `Big.DP` — writable by anything in the process — cannot
+  // reach it; on the global constructor the same division would answer 0.02.
+  describe('when something else has changed the global big.js precision', () => {
+    const GLOBAL_DP = Big.DP;
+
+    afterEach(() => {
+      Big.DP = GLOBAL_DP;
+    });
+
+    it('prices the reciprocal at its own precision', () => {
+      Big.DP = 2;
+
+      expect(rateOf('UAH', 'USD')).toBe(0.022306);
+      expect(new Big(1).div(44.831).toString()).toBe('0.02');
     });
   });
 });

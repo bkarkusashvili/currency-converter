@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import Big from 'big.js';
 import { PinoLogger } from 'nestjs-pino';
 import {
   RATE_DECIMALS,
   RESULT_DECIMALS,
 } from '../../common/money/money-decimals';
+import { Money } from '../../common/money/money';
 import { roundHalfUp } from '../../common/money/round-half-up';
 import { RatesService } from '../rates/application/rates.service';
 import { ConversionRequest } from './domain/conversion-request';
@@ -28,6 +28,10 @@ export class ConversionService {
   // rounded separately, so a large amount is not multiplied by an error of up
   // to half a unit in the sixth decimal — a million pounds crossed to zloty
   // differ by 29 groszy between the two. §5 records the choice.
+  //
+  // The other end of the same scale is an amount worth less than half a minor
+  // unit of `to`, which rounds to `0`: the answer is the money, and `rate` is
+  // what explains it. §5 records that too.
   async convert({
     from,
     to,
@@ -36,7 +40,7 @@ export class ConversionService {
     const { snapshot, source } = await this.rates.getSnapshot();
     const strategy = this.resolver.resolve(from, to, snapshot.rates);
     const rate = strategy.rate(from, to, snapshot.rates);
-    const result = roundHalfUp(new Big(amount).times(rate), RESULT_DECIMALS);
+    const result = roundHalfUp(new Money(amount).times(rate), RESULT_DECIMALS);
 
     this.logger.info(
       `Converted ${from} to ${to} at the ${strategy.name} rate from ${source} rates`,
