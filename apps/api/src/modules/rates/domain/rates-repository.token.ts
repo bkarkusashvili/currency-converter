@@ -1,0 +1,1 @@
+export const RATES_REPOSITORY = Symbol('RATES_REPOSITORY');
