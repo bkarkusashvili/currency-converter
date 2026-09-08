@@ -23,8 +23,11 @@ describe('IdentityStrategy', () => {
 
   // Through the port, with the snapshot the other strategies read: identity is
   // the one answer the rates cannot change, including for a currency the
-  // snapshot has no pair for at all.
-  it('answers the same whatever the snapshot holds', () => {
+  // snapshot has no pair for at all. That is the strategy's contract and not
+  // the endpoint's answer — `ConversionStrategyResolver` settles membership
+  // before the chain runs, so `XYZ → XYZ` never reaches this and is reported
+  // `UNSUPPORTED_CURRENCY`.
+  it('stays ignorant of the snapshot it is handed', () => {
     const port: ConversionStrategy = strategy;
 
     expect(port.supports('XYZ', 'XYZ', RATES)).toBe(true);

@@ -248,6 +248,24 @@ describe('conversion (e2e)', () => {
       });
     });
 
+    // Identity prices any code against itself, so this pair is the one place a
+    // code the snapshot never quotes could have answered 200 with rate 1. The
+    // membership check runs before the strategy chain, so it does not.
+    it('reports a code it never quotes converted to itself as unsupported', async () => {
+      const response = await convert({
+        from: 'XYZ',
+        to: 'XYZ',
+        amount: 100,
+      }).expect(422);
+
+      expect(response.body).toMatchObject({
+        statusCode: 422,
+        code: ErrorCode.UNSUPPORTED_CURRENCY,
+        path: CONVERT_PATH,
+        details: { currency: 'XYZ' },
+      });
+    });
+
     // Both codes are quoted and there is still no path between them: CHF is
     // priced only in dollars, so it has no leg to the hryvnia to cross through.
     it('reports two quoted currencies with no path between them', async () => {

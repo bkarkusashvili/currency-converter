@@ -95,6 +95,15 @@ describe('ConversionStrategyResolver', () => {
         UnsupportedCurrencyError,
       );
     });
+
+    // Identity prices any code against itself, so a chain asked first would
+    // answer this pair 200 with rate 1 for a code /currencies does not list.
+    // Membership is settled before the chain, so it is the 422 §3 gives it.
+    it('reports a code the snapshot never quotes converted to itself', () => {
+      expect(() => resolver.resolve('XYZ', 'XYZ', RATES)).toThrow(
+        expect.objectContaining({ details: { currency: 'XYZ' } }) as Error,
+      );
+    });
   });
 
   describe('ordering', () => {
@@ -129,6 +138,18 @@ describe('ConversionStrategyResolver', () => {
       expect(() =>
         resolverOf(stub('none', false)).resolve('USD', 'UAH', RATES),
       ).toThrow(RateNotAvailableError);
+    });
+
+    // The membership check is a precondition of the chain, not a fallback for
+    // it: no strategy is consulted about a code the snapshot never quotes,
+    // however eagerly it would have answered.
+    it('does not consult the chain about a code the snapshot never quotes', () => {
+      const eager = stub('eager', true);
+
+      expect(() => resolverOf(eager).resolve('XYZ', 'XYZ', RATES)).toThrow(
+        UnsupportedCurrencyError,
+      );
+      expect(eager.supports).not.toHaveBeenCalled();
     });
   });
 });

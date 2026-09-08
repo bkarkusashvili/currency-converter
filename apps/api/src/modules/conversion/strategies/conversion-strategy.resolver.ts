@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AppError } from '../../../common/errors/app-error';
 import { RateNotAvailableError } from '../../../common/errors/rate-not-available.error';
 import { UnsupportedCurrencyError } from '../../../common/errors/unsupported-currency.error';
 import { CurrencyCode } from '../../rates/domain/currency-code';
@@ -7,7 +6,10 @@ import { ExchangeRate } from '../../rates/domain/exchange-rate';
 import { ConversionStrategy } from './conversion-strategy';
 import { CONVERSION_STRATEGIES } from './conversion-strategies.token';
 
-function mentions(code: CurrencyCode, rates: readonly ExchangeRate[]): boolean {
+// Whether the snapshot quotes a code at all, on either side of any pair. It is
+// the same question `GET /currencies` answers, so a code this says no to is one
+// the client could not have found listed.
+function quotes(rates: readonly ExchangeRate[], code: CurrencyCode): boolean {
   return rates.some((rate) => rate.base === code || rate.quote === code);
 }
 
@@ -17,22 +19,15 @@ function mentions(code: CurrencyCode, rates: readonly ExchangeRate[]): boolean {
 // help. Two codes it does mention with no path between them is the rates':
 // nothing is wrong with the request, the snapshot is simply thin today.
 //
-// `from` is named first when neither is known, so the message points at the
-// field a caller would fix first rather than at whichever check ran first.
-function describeFailure(
-  from: CurrencyCode,
-  to: CurrencyCode,
+// `from` is checked first so that when neither is known the message points at
+// the field a caller would fix first.
+function requireQuoted(
   rates: readonly ExchangeRate[],
-): AppError {
-  if (!mentions(from, rates)) {
-    return new UnsupportedCurrencyError(from);
+  code: CurrencyCode,
+): void {
+  if (!quotes(rates, code)) {
+    throw new UnsupportedCurrencyError(code);
   }
-
-  if (!mentions(to, rates)) {
-    return new UnsupportedCurrencyError(to);
-  }
-
-  return new RateNotAvailableError(from, to);
 }
 
 // The strategies arrive as an ordered list through the token, so which ways of
@@ -45,17 +40,28 @@ export class ConversionStrategyResolver {
     private readonly strategies: readonly ConversionStrategy[],
   ) {}
 
+  // Membership is settled before the chain runs rather than inferred from it
+  // failing. `IdentityStrategy` prices any code against itself — that is its
+  // contract and the rates cannot change it — so a chain asked first would
+  // answer `XYZ → XYZ` with rate 1 for a code the snapshot never quotes and
+  // `/currencies` does not list, which is the row §3 reserves for
+  // `UNSUPPORTED_CURRENCY`. Checking here keeps each strategy ignorant of what
+  // the API supports and leaves one meaning for a chain that finds nothing:
+  // both codes are quoted and there is no path between them.
   resolve(
     from: CurrencyCode,
     to: CurrencyCode,
     rates: readonly ExchangeRate[],
   ): ConversionStrategy {
+    requireQuoted(rates, from);
+    requireQuoted(rates, to);
+
     const strategy = this.strategies.find((candidate) =>
       candidate.supports(from, to, rates),
     );
 
     if (strategy === undefined) {
-      throw describeFailure(from, to, rates);
+      throw new RateNotAvailableError(from, to);
     }
 
     return strategy;
