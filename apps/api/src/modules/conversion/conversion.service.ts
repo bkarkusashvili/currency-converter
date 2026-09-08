@@ -6,9 +6,9 @@ import {
 } from '../../common/money/money-decimals';
 import { Money } from '../../common/money/money';
 import { roundHalfUp } from '../../common/money/round-half-up';
-import { collectWarnings } from '../../common/warnings/collect-warnings';
 import { HistoryService } from '../history/history.service';
 import { RatesService } from '../rates/application/rates.service';
+import { ConversionOutcome } from './domain/conversion-outcome';
 import { ConversionRequest } from './domain/conversion-request';
 import { ConversionResult } from './domain/conversion-result';
 import { ConversionStrategyResolver } from './strategies/conversion-strategy.resolver';
@@ -35,14 +35,21 @@ export class ConversionService {
   // The other end of the same scale is an amount worth less than half a minor
   // unit of `to`, which rounds to `0`: the answer is the money, and `rate` is
   // what explains it. §5 records that too.
+  //
+  // What comes back is the conversion and what answering it cost, not the
+  // response: the warnings §3 publishes are assembled in the controller, where
+  // /rates assembles its own.
   async convert({
     from,
     to,
     amount,
-  }: ConversionRequest): Promise<ConversionResult> {
+  }: ConversionRequest): Promise<ConversionOutcome> {
     const { snapshot, source, cacheDegraded } = await this.rates.getSnapshot();
     const { strategy, rate } = this.resolver.resolve(from, to, snapshot.rates);
-    const result = roundHalfUp(new Money(amount).times(rate), RESULT_DECIMALS);
+    const converted = roundHalfUp(
+      new Money(amount).times(rate),
+      RESULT_DECIMALS,
+    );
 
     this.logger.info(
       `Converted ${from} to ${to} at the ${strategy.name} rate from ${source} rates`,
@@ -50,13 +57,13 @@ export class ConversionService {
     // The amount is the one part of a conversion that says something about the
     // caller rather than about the rates, so the line that is on in production
     // carries the pair and how it was priced, and this one carries the money.
-    this.logger.debug(`Converted ${amount} ${from} to ${result} ${to}`);
+    this.logger.debug(`Converted ${amount} ${from} to ${converted} ${to}`);
 
-    const answer: ConversionResult = {
+    const result: ConversionResult = {
       from,
       to,
       amount,
-      result,
+      result: converted,
       rate: roundHalfUp(rate, RATE_DECIMALS),
       strategy: strategy.name,
       source,
@@ -70,15 +77,8 @@ export class ConversionService {
     // over it would only be a branch no test can reach honestly. It does report
     // whether the record landed, which is the one thing the client cannot see
     // for itself: /history will not have this conversion in it.
-    const recorded = await this.history.record(answer);
+    const recorded = await this.history.record(result);
 
-    const warnings = collectWarnings({
-      CACHE_UNAVAILABLE: cacheDegraded,
-      HISTORY_NOT_RECORDED: !recorded,
-    });
-
-    // Spread rather than assigned undefined: an answer nothing degraded is
-    // exactly the one this route has always given, down to the absent key.
-    return warnings === undefined ? answer : { ...answer, warnings };
+    return { result, cacheDegraded, recorded };
   }
 }

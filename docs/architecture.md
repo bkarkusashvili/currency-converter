@@ -244,6 +244,10 @@ beside their answer:
 
 The request succeeded — that is what separates a warning from the error
 envelope below — and each entry says what degraded while it was being answered.
+Both routes assemble the array the same way and in the same place: the service
+reports what degraded (`RatesLookup.cacheDegraded`, `ConversionOutcome`) and the
+controller turns that into the field, so a stored conversion is a record of what
+was converted rather than of the request that converted it.
 The field is **absent, not empty**, when nothing did: it exists to be noticed,
 and a healthy response is byte for byte the one it has always been.
 
@@ -703,7 +707,8 @@ apps/api
 │       │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
 │       │   └── rates.module.ts
 │       ├── conversion/
-│       │   ├── domain/          ConversionRequest, ConversionResult
+│       │   ├── domain/          ConversionRequest, ConversionResult and the ConversionOutcome that
+│       │   │                    carries it out of the service with what degraded beside it
 │       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
 │       │   ├── strategies/      interface, identity, direct, cross, resolver + token,
 │       │   │                    orderStrategies, findRate and directionalRate,
