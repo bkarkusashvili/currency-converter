@@ -433,20 +433,25 @@ still returned.
   each, bound through a React context (`RepositoriesProvider` /
   `useRepositories`). `src/api/hooks` wraps them in TanStack Query hooks
   (`useConvert`, `useCurrencies`, `useHistory`, `useHealth`) that depend only on
-  the interfaces. `src/api/http` is the only place that knows about `fetch`, and
-  no component imports it.
-- `GET /health` uses its own transport: `200` and `503` both carry the terminus
-  report, so a degraded API is rendered indicator by indicator instead of as
-  unreachable. Only a transport failure or an unreadable body is an error, and
-  the query does not retry.
+  the interfaces. `src/api/http` is the only place that knows about `fetch`; a
+  component imports nothing from it but the `ApiError` and field-error types it
+  renders.
+- `GET /health` goes through that same transport, with `[200, 503]` passed as
+  its accepted statuses: both carry the terminus report, so a degraded API is
+  rendered indicator by indicator instead of as unreachable. A transport
+  failure, a body that does not parse and a report that fails its guard are the
+  only errors, each carrying the status it arrived on, and the query does not
+  retry.
 - **Internationalisation.** Every user-facing string lives in
   `src/i18n/en.json`, loaded through `react-i18next`; the `CustomTypeOptions`
   augmentation type-checks keys against the JSON. Numbers and dates are
-  formatted with `Intl` in the active language. Adding a language is a new JSON
+  formatted with `Intl` in the active language, and the document's `lang`
+  attribute follows i18next's resolved language. Adding a language is a new JSON
   file plus a language switch, with no component changes. API failures map the
   envelope `code` to a translated message and fall back to the server `message`;
   `details.errors` entries are shown as returned, and the ones naming `amount`,
-  `from` or `to` are routed onto that input.
+  `from` or `to` are routed onto that input, where they clear as soon as the
+  user edits the field they describe.
 - Feature folders carry their own structure (`components/`, `hooks/`, `lib/`,
   `__tests__/`); shared test helpers and fakes live in `src/test/`.
 - Tests: Vitest + Testing Library, rendered through the i18n and repository
@@ -511,9 +516,10 @@ extends it:
 - Data access is layered and each layer is the only one that knows its concern:
   `src/api/http` is the fetch client (base url, headers, decoding the error
   envelope), `src/api/repositories` holds one interface per resource with its
-  implementation (`RatesRepository`, `ConversionRepository`,
-  `HistoryRepository`) handed to the tree through a provider, and
-  `src/api/hooks` exposes the TanStack Query hooks components consume
-  (`useConvert`, `useCurrencies`, `useHistory`). A component never fetches.
+  implementation (`ConversionRepository`, `CurrenciesRepository`,
+  `HistoryRepository`, `HealthRepository`) handed to the tree through a
+  provider, and `src/api/hooks` exposes the TanStack Query hooks components
+  consume (`useConvert`, `useCurrencies`, `useHistory`, `useHealth`). A
+  component never fetches.
 - Tests inject a fake repository through that same provider rather than mocking
   `fetch` or the network, so a component test never depends on the transport.
