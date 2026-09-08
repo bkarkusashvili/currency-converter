@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { canonicalAmount } from '../lib/canonicalAmount';
 import {
+  DEFAULT_SEPARATORS,
   formatAmountInput,
   MAX_INTEGER_DIGITS,
   type AmountSeparators,
@@ -120,12 +122,42 @@ describe('locale separators', () => {
   });
 });
 
-describe('what the form then parses', () => {
-  it('produces a value parseAmount reads back as the number typed', () => {
-    expect(parseAmount(formatAmountInput('1234567.89', 10).value)).toEqual({
-      ok: true,
-      value: 1234567.89,
-    });
-    expect(parseAmount(formatAmountInput('1250.5', 6).value)).toEqual({ ok: true, value: 1250.5 });
+/**
+ * The whole round trip, in both a locale that groups with `,` and one that
+ * groups with `.`: what the field writes, canonicalised, is what the form
+ * submits. Under the swapped separators the field's own output collides with
+ * `parseAmount`'s reading of a typed string — `1.234` is 1234 here and 1.234
+ * there — which is what `canonicalAmount` stands between.
+ */
+describe.each([
+  ['the locale separators', DEFAULT_SEPARATORS],
+  ['separators the other way round', SWAPPED],
+])('what the form then parses under %s', (_name, separators) => {
+  function submitted(typed: string) {
+    const { value } = formatAmountInput(typed, typed.length, separators);
+    return parseAmount(canonicalAmount(value, separators));
+  }
+
+  const decimal = separators.decimal;
+
+  it('reads back the number that was typed', () => {
+    expect(submitted(`1234567${decimal}89`)).toEqual({ ok: true, value: 1234567.89 });
+    expect(submitted(`1250${decimal}5`)).toEqual({ ok: true, value: 1250.5 });
+  });
+
+  it('reads back a grouped whole number as the number, not as a fraction', () => {
+    expect(submitted('1234')).toEqual({ ok: true, value: 1234 });
+    expect(submitted('12345')).toEqual({ ok: true, value: 12345 });
+  });
+
+  it('submits a half-typed decimal as the whole number in front of it', () => {
+    expect(submitted(`12${decimal}`)).toEqual({ ok: true, value: 12 });
+    expect(submitted(`1234${decimal}`)).toEqual({ ok: true, value: 1234 });
+  });
+
+  it('still refuses what no amount may be', () => {
+    expect(submitted('0')).toEqual({ ok: false, error: 'notPositive' });
+    expect(submitted('')).toEqual({ ok: false, error: 'empty' });
+    expect(submitted('9'.repeat(MAX_INTEGER_DIGITS))).toEqual({ ok: false, error: 'tooLarge' });
   });
 });

@@ -695,6 +695,14 @@ newest-first page and the retention ride on the same key rather than on two.
   regrouping would otherwise put straight back. What an amount *means* is still
   `parseAmount`'s rule alone, and it is what answers `tooLarge`; the field only
   keeps characters no amount can contain from being typed at all.
+  The two do not read the same string, so one step stands between them:
+  `canonicalAmount(value, separators)` drops the group mark, normalises the
+  decimal mark to `.` and drops a decimal mark with no digits behind it, and the
+  form parses **that**. Without it the field's own output is ambiguous — under
+  `{group: '.', decimal: ','}` the `1.234` it writes for 1234 parses as 1.234, a
+  silent 1000× error — and a half-typed `12.` submitted with Enter, which does
+  not blur, parses as nothing at all. Blur still trims a dangling separator, but
+  only so the field looks finished; correctness does not depend on it.
 - **Provenance in the client.** The result card prints the rate in both
   directions — the API publishes one, and `inverseRate` computes the other on
   the same `big.js` constructor, rounded half-up to the six places §3 uses — and

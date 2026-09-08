@@ -447,6 +447,37 @@ describe('the amount field', () => {
     expect(amount).toHaveValue('12');
   });
 
+  it('submits the number in front of a dangling separator when Enter skips the blur', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '12.{Enter}');
+
+    // The field still shows what was typed — only blur tidies that — and the
+    // form has already sent the number it stands for.
+    expect(amount).toHaveValue('12.');
+    await waitFor(() => {
+      expect(fake.convertCalls).toEqual([{ from: 'USD', to: 'UAH', amount: 12 }]);
+    });
+    expect(screen.queryByText('Enter a number, for example 250.75.')).not.toBeInTheDocument();
+  });
+
+  it('sends the number behind the grouping when Enter follows a dangling separator', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+    const amount = screen.getByLabelText('Amount');
+
+    await user.clear(amount);
+    await user.type(amount, '1234.{Enter}');
+
+    expect(amount).toHaveValue('1,234.');
+    await waitFor(() => {
+      expect(fake.convertCalls).toEqual([{ from: 'USD', to: 'UAH', amount: 1234 }]);
+    });
+  });
+
   it('describes what the field accepts', () => {
     renderPage();
 

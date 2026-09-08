@@ -57,6 +57,14 @@ It decides what may be _typed_, not what an amount _means_: `parseAmount` is
 still the single rule for that, and it is what answers `Amount must be
 1,000,000,000,000 or less.`
 
+The two do not read the same string, so `lib/canonicalAmount.ts` stands between
+them: it drops the group mark, normalises the decimal mark to `.` and drops a
+decimal mark with nothing behind it, and the form parses that. It is what keeps
+`12.` submitted with Enter — which never blurs — from being read as no number
+at all, and what stops the `1.234` the field writes for 1234 in a
+`.`-grouping locale from being read as 1.234. Blur still trims a dangling
+separator, but only so the field looks finished.
+
 ## Internationalisation
 
 Every user-facing string lives in `src/i18n/en.json` and is read through
