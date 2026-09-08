@@ -1,4 +1,4 @@
-import { RatesSnapshot } from '../../../src/modules/rates/domain/rates-snapshot';
+import { RatesSnapshot } from '../../../src/modules/rates/domain/exchange-rate';
 
 const QUOTED_AT = '2026-09-08T11:00:00.000Z';
 

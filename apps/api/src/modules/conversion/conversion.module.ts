@@ -4,9 +4,11 @@ import { HistoryModule } from '../history/history.module';
 import { RatesModule } from '../rates/rates.module';
 import { ConversionController } from './conversion.controller';
 import { ConversionService } from './conversion.service';
-import { ConversionStrategy } from './strategies/conversion-strategy';
+import {
+  ConversionStrategy,
+  CONVERSION_STRATEGIES,
+} from './strategies/conversion-strategy';
 import { ConversionStrategyResolver } from './strategies/conversion-strategy.resolver';
-import { CONVERSION_STRATEGIES } from './strategies/conversion-strategies.token';
 import { CrossRateStrategy } from './strategies/cross-rate.strategy';
 import { DirectPairStrategy } from './strategies/direct-pair.strategy';
 import { IdentityStrategy } from './strategies/identity.strategy';

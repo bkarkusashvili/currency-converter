@@ -3,8 +3,10 @@ import { TerminusModule } from '@nestjs/terminus';
 import { RedisModule } from '../../infrastructure/redis/redis.module';
 import { RatesModule } from '../rates/rates.module';
 import { HealthController } from './health.controller';
-import { HEALTH_INDICATORS } from './health-indicators.token';
-import type { HealthIndicatorPort } from './health-indicator.port';
+import {
+  HEALTH_INDICATORS,
+  HealthIndicatorPort,
+} from './health-indicator.port';
 import { MongoHealthIndicator } from './mongo-health.indicator';
 import { MonobankHealthIndicator } from './monobank-health.indicator';
 import { RedisHealthIndicator } from './redis-health.indicator';

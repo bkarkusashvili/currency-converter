@@ -1,1 +1,0 @@
-export const HISTORY_REPOSITORY = Symbol('HISTORY_REPOSITORY');

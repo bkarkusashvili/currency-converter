@@ -14,3 +14,5 @@ export interface HistoryRepository {
   // whatever the caller asks for. Rejects when the store cannot be read.
   findRecent(limit: number): Promise<ConversionRecord[]>;
 }
+
+export const HISTORY_REPOSITORY = Symbol('HISTORY_REPOSITORY');

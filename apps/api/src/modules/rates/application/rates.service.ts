@@ -1,12 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { RatesUnavailableError } from '../../../common/errors/rates-unavailable.error';
-import { RatesLookup } from '../domain/rates-lookup';
-import type { RatesProvider } from '../domain/rates-provider.port';
-import { RATES_PROVIDER } from '../domain/rates-provider.token';
-import type { RatesRepository } from '../domain/rates-repository.port';
-import { RATES_REPOSITORY } from '../domain/rates-repository.token';
-import { RatesSnapshot } from '../domain/rates-snapshot';
+import { RatesLookup, RatesSnapshot } from '../domain/exchange-rate';
+import { RATES_PROVIDER, RATES_REPOSITORY } from '../domain/ports';
+import type { RatesProvider, RatesRepository } from '../domain/ports';
 import { describeRatesFailure } from './describe-rates-failure';
 
 // A fetch and what caching it cost: the snapshot the upstream answered with,

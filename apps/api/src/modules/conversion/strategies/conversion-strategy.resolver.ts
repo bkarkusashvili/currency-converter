@@ -4,8 +4,8 @@ import { CurrencyCode } from '../../../common/currency/currency-code';
 import { RateNotAvailableError } from '../../../common/errors/rate-not-available.error';
 import { UnsupportedCurrencyError } from '../../../common/errors/unsupported-currency.error';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
-import { ConversionStrategy } from './conversion-strategy';
-import { CONVERSION_STRATEGIES } from './conversion-strategies.token';
+import { CONVERSION_STRATEGIES } from './conversion-strategy';
+import type { ConversionStrategy } from './conversion-strategy';
 
 // Whether the snapshot quotes a code at all, on either side of any pair. It is
 // the same question `GET /currencies` answers, so a code this says no to is one

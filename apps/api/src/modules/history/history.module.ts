@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LoggingModule } from '../../common/logging/logging.module';
-import { HISTORY_REPOSITORY } from './domain/history-repository.token';
+import { HISTORY_REPOSITORY } from './domain/history-repository.port';
 import { HistoryController } from './history.controller';
 import { HistoryService } from './history.service';
 import { HistoryIndexes } from './infrastructure/history-indexes';

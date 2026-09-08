@@ -1,5 +1,5 @@
 import { CacheUnavailableError } from '../../../common/errors/cache-unavailable.error';
-import { RatesLookup } from '../domain/rates-lookup';
+import { RatesLookup } from '../domain/exchange-rate';
 import { RatesService } from '../application/rates.service';
 import { RatesController } from '../rates.controller';
 

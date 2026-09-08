@@ -6,8 +6,10 @@ import {
   HealthIndicatorResult,
   TerminusModule,
 } from '@nestjs/terminus';
-import type { HealthIndicatorPort } from '../health-indicator.port';
-import { HEALTH_INDICATORS } from '../health-indicators.token';
+import {
+  HealthIndicatorPort,
+  HEALTH_INDICATORS,
+} from '../health-indicator.port';
 import { HealthController } from '../health.controller';
 
 async function createController(

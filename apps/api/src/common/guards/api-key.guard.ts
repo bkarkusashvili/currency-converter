@@ -9,7 +9,10 @@ import { Request } from 'express';
 import type { TypedConfigService } from '../../config/typed-config.service';
 import { UnauthorizedError } from '../errors/unauthorized.error';
 import { timingSafeCompare } from '../utils/timing-safe-compare';
-import { API_KEY_HEADER } from './api-key.constant';
+
+// The header the admin key travels in, named here beside the guard that reads
+// it: the OpenAPI security scheme has to publish the same name.
+export const API_KEY_HEADER = 'x-api-key';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {

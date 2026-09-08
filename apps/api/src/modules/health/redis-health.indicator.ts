@@ -4,7 +4,7 @@ import {
   HealthIndicatorService,
 } from '@nestjs/terminus';
 import Redis from 'ioredis';
-import { REDIS_CLIENT } from '../../infrastructure/redis/redis-client.token';
+import { REDIS_CLIENT } from '../../infrastructure/redis/create-redis-client';
 import { HealthIndicatorPort } from './health-indicator.port';
 import { pingIndicator } from './ping-indicator';
 

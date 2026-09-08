@@ -6,7 +6,7 @@ import {
 } from '../../../common/logging/__tests__/fake-pino-logger';
 import { HistoryService } from '../../history/history.service';
 import { RatesService } from '../../rates/application/rates.service';
-import { RatesLookup } from '../../rates/domain/rates-lookup';
+import { RatesLookup } from '../../rates/domain/exchange-rate';
 import { ConversionService } from '../conversion.service';
 import { ConversionRequest } from '../domain/conversion-request';
 import { ConversionResult } from '../domain/conversion-result';

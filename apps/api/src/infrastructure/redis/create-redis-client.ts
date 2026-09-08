@@ -3,6 +3,10 @@ import { PinoLogger } from 'nestjs-pino';
 import { createOutageReporter } from '../../common/logging/outage-reporter';
 import type { TypedConfigService } from '../../config/typed-config.service';
 
+// The injection token for the client this factory builds. One connection is
+// shared by the cache adapter, the health indicator and the connection manager.
+export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
+
 export function createRedisClient(
   config: TypedConfigService,
   logger: PinoLogger,
