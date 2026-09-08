@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { AppError } from '../app-error';
 import { ErrorCode } from '../error-code.enum';
+import { HistoryUnavailableError } from '../history-unavailable.error';
 import { RateNotAvailableError } from '../rate-not-available.error';
 import { RatesUnavailableError } from '../rates-unavailable.error';
 import { UnauthorizedError } from '../unauthorized.error';
@@ -11,6 +12,7 @@ describe('AppError', () => {
     new UnsupportedCurrencyError('XYZ'),
     new RateNotAvailableError('EUR', 'GBP'),
     new RatesUnavailableError(),
+    new HistoryUnavailableError(),
     new UnauthorizedError(),
   ])('is a real Error subclass carrying a stack (%s)', (error) => {
     expect(error).toBeInstanceOf(AppError);
@@ -22,6 +24,7 @@ describe('AppError', () => {
     new UnsupportedCurrencyError('XYZ'),
     new RateNotAvailableError('EUR', 'GBP'),
     new RatesUnavailableError(),
+    new HistoryUnavailableError(),
     new UnauthorizedError(),
   ])('reports its own class name rather than "Error"', (error) => {
     expect(error.name).toBe(error.constructor.name);
@@ -31,6 +34,7 @@ describe('AppError', () => {
     new UnsupportedCurrencyError('XYZ'),
     new RateNotAvailableError('EUR', 'GBP'),
     new RatesUnavailableError(),
+    new HistoryUnavailableError(),
     new UnauthorizedError(),
   ])('has a non-empty default message (%s)', (error) => {
     expect(error.message.length).toBeGreaterThan(0);
@@ -79,6 +83,32 @@ describe('RatesUnavailableError', () => {
     expect(
       new RatesUnavailableError({ reason: 'circuit-open' }).details,
     ).toStrictEqual({ reason: 'circuit-open' });
+  });
+});
+
+describe('HistoryUnavailableError', () => {
+  it('maps to 503 HISTORY_UNAVAILABLE with no details by default', () => {
+    const error = new HistoryUnavailableError();
+
+    expect(error.status).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+    expect(error.code).toBe(ErrorCode.HISTORY_UNAVAILABLE);
+    expect(error.message).toBe('Conversion history is temporarily unavailable');
+    expect(error.details).toBeUndefined();
+  });
+
+  // The history is down on its own terms; the rates are a separate dependency
+  // and a client that treats the two 503s alike would stop converting because
+  // a record could not be read.
+  it('is distinct from a rates outage', () => {
+    expect(new HistoryUnavailableError().code).not.toBe(
+      new RatesUnavailableError().code,
+    );
+  });
+
+  it('carries the cause when one is supplied', () => {
+    expect(
+      new HistoryUnavailableError({ reason: 'connection not ready' }).details,
+    ).toStrictEqual({ reason: 'connection not ready' });
   });
 });
 

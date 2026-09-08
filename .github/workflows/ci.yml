@@ -98,11 +98,20 @@ jobs:
 
   # The root package and the deployment descriptors belong to neither app, so
   # nothing above would catch a compose file that stopped parsing, a root
-  # lockfile out of sync, or a railway.json typo. Config validation only — no
-  # image builds, so it stays a few seconds long.
+  # lockfile out of sync, or a railway.json typo.
+  #
+  # Parsing is not enough on its own: a stack that parses and then refuses to
+  # start — a variable the API's schema requires and Compose never sets, a
+  # healthcheck pointed at a route that does not exist — is exactly the class of
+  # regression the config checks cannot see. So the job also runs the stack. It
+  # builds both images, which is the cost; `--wait` then does most of the work,
+  # since it only returns once every healthcheck in the file passes.
   orchestration:
     name: orchestration
     runs-on: ubuntu-latest
+    # The stack itself is the slow part, and a hang must not sit here for the
+    # default six hours.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
@@ -125,3 +134,40 @@ jobs:
         run: |
           node -e "JSON.parse(require('fs').readFileSync('apps/api/railway.json', 'utf8'))"
           node -e "JSON.parse(require('fs').readFileSync('apps/web/railway.json', 'utf8'))"
+
+      # No ADMIN_API_KEY in the environment: the compose file's own default is
+      # what has to carry a stack the API runs as NODE_ENV=production, where the
+      # schema refuses to start without one. Setting it here would hide exactly
+      # the regression this step exists to catch.
+      - name: Start the stack
+        run: docker compose up --build -d --wait
+
+      # The deploy gate and the container healthcheck both probe this one, so a
+      # route that stopped existing has to fail here rather than at rollout.
+      - name: Liveness answers
+        run: curl -fsS localhost:3000/health/live
+
+      # /health is allowed to answer 503 when a dependency is down; in this job
+      # all four are up and waited for, so anything but 200 with all three
+      # indicators present is a real failure.
+      - name: Every dependency reports up
+        run: |
+          report=$(curl -fsS localhost:3000/health)
+          echo "$report"
+          node -e '
+            const report = JSON.parse(process.argv[1]);
+            const details = report.details ?? {};
+            for (const key of ["redis", "mongodb", "monobank"]) {
+              if (details[key]?.status !== "up") {
+                throw new Error(`${key} is not up: ${JSON.stringify(details)}`);
+              }
+            }
+          ' "$report"
+
+      - name: Stack logs
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v

@@ -12,6 +12,10 @@ services:
       # The browser talks to the API from the host, so the allowed origins are
       # the published web port and the Vite dev server, not the compose network.
       CORS_ORIGINS: http://localhost:${WEB_PORT:-8080},http://localhost:5173
+      # The image runs as NODE_ENV=production, where the schema requires this
+      # rather than leaving DELETE /rates/cache open. The default is a local
+      # placeholder, not a secret: a real deployment sets its own.
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-local-admin-key}
       RATES_CACHE_TTL_SECONDS: ${RATES_CACHE_TTL_SECONDS:-300}
       RATES_STALE_TTL_SECONDS: ${RATES_STALE_TTL_SECONDS:-86400}
     ports:
@@ -27,11 +31,15 @@ services:
       # Same expression as the Dockerfile's own HEALTHCHECK so the two cannot
       # drift, but on a tighter schedule so `up --wait` and the
       # `service_healthy` conditions below settle in seconds, not minutes.
+      #
+      # /health/live rather than /health: this decides whether the container is
+      # restarted, and an API that still converts is not unhealthy because the
+      # conversion history is unreachable.
       test:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:' + (process.env.PORT ?? 3000) + '/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+        - "fetch('http://127.0.0.1:' + (process.env.PORT ?? 3000) + '/health/live').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 10s
       timeout: 3s
       retries: 5

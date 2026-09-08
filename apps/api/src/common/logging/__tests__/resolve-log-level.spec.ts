@@ -32,9 +32,12 @@ describe('resolveLogLevel', () => {
     );
   });
 
-  it('drops a successful liveness probe so it does not bury the traffic', () => {
-    expect(levelFor('/health', 200)).toBe('silent');
-  });
+  it.each(['/health', '/health/live'])(
+    'drops a successful %s probe so it does not bury the traffic',
+    (path) => {
+      expect(levelFor(path, 200)).toBe('silent');
+    },
+  );
 
   it('keeps dropping it when the probe carries a query string', () => {
     expect(levelFor('/health?verbose=1', 200)).toBe('silent');
