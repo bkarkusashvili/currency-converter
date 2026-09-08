@@ -1,13 +1,15 @@
+import type { QueryClient } from '@tanstack/react-query';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../api/http/ApiError';
+import { queryKeys } from '../../../api/queryKeys';
 import type { ConvertResponse, RatesSnapshotResponse } from '../../../api/types';
 import {
   createFakeRepositories,
   type FakeRepositoriesOptions,
 } from '../../../test/fakes/createFakeRepositories';
-import { renderWithProviders } from '../../../test/renderWithProviders';
+import { createTestQueryClient, renderWithProviders } from '../../../test/renderWithProviders';
 import { ConverterPage } from '../components/ConverterPage';
 
 const QUOTED_AT = '2026-09-08T11:00:00.000Z';
@@ -38,12 +40,30 @@ function unreachable(): ApiError {
 
 function renderPage(options: FakeRepositoriesOptions) {
   const fake = createFakeRepositories(options);
-  renderWithProviders(<ConverterPage />, { repositories: fake.repositories });
-  return fake;
+  const queryClient = createTestQueryClient();
+  renderWithProviders(<ConverterPage />, { repositories: fake.repositories, queryClient });
+  return { ...fake, queryClient };
 }
 
 async function convert(): Promise<void> {
   await userEvent.setup().click(screen.getByRole('button', { name: 'Convert' }));
+}
+
+/**
+ * What a browser does when it loses the network: `navigator.onLine` flips and
+ * the window fires `offline`, which is the event query-core's `onlineManager`
+ * listens for. Nothing here touches the client — the queries and the mutation
+ * decide for themselves whether a request is worth making.
+ */
+function goOffline(): void {
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+  window.dispatchEvent(new Event('offline'));
+}
+
+async function loaded(page: { queryClient: QueryClient }): Promise<void> {
+  await waitFor(() => {
+    expect(page.queryClient.getQueryData(queryKeys.rates)).toBeDefined();
+  });
 }
 
 describe('converting while the API is unreachable', () => {
@@ -146,5 +166,59 @@ describe('converting while the API is unreachable', () => {
     expect(notice).toBeInTheDocument();
     expect(screen.getByText(/Cannot reach the API/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Result' })).not.toBeInTheDocument();
+  });
+});
+
+describe('converting from a browser that reports itself offline', () => {
+  // `onlineManager` is a module singleton, so the window has to be put back.
+  afterEach(() => {
+    window.dispatchEvent(new Event('online'));
+  });
+
+  it('makes the request and estimates from its rejection instead of pausing', async () => {
+    const page = renderPage({ convert: unreachable(), rates: snapshot });
+    await loaded(page);
+
+    goOffline();
+    await convert();
+
+    const card = await screen.findByRole('region', { name: 'Result' });
+    expect(within(card).getByText('offline estimate')).toBeInTheDocument();
+    expect(card).toHaveTextContent('4,435.00 UAH');
+    // A paused mutation never reaches the repository; this one was rejected by it.
+    expect(page.convertCalls).toHaveLength(1);
+  });
+
+  it('keeps refreshing the snapshot the estimate is priced from', async () => {
+    // The fake is reachable even when the browser says it is not, so a query
+    // that ran answers with the newer rate and one that was paused does not.
+    const options: FakeRepositoriesOptions = { convert: unreachable(), rates: snapshot };
+    const page = renderPage(options);
+    await loaded(page);
+
+    goOffline();
+    options.rates = {
+      ...snapshot,
+      rates: [{ base: 'USD', quote: 'UAH', buy: 50, sell: 50, date: QUOTED_AT }],
+    };
+    void page.queryClient.invalidateQueries({ queryKey: queryKeys.rates });
+    await convert();
+
+    expect(await screen.findByRole('region', { name: 'Result' })).toHaveTextContent('5,000.00 UAH');
+  });
+
+  it('keeps loading the currency list the form offers', async () => {
+    const options: FakeRepositoriesOptions = { convert: unreachable(), rates: snapshot };
+    const page = renderPage(options);
+    await loaded(page);
+
+    goOffline();
+    options.currencies = {
+      currencies: [{ code: 'GBP', numericCode: 826, name: 'Pound Sterling' }],
+    };
+    void page.queryClient.invalidateQueries({ queryKey: queryKeys.currencies });
+
+    // One option in each select: the list the query loaded, not the two defaults.
+    expect(await screen.findAllByRole('option', { name: 'GBP — Pound Sterling' })).toHaveLength(2);
   });
 });

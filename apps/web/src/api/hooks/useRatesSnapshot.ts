@@ -23,5 +23,10 @@ export function useRatesSnapshot(): UseQueryResult<RatesSnapshotResponse, ApiErr
     queryFn: ({ signal }) => rates.getSnapshot(signal),
     refetchInterval: REFETCH_INTERVAL_MS,
     staleTime: REFETCH_INTERVAL_MS,
+    // Paused is the one state the fallback cannot use: it is neither a
+    // snapshot nor a failure. The fetch is attempted whatever the browser
+    // believes about the network, and a failure leaves the persisted copy in
+    // place for the estimate to be priced from.
+    networkMode: 'always',
   });
 }

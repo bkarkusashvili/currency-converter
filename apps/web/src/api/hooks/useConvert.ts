@@ -10,6 +10,11 @@ export function useConvert(): UseMutationResult<ConvertResponse, ApiError, Conve
 
   return useMutation<ConvertResponse, ApiError, ConvertRequest>({
     mutationFn: (payload) => conversion.convert(payload),
+    // A browser query-core believes is offline would otherwise have this
+    // mutation paused rather than run: no request, no error, and a button left
+    // at "Converting..." forever. The offline estimate is answered from the
+    // rejection, so the request is always attempted and the transport decides.
+    networkMode: 'always',
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.history.all });
     },
