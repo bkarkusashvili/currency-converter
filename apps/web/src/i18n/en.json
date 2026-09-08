@@ -258,11 +258,14 @@
     "codes": {
       "VALIDATION_ERROR": "The request did not pass validation.",
       "UNAUTHORIZED": "This request needs an admin API key.",
+      "FORBIDDEN": "This request is not allowed.",
       "NOT_FOUND": "The API does not have that endpoint.",
       "UNSUPPORTED_CURRENCY": "That currency is not in the current rate snapshot.",
       "RATE_NOT_AVAILABLE": "No rate path connects those two currencies right now.",
       "TOO_MANY_REQUESTS": "Too many requests. Wait a moment and try again.",
       "RATES_UNAVAILABLE": "Exchange rates are unavailable: Monobank could not be reached and there is no recent snapshot to fall back on.",
+      "CACHE_UNAVAILABLE": "The rates cache could not be reached, so it could not be cleared.",
+      "HISTORY_UNAVAILABLE": "Recent conversions cannot be read right now: the history store is unreachable.",
       "INTERNAL_ERROR": "The API failed unexpectedly. Try again in a moment.",
       "NETWORK_ERROR": "Cannot reach the API at {{url}}. Check that it is running and reachable."
     }
