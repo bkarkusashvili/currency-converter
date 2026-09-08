@@ -420,17 +420,43 @@ still returned.
 ## 10. Web app
 
 - React 19, Vite, TypeScript strict, Tailwind CSS, React Router, TanStack Query,
-  i18next for every user-visible string.
+  i18next + react-i18next.
 - Routes: `/` converter (form, result card, recent conversions), `/about`
   reviewer page (what was built, why, links to repo / API docs / health).
 - Runtime configuration: `public/config.js` sets `window.__APP_CONFIG__.apiUrl`;
   the Docker image regenerates it from `API_URL` at container start so the same
-  image runs locally and on Railway.
-- `src/api/` is the only place that knows about HTTP, layered
-  `http` → `repositories` → `hooks`; components consume the typed hooks
-  (`useConvert`, `useCurrencies`, `useHistory`). See §12.
-- Tests: Vitest + Testing Library for the form, result rendering and error
-  states, with a fake repository injected through the provider.
+  image runs locally and on Railway. The value is JSON-escaped as it is written,
+  so a quote in the URL cannot break the file.
+- **Ports and adapters, client side.** `src/api/repositories` declares one
+  interface per resource (`ConversionRepository`, `CurrenciesRepository`,
+  `HistoryRepository`, `HealthRepository`) with an HTTP implementation factory
+  each, bound through a React context (`RepositoriesProvider` /
+  `useRepositories`). `src/api/hooks` wraps them in TanStack Query hooks
+  (`useConvert`, `useCurrencies`, `useHistory`, `useHealth`) that depend only on
+  the interfaces. `src/api/http` is the only place that knows about `fetch`; a
+  component imports nothing from it but the `ApiError` and field-error types it
+  renders.
+- `GET /health` goes through that same transport, with `[200, 503]` passed as
+  its accepted statuses: both carry the terminus report, so a degraded API is
+  rendered indicator by indicator instead of as unreachable. A transport
+  failure, a body that does not parse and a report that fails its guard are the
+  only errors, each carrying the status it arrived on, and the query does not
+  retry.
+- **Internationalisation.** Every user-facing string lives in
+  `src/i18n/en.json`, loaded through `react-i18next`; the `CustomTypeOptions`
+  augmentation type-checks keys against the JSON. Numbers and dates are
+  formatted with `Intl` in the active language, and the document's `lang`
+  attribute follows i18next's resolved language. Adding a language is a new JSON
+  file plus a language switch, with no component changes. API failures map the
+  envelope `code` to a translated message and fall back to the server `message`;
+  `details.errors` entries are shown as returned, and the ones naming `amount`,
+  `from` or `to` are routed onto that input, where they clear as soon as the
+  user edits the field they describe.
+- Feature folders carry their own structure (`components/`, `hooks/`, `lib/`,
+  `__tests__/`); shared test helpers and fakes live in `src/test/`.
+- Tests: Vitest + Testing Library, rendered through the i18n and repository
+  providers with in-memory repository fakes, plus fetch-level tests asserting
+  the URL, method, headers and body of every endpoint.
 
 ## 11. Testing strategy
 
@@ -438,11 +464,12 @@ still returned.
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
 | E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history`, `/health` |
-| Unit (web)           | Vitest + Testing Library     | form validation, result display, error display, history list |
+| Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
 
-Coverage threshold for `apps/api`: 85% lines/branches enforced in Jest config;
-nothing under a `__tests__` folder counts as source. Unit tests never touch the
-network, Redis or Mongo.
+Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
+90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
+runs the coverage script, not the plain one, plus `format:check`.
+Unit tests never touch the network, Redis or Mongo.
 
 ## 12. Conventions
 
@@ -489,9 +516,10 @@ extends it:
 - Data access is layered and each layer is the only one that knows its concern:
   `src/api/http` is the fetch client (base url, headers, decoding the error
   envelope), `src/api/repositories` holds one interface per resource with its
-  implementation (`RatesRepository`, `ConversionRepository`,
-  `HistoryRepository`) handed to the tree through a provider, and
-  `src/api/hooks` exposes the TanStack Query hooks components consume
-  (`useConvert`, `useCurrencies`, `useHistory`). A component never fetches.
+  implementation (`ConversionRepository`, `CurrenciesRepository`,
+  `HistoryRepository`, `HealthRepository`) handed to the tree through a
+  provider, and `src/api/hooks` exposes the TanStack Query hooks components
+  consume (`useConvert`, `useCurrencies`, `useHistory`, `useHealth`). A
+  component never fetches.
 - Tests inject a fake repository through that same provider rather than mocking
   `fetch` or the network, so a component test never depends on the transport.
