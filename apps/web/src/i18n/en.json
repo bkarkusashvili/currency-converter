@@ -127,7 +127,7 @@
     "status": {
       "title": "Where it stands",
       "items": [
-        "Everything below is merged on main and deployed. Nine pull requests, each merged with CI green; there is nothing outstanding and no branch waiting.",
+        "Everything below is merged on main and deployed; there is nothing outstanding and no branch waiting. Every change landed through a pull request into main, each carrying review comments anchored to the lines they concern and a round of commits answering them before the author merged it with CI green. GitHub does not allow approving your own pull request, so the record is those comments and the fixes rather than an approval decision; nothing was pushed to main directly.",
         "Every module the architecture describes is in: rates, conversion through three strategies, currencies, history, the health endpoints and this client.",
         "The API and this client are two independent images, built by one CI workflow that runs lint, formatting, typecheck, tests with coverage thresholds, the build and the image build per app — plus a job that boots the whole Docker Compose stack and probes it.",
         "Both run on Railway behind the platform edge, each on its own hostname; the panel above reads the live health endpoint every 30 seconds.",
@@ -167,7 +167,7 @@
         },
         {
           "term": "Operations",
-          "description": "pino request logging with a request id, environment validated by a zod schema at boot, a multi-stage Docker image per app, and GitHub Actions running lint, formatting, typecheck, tests with coverage thresholds, build and the image build — one job per app, both gated the same way."
+          "description": "pino request logging with a request id, environment validated by a zod schema at boot, a multi-stage Docker image per app, and GitHub Actions running lint, formatting, typecheck, tests with coverage thresholds, build and the image build — one job per app, both gated on the same checks."
         },
         {
           "term": "This client",
@@ -295,7 +295,7 @@
       "title": "How this was built",
       "paragraphs": [
         "Specification first. docs/architecture.md was written before the code and describes the module layout, the API contract, the caching and resilience model, the error envelope and the testing strategy. Every pull request was reviewed against it, and behaviour that changed changed the document in the same pull request.",
-        "Then one pull request at a time — nine of them, 206 commits — each with CI green before merge: lint, formatting, typecheck, build, unit tests against coverage thresholds, the API end-to-end suite, both Docker images, and a job that starts the whole Compose stack and probes it. Nothing was pushed to main directly.",
+        "Then one pull request at a time, every change landing in main that way. Each pull request drew review comments anchored to the lines they concern and a round of commits answering them, and was merged by its author with CI green: lint, formatting, typecheck, build, unit tests against coverage thresholds, the API end-to-end suite, both Docker images, and a job that starts the whole Compose stack and probes it. GitHub does not allow approving your own pull request, so what the record shows is those comments and the commits that answered them rather than an approval decision; nothing was pushed to main directly.",
         "The implementation was AI-assisted, under human direction and review: the architecture, the scope of each pull request and the decisions listed above were set and reviewed by a person, and a coding assistant wrote much of the code against them. The commits carry a Co-Authored-By trailer saying so, so the record is in the git history rather than in a claim on this page."
       ]
     }

@@ -24,8 +24,12 @@ comes up with one command locally and deploys from the same images.
 ## What is here
 
 Everything described in [`docs/architecture.md`](docs/architecture.md) is
-merged on `main` and deployed. Nine pull requests, each merged with CI green,
-built:
+merged on `main` and deployed. Every change landed through a pull request into
+`main`, each carrying review comments anchored to the lines they concern and a
+round of commits answering them before the author merged it with CI green;
+GitHub does not allow approving your own pull request, so the record is those
+comments and the fixes rather than an approval decision, and nothing was pushed
+to `main` directly. Those pull requests built:
 
 - **API** (`apps/api`) — NestJS 11, TypeScript strict. `POST /api/v1/convert`
   through a strategy chain (identity, direct pair, cross via UAH),
@@ -91,8 +95,13 @@ docker compose down -v   # npm run down:clean — stop and wipe them
 
 ### 3. One app at a time
 
+In two terminals, both starting from the repository root:
+
 ```bash
 cd apps/api && npm ci && npm run start:dev   # http://localhost:3000
+```
+
+```bash
 cd apps/web && npm ci && npm run dev         # http://localhost:5173
 ```
 
@@ -110,10 +119,11 @@ app's `API_URL` from `API_PORT`, the API's `CORS_ORIGINS` from `WEB_PORT`. Redis
 and MongoDB are unpublished in that stack, so `REDIS_PORT` and `MONGO_PORT` do
 nothing there; they belong to the dev overlay below.
 
-Under `npm run dev` the API's port is `PORT` in `apps/api/.env`, and Vite is
-pinned to 5173 (`strictPort`) — it refuses to start if the port is taken rather
-than moving to 5174, which would leave the dev server on an origin the API's
-CORS does not allow.
+Under `npm run dev` the API's port is `PORT` in `apps/api/.env`. That file is not
+in the repository: copy [`apps/api/.env.example`](apps/api/.env.example) to
+`apps/api/.env` and set `PORT` there. Vite is pinned to 5173 (`strictPort`) — it
+refuses to start if the port is taken rather than moving to 5174, which would
+leave the dev server on an origin the API's CORS does not allow.
 
 ## Local development
 
@@ -141,7 +151,11 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml \
 ```
 
 If `6379` or `27017` is taken, set `REDIS_PORT` or `MONGO_PORT` in `.env`; only
-this overlay publishes them.
+this overlay publishes them. Point the API at the new ports as well — it reads
+its own `apps/api/.env`, not the root one, so set `REDIS_URL` and `MONGO_URL`
+there to match. Without that the API run from npm keeps dialling `6379` and
+`27017` and degrades instead of failing: conversions still answer, but each one
+carries a cache warning and `GET /api/v1/history` returns 503.
 
 To point the Vite dev server at a different API, edit
 `apps/web/public/config.js`.
@@ -685,7 +699,7 @@ is implemented and covered:
 | Offline fallback | `features/converter/lib/convertOffline.ts` + `api/persistence/` — a persisted snapshot re-priced in the browser, labelled `offline-estimate` and never written to history |
 | i18n-ready strings | `apps/web/src/i18n/` — every string in `en.json`, keys type-checked; `messageKeys.test.ts` proves every envelope and warning code has a sentence |
 | Strict typing | `tsc --noEmit` / `tsc -b` clean, `no-unsafe-*` on, `ConfigService<AppConfig, true>` so an unknown config key is a compile error |
-| Multi-commit history through PRs | 206 commits, 9 merged pull requests, conventional-commit subjects, branch per feature |
+| Multi-commit history through PRs | Conventional-commit subjects, a branch per feature, and every change merged into `main` through a reviewed pull request with CI green |
 | Railway hosting | `apps/api/railway.json`, `apps/web/railway.json`, both services live at the URLs above |
 | Reviewer page | `/about` in the web app — status, traceability, how to run, decisions, live health check |
 
