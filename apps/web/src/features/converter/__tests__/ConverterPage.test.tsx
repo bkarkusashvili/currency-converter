@@ -10,31 +10,26 @@ import type {
 } from '../../../api/types';
 import {
   createFakeRepositories,
+  FAKE_RESPONSES,
   type FakeRepositoriesOptions,
 } from '../../../test/fakes/createFakeRepositories';
 import { createTestQueryClient, renderWithProviders } from '../../../test/renderWithProviders';
 import { queryKeys } from '../../../api/queryKeys';
 import { ConverterPage } from '../components/ConverterPage';
 
-const currencies: CurrenciesResponse = {
-  currencies: [
-    { code: 'EUR', numericCode: 978, name: 'Euro' },
-    { code: 'PLN', numericCode: 985, name: 'Zloty' },
-    { code: 'UAH', numericCode: 980, name: 'Hryvnia' },
-    { code: 'USD', numericCode: 840, name: 'US Dollar' },
-  ],
-};
+/**
+ * The bodies this page is rendered from are the ones `openapiContract.test.ts`
+ * validates against `docs/openapi.json`, rather than a second table beside
+ * them: a field the API renames fails the contract check *and* the case that
+ * reads it, instead of leaving the two to drift apart.
+ */
+const currencies = FAKE_RESPONSES.currencies;
 
-const conversion: ConvertResponse = {
-  from: 'EUR',
-  to: 'PLN',
-  amount: 100,
-  result: 425.71,
-  rate: 4.257112,
-  strategy: 'cross',
-  source: 'stale-cache',
-  ratesTimestamp: '2024-03-05T12:00:00.000Z',
-};
+// `warnings` is removed rather than set to `undefined`, because §3 makes it
+// absent and not empty when nothing degraded — which is what most of these
+// cases are about. The two that are about a warning add their own back.
+const conversion: ConvertResponse = { ...FAKE_RESPONSES.convert };
+delete conversion.warnings;
 
 function renderPage(options: FakeRepositoriesOptions = {}) {
   const fake = createFakeRepositories({ currencies, convert: conversion, ...options });
@@ -462,8 +457,8 @@ describe('warnings on a successful answer', () => {
 
   it('carries a list warning under the form, once, however many lists report it', async () => {
     const snapshot: RatesSnapshotResponse = {
+      ...FAKE_RESPONSES.rates,
       source: 'provider',
-      fetchedAt: '2024-03-05T12:00:00.000Z',
       rates: [],
       warnings: [{ code: 'CACHE_UNAVAILABLE', message: 'Server sentence.' }],
     };

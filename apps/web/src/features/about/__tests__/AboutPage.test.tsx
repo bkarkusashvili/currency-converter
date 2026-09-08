@@ -4,18 +4,21 @@ import { ApiError } from '../../../api/http/ApiError';
 import type { HealthResponse } from '../../../api/types';
 import {
   createFakeRepositories,
+  FAKE_RESPONSES,
   type FakeRepositoriesOptions,
 } from '../../../test/fakes/createFakeRepositories';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { AboutPage } from '../components/AboutPage';
 
+/**
+ * The report this page renders is the one `openapiContract.test.ts` validates
+ * against `docs/openapi.json`, with the third indicator the API also reports
+ * added — the contract check covers what is on screen rather than a second
+ * report beside it.
+ */
 const healthy: HealthResponse = {
-  status: 'ok',
-  details: {
-    redis: { status: 'up' },
-    mongodb: { status: 'up' },
-    monobank: { status: 'up' },
-  },
+  ...FAKE_RESPONSES.health,
+  details: { ...FAKE_RESPONSES.health.details, monobank: { status: 'up' } },
 };
 
 function renderAbout(options: FakeRepositoriesOptions = {}) {
@@ -72,6 +75,7 @@ describe('AboutPage', () => {
   it('renders an indicator status it does not know as it arrived', async () => {
     renderAbout({
       health: {
+        ...healthy,
         status: 'shutting_down',
         details: { redis: { status: 'up' }, monobank: { status: 'degraded' } },
       },
@@ -84,14 +88,11 @@ describe('AboutPage', () => {
   it('shows a degraded API as degraded, not as a failure', async () => {
     renderAbout({
       health: {
+        ...healthy,
         status: 'error',
         info: { mongodb: { status: 'up' }, monobank: { status: 'up' } },
         error: { redis: { status: 'down' } },
-        details: {
-          redis: { status: 'down' },
-          mongodb: { status: 'up' },
-          monobank: { status: 'up' },
-        },
+        details: { ...healthy.details, redis: { status: 'down' } },
       },
     });
 

@@ -27,15 +27,19 @@ export interface FakeRepositories {
 }
 
 /**
- * One representative of every response this client knows how to receive: what
- * the fakes answer with, and what the suite passes in when it wants a
- * populated page.
+ * One representative of every response this client knows how to receive, and
+ * the one table the component suites build their fixtures from:
+ * `ConverterPage.test.tsx`, `offlineFallback.test.tsx` and
+ * `AboutPage.test.tsx` spread these and override the fields their case is
+ * about, so the bodies validated below are the bodies the pages render.
  *
  * `openapiContract.test.ts` validates each of them against the schema
  * `docs/openapi.json` publishes for its route, which is what keeps
- * `api/types.ts` — a hand-written mirror of the API's DTOs — honest. A field
- * the API renamed, or one this client invented, fails there rather than in a
- * browser.
+ * `api/types.ts` — a hand-written mirror of the API's DTOs — honest. What that
+ * catches is a required field gone missing, a value outside an enum and a
+ * wrong type: it fails here rather than in a browser. What it cannot catch is
+ * a field this client invented, because the published schemas do not set
+ * `additionalProperties: false`.
  */
 export const FAKE_RESPONSES = {
   convert: {

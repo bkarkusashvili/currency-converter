@@ -11,11 +11,17 @@ import { createFakeRepositories, FAKE_RESPONSES } from '../../test/fakes/createF
  * document, the client re-declares the same shapes, and the two could part
  * without a single test noticing.
  *
- * So every sample response this suite renders is validated against the schema
- * the committed contract publishes for its route. It is deliberately narrow —
- * it does not typecheck `types.ts` against the document, it checks that the
+ * So every sample response the component suites render — they build their
+ * fixtures by spreading `FAKE_RESPONSES` — is validated against the schema the
+ * committed contract publishes for its route. It is deliberately narrow: it
+ * does not typecheck `types.ts` against the document, it checks that the
  * bodies the fakes hand the app are bodies the API could actually have sent.
- * A field the API renamed, dropped or made required fails here.
+ *
+ * What that catches is a required field the API dropped or added, a value
+ * outside an enum, and a wrong type. What it cannot catch is a field this
+ * client invented: the document sets `additionalProperties: false` nowhere, so
+ * a key the API never publishes validates. The health route has no `required`
+ * at all, which is why its case asserts the keys it reads as well.
  */
 const DOCUMENT_PATH = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -82,7 +88,7 @@ beforeAll(() => {
   ) as Record<Route, ValidateFunction>;
 });
 
-describe('the fixtures this suite renders against the published contract', () => {
+describe('the fixtures the component suites render, against the published contract', () => {
   it.each(Object.keys(SCHEMA_REFS) as Route[])('accepts the %s sample response', (route) => {
     check(route, FAKE_RESPONSES[route]);
   });
@@ -97,6 +103,25 @@ describe('the fixtures this suite renders against the published contract', () =>
     check('rates', await repositories.rates.getSnapshot());
     check('history', await repositories.history.recent(10));
     check('health', await repositories.health.report());
+  });
+
+  /**
+   * Terminus documents its report inline on the route and gives it no
+   * `required`, so the schema on its own is satisfied by `{}` — which is what
+   * would make this route's case vacuous. The two keys `HealthStatus` reads
+   * are asserted here beside it.
+   */
+  it('carries the health keys the page reads, which the schema does not require', () => {
+    check('health', FAKE_RESPONSES.health);
+
+    // `status` decides the headline and `details` is the list, so a report
+    // missing either renders nothing at all.
+    expect(Object.keys(FAKE_RESPONSES.health)).toContain('status');
+    expect(Object.keys(FAKE_RESPONSES.health)).toContain('details');
+    expect(typeof FAKE_RESPONSES.health.status).toBe('string');
+    expect(Object.keys(FAKE_RESPONSES.health.details)).not.toHaveLength(0);
+    // The reason the two assertions above are the substance of this case.
+    expect(() => check('health', {})).not.toThrow();
   });
 
   // The check is only worth having if it can fail.
