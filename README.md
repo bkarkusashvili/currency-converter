@@ -107,9 +107,18 @@ Every root script is a thin wrapper around the two apps and Compose:
 
 `infra:up` applies [`docker-compose.dev.yml`](docker-compose.dev.yml), which
 publishes Redis on `6379` and MongoDB on `27017` — the addresses
-`apps/api/.env.example` already defaults to — and moves the `api` and `web`
-containers behind a `containers` profile so they stay out of `up`. Add
-`--profile containers` to the compose command to bring them back.
+`apps/api/.env.example` already defaults to — on `127.0.0.1` only, since both
+run unauthenticated. It also moves the `api` and `web` containers behind a
+`containers` profile so they stay out of `up`. `--profile` is a global flag, so
+it goes before the subcommand:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+  --profile containers up -d          # or: COMPOSE_PROFILES=containers … up -d
+```
+
+If `6379` or `27017` is taken on your machine, set `REDIS_PORT` or `MONGO_PORT`
+in `.env`; only this overlay publishes them.
 
 The apps still run standalone, which is all the root scripts do:
 

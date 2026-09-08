@@ -5,7 +5,13 @@
 # Redis and Mongo publish their ports on the host loopback only — both run
 # unauthenticated, so binding 0.0.0.0 would serve them to any shared network.
 # The api and web containers move behind a profile so they stay out of `up`
-# unless asked for explicitly.
+# unless asked for explicitly. `--profile` is a global flag, so it goes before
+# the subcommand:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+#     --profile containers up -d
+#
+# or COMPOSE_PROFILES=containers in the environment.
 services:
   api:
     profiles: ['containers']
