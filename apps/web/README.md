@@ -41,6 +41,22 @@ provider is wired to the HTTP implementations in `main.tsx`; tests inject
 in-memory fakes through the same provider, so nothing in the suite touches the
 network.
 
+## The amount field
+
+`features/converter/lib/formatAmountInput.ts` is the one rule for what the
+field may hold. Every edit — a keystroke, a paste, a drop — goes through it:
+anything that is not a digit or the active locale's decimal separator is
+dropped, the integer part is capped at the width of the API's maximum, at most
+two decimals survive, thousands are grouped with the separator `Intl` reports
+for the language, and the caret is placed after the same number of significant
+characters it had passed, so typing inside a grouped number does not throw it
+to the end. Backspace and Delete landing on a group separator take the digit
+beside it, which the regrouping would otherwise restore.
+
+It decides what may be *typed*, not what an amount *means*: `parseAmount` is
+still the single rule for that, and it is what answers `Amount must be
+1,000,000,000,000 or less.`
+
 ## Internationalisation
 
 Every user-facing string lives in `src/i18n/en.json` and is read through

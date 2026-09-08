@@ -684,6 +684,22 @@ newest-first page and the retention ride on the same key rather than on two.
   other envelope code is left as the API answered it, and an estimate is never
   added to the history. The currency selects fall back the same way: the API's
   list, then the persisted copy, then the two defaults.
+- **The amount field.** `formatAmountInput(raw, caret)` is the one rule for what
+  the field may hold: everything that is not a digit or the locale's decimal
+  separator is dropped — letters, signs, a second separator, a third decimal —
+  the integer part is capped at the width of `MAX_AMOUNT`, thousands are grouped
+  with the separator `Intl` reports for the active language, and the caret is
+  put back after the same number of significant characters it had passed, so
+  typing inside a grouped number does not throw it to the end. Backspace and
+  Delete landing on a group separator take the digit beside it, which the
+  regrouping would otherwise put straight back. What an amount *means* is still
+  `parseAmount`'s rule alone, and it is what answers `tooLarge`; the field only
+  keeps characters no amount can contain from being typed at all.
+- **Provenance in the client.** The result card prints the rate in both
+  directions — the API publishes one, and `inverseRate` computes the other on
+  the same `big.js` constructor, rounded half-up to the six places §3 uses — and
+  draws the hops the strategy took. The history panel shows each entry's
+  `source` for the same reason §3 stores it.
 - **Internationalisation.** Every user-facing string lives in
   `src/i18n/en.json`, loaded through `react-i18next`; the `CustomTypeOptions`
   augmentation type-checks keys against the JSON. Numbers and dates are
@@ -706,7 +722,7 @@ newest-first page and the retention ride on the same key rather than on two.
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
 | E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history` with a store that is up and one that is down, `/health`, `/health/live` while the dependencies report down |
-| Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
+| Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, error display, history list and its loading and empty states, health rendering, every HTTP repository |
 
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
 90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
