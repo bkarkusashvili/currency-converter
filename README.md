@@ -160,11 +160,14 @@ in `.env` form.
 | `TRUST_PROXY`                       | `false`                                          | Express `trust proxy`; `1` behind a single proxy, so rate limits and logs see the real client |
 | `CORS_ORIGINS`                      | `http://localhost:5173,http://localhost:8080`    | Comma-separated browser origins allowed to call the API                          |
 | `REDIS_URL`                         | `redis://localhost:6379`                         | Rates cache and its stale fallback                                               |
+| `REDIS_COMMAND_TIMEOUT_MS`          | `300`                                            | Deadline on a single Redis command, so a cache that stops answering degrades the lookup instead of holding it |
 | `MONGO_URL`                         | `mongodb://localhost:27017/currency_converter`   | Conversion history                                                               |
 | `MONGO_SERVER_SELECTION_TIMEOUT_MS` | `3000`                                           | How long the driver looks for a server; a bound on time a conversion spends on a database that is down |
+| `HISTORY_OPERATION_TIMEOUT_MS`      | `1000`                                           | Deadline on a history read or write, which server selection alone does not bound |
 | `HISTORY_TTL_DAYS`                  | `30`                                             | How long a conversion record is kept, enforced by a TTL index                    |
 | `MONOBANK_API_URL`                  | `https://api.monobank.ua/bank/currency`          | Upstream rate source                                                             |
 | `MONOBANK_TIMEOUT_MS`               | `5000`                                           | Per-request upstream timeout                                                     |
+| `MONOBANK_TOTAL_BUDGET_MS`          | `8000`                                           | Budget for the whole upstream call including retries and the backoff between them |
 | `MONOBANK_RETRY_ATTEMPTS`           | `3`                                              | Total attempts including the first; 429 is never retried                         |
 | `MONOBANK_RETRY_BASE_DELAY_MS`      | `300`                                            | Base delay for exponential backoff with full jitter                              |
 | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5`                                              | Consecutive upstream failures that trip the breaker open                         |
