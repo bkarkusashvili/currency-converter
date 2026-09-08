@@ -79,6 +79,18 @@ export class MongoConnection implements OnModuleInit, OnApplicationShutdown {
   // A shutdown hook rather than a destroy hook, for the same reason the Redis
   // one is: Nest closes the HTTP listener in `dispose()`, between the two, so
   // closing here leaves the requests still in flight with a store to write to.
+  //
+  // `MongooseCoreModule` closes this same connection in a shutdown hook of its
+  // own, so the close below is deliberately one of two — and the order is what
+  // makes it the useful one. Nest calls `onApplicationShutdown` from the root
+  // outwards (`callShutdownHook` reverses the distance order it initialises
+  // in), and the core module is imported by this one, so this hook runs first:
+  // it sets `stopping` and cancels the retry timer while the connection is
+  // still open, and the disconnect the core module's close then emits arrives
+  // at a listener that knows a shutdown is in progress. Without it the last
+  // line of the process would be a warning about a database nothing is going
+  // to ask for again. Closing an already-closed connection resolves, so
+  // whichever of the two runs second costs nothing.
   async onApplicationShutdown(): Promise<void> {
     this.stopping = true;
     clearTimeout(this.retryTimer);

@@ -12,6 +12,10 @@ export interface RatesRepository {
   getFresh(): Promise<CachedSnapshot>;
   getStale(): Promise<CachedSnapshot>;
   save(snapshot: RatesSnapshot): Promise<CacheWrite>;
-  // Rejects with CacheUnavailableError when the cache refused the command.
+  // Resolves when both keys are gone, including when they were already absent:
+  // the caller stated a wanted end state. Rejects with `CacheUnavailableError`
+  // when the cache could not be reached or refused the command, because the
+  // keys are then still there — which is what /rates/cache answers 503 for
+  // (§3), rather than the 204 a degraded no-op would have produced.
   clear(): Promise<void>;
 }

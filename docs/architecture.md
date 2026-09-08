@@ -363,10 +363,11 @@ const RATES_REPOSITORY = Symbol('RATES_REPOSITORY');
 interface CachedSnapshot { snapshot: RatesSnapshot | null; degraded: boolean; }
 
 interface RatesRepository {
-  getFresh(): Promise<CachedSnapshot>;
-  getStale(): Promise<CachedSnapshot>;
-  save(snapshot: RatesSnapshot): Promise<{ degraded: boolean }>;
-  clear(): Promise<void>;
+  getFresh(): Promise<CachedSnapshot>;   // degrades: { snapshot: null, degraded: true }
+  getStale(): Promise<CachedSnapshot>;   // degrades: { snapshot: null, degraded: true }
+  save(snapshot: RatesSnapshot): Promise<{ degraded: boolean }>;  // degrades: { degraded: true }
+  clear(): Promise<void>;                // rejects: CacheUnavailableError when
+                                         // the cache could not be reached
 }
 ```
 
@@ -573,11 +574,10 @@ Logging uses `nestjs-pino`: JSON in production, `pino-pretty` in development,
 one log line per request carrying exactly the request id, method, path, client
 address, status and duration. Those fields are produced by custom
 `serializers.req` / `serializers.res`, which emit `req.id`, `req.method`,
-`req.url` and `req.remoteAddress` and `res.statusCode`; pino-http adds the id
-again as a top-level `reqId` and the duration as `responseTime`. No header is
-ever written, so a credential cannot reach the log by being forgotten in a
-denylist. Services use
-the injected `PinoLogger` with a context.
+`req.url` and `req.remoteAddress` and `res.statusCode`; pino-http adds the
+duration as `responseTime`. The id is on the line once, inside `req`. No header
+is ever written, so a credential cannot reach the log by being forgotten in a
+denylist. Services use the injected `PinoLogger` with a context.
 
 The line is levelled by outcome: `error` for a 5xx or a thrown error, `warn` for
 a 4xx, `info` otherwise. A successful `/health` probe is dropped entirely — it
