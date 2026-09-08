@@ -1,4 +1,4 @@
-import { CurrencyCode } from './currency-code';
+import { CurrencyCode } from '../../../common/currency/currency-code';
 
 // Monobank is a Ukrainian bank: every pair it publishes is either against the
 // hryvnia or between two foreign currencies, and UAH is what a cross rate

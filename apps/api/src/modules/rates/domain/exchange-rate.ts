@@ -1,4 +1,4 @@
-import { CurrencyCode } from './currency-code';
+import { CurrencyCode } from '../../../common/currency/currency-code';
 
 export interface ExchangeRate {
   // Monobank's currencyCodeA: one unit of it costs the quoted amount of quote.

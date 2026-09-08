@@ -3,11 +3,13 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../common/logging/__tests__/fake-pino-logger';
-import { ConversionResult } from '../../conversion/domain/conversion-result';
 import { ConversionRecord } from '../domain/conversion-record';
+import type { NewConversionRecord } from '../domain/conversion-record';
 import { HistoryService } from '../history.service';
 
-const RESULT: ConversionResult = {
+// Exactly what a conversion answers, which is why the service can take the
+// port's type and the conversion module can hand over its result unchanged.
+const RESULT: NewConversionRecord = {
   from: 'EUR',
   to: 'GBP',
   amount: 100,
