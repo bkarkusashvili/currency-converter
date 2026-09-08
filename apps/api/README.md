@@ -187,6 +187,16 @@ log that names the load balancer.
 Unit tests live in a `__tests__` folder beside the code they cover; the
 end-to-end suites live in `test/e2e` and boot the app the way `main.ts` does.
 
+The coverage report is the **unit** suites only, and the 85% gate is on those
+numbers. `npm run test:e2e` runs without instrumentation, so what only it
+exercises is missing from the report rather than uncovered: `configure-http.ts`
+and `setup-swagger.ts` read 0% while every e2e suite boots through both, and
+`main.ts` and the `*.module.ts` files are excluded outright — a module is
+wiring, and what a module decides lives in a file of its own beside it so that
+the gate does see it. Read the two numbers as what they are: the unit suites
+cover the logic, the e2e suites cover the surface, and only the first is
+counted.
+
 ## Errors
 
 Every non-2xx response uses one envelope:

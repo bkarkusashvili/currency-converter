@@ -839,7 +839,11 @@ cover.
 
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
 90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
-runs the coverage script, not the plain one, plus `format:check`.
+runs the coverage script, not the plain one, plus `format:check`. The API
+report covers the unit suites alone: `test:e2e` runs uninstrumented, so
+`configure-http.ts` and `setup-swagger.ts` read 0% in it while every e2e suite
+boots through both. The gate is on the unit numbers, and the e2e suites are the
+surface they cannot reach.
 Unit tests never touch the network, Redis or Mongo. The e2e suites do not
 either: the shared factory swaps the Redis client, the Mongo connection and the
 history repository for in-process fakes, and the environment points every url
