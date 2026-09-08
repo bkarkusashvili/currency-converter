@@ -13,7 +13,9 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
   const strategy = strategyCopy(result.strategy);
   const source = sourceCopy(result.source);
   const rate = formatters.splitRate(result.rate);
-  // The estimate's note is the only one that has to say how old its rates are.
+  // The estimate's note is the only one that has to say how old its rates are,
+  // and it is where a reader looks for it: the shared line below would be the
+  // same timestamp a second time, so the card carries one or the other.
   const isEstimate = result.source === OFFLINE_ESTIMATE;
 
   return (
@@ -85,9 +87,11 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
           </div>
         </dl>
 
-        <p className="eyebrow mt-4">
-          {t('converter.result.ratesFetched')} <Timestamp value={result.ratesTimestamp} />
-        </p>
+        {!isEstimate && (
+          <p className="eyebrow mt-4">
+            {t('converter.result.ratesFetched')} <Timestamp value={result.ratesTimestamp} />
+          </p>
+        )}
       </div>
     </section>
   );

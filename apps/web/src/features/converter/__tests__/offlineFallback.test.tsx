@@ -79,6 +79,9 @@ describe('converting while the API is unreachable', () => {
 
     const note = within(card).getByText(/API unreachable; estimated from rates fetched/);
     expect(note.querySelector('time')).not.toBeNull();
+    // The age of the rates is on the card once, in the sentence that warns about it.
+    expect(card.querySelectorAll('time')).toHaveLength(1);
+    expect(within(card).queryByText(/Rates fetched/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Cannot reach the API/)).not.toBeInTheDocument();
   });
 
@@ -101,12 +104,14 @@ describe('converting while the API is unreachable', () => {
     });
 
     await convert();
-    await screen.findByRole('region', { name: 'Result' });
+    const card = await screen.findByRole('region', { name: 'Result' });
 
     await waitFor(() => {
       expect(fake.historyLimits).toHaveLength(2);
     });
     expect(screen.getByText('cache')).toBeInTheDocument();
+    // An answer from the API keeps the line every other card carries.
+    expect(within(card).getByText(/Rates fetched/)).toBeInTheDocument();
   });
 
   it('estimates when the API answers a 5xx of its own', async () => {
