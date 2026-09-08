@@ -8,8 +8,9 @@ is built and deployed on its own, without a root workspace.
 
 ## Requirements
 
-Node 24 (see `.nvmrc`). Redis and MongoDB are only needed once the rates and
-history modules land; the API starts and answers `/health` without them.
+Node 24 (see `.nvmrc`). Redis backs the rates cache; the API starts and serves
+without it, reporting the cache as down on `/health` and paying an upstream call
+per request. MongoDB is only needed once the history module lands.
 
 ## Getting started
 
@@ -23,6 +24,24 @@ npm run start:dev
 - Swagger UI: `http://localhost:3000/docs`
 - OpenAPI JSON: `http://localhost:3000/docs-json`
 - Health: `http://localhost:3000/health`
+
+## Endpoints
+
+| Method | Path | What it does |
+| ------ | ---- | ------------ |
+| `GET` | `/api/v1/rates` | The current exchange rate snapshot, with the `source` it was served from: `cache`, `provider` or `stale-cache` |
+| `DELETE` | `/api/v1/rates/cache` | Drops both cache keys so the next read refetches. `204`; needs `x-api-key` when `ADMIN_API_KEY` is set |
+| `GET` | `/api/v1/currencies` | The currencies of the current snapshot, with ISO 4217 names and numeric codes, sorted by code |
+| `GET` | `/health` | Terminus report with the `redis` and `monobank` indicators |
+
+`source` is worth reading: `stale-cache` is a `200` served from the fallback key
+because the upstream could not be reached, so the rates are older than the cache
+TTL. When the upstream fails and no fallback exists, `/rates` and `/currencies`
+answer `503 RATES_UNAVAILABLE`.
+
+Monobank allows one request per minute. A cache miss is de-duplicated, so a
+burst of concurrent callers produces one upstream call rather than one each, and
+`DELETE /rates/cache` is the only way to force a refetch before the TTL expires.
 
 ## Configuration
 
