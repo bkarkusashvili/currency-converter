@@ -16,7 +16,7 @@ npm run typecheck      # tsc -b
 npm run format         # prettier --write
 npm run format:check   # prettier --check (the gate CI runs)
 npm test               # vitest
-npm run test:coverage  # vitest with coverage thresholds (85%)
+npm run test:coverage  # vitest with coverage thresholds (90%)
 ```
 
 ## Layout

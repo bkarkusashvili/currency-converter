@@ -462,7 +462,7 @@ still returned.
 | Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
 
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
-85% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
+90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
 runs the coverage script, not the plain one, plus `format:check`.
 Unit tests never touch the network, Redis or Mongo.
 

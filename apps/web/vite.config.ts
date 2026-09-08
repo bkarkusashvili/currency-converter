@@ -2,7 +2,9 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-const COVERAGE_THRESHOLD = 85;
+// Raised to what the suite actually reaches (99.4% statements, 97.0% branches),
+// so a change that stops covering a path fails here rather than merging quietly.
+const COVERAGE_THRESHOLD = 90;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
