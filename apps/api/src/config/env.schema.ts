@@ -47,6 +47,10 @@ export const envSchema = z
     MONOBANK_TIMEOUT_MS: positiveInt.default(5000),
     MONOBANK_RETRY_ATTEMPTS: positiveInt.default(3),
     MONOBANK_RETRY_BASE_DELAY_MS: positiveInt.default(300),
+    // Ceiling on one upstream call including every retry and the backoff
+    // between them. MONOBANK_TIMEOUT_MS bounds a single request; this bounds
+    // how long a caller waits before the stale copy is served instead.
+    MONOBANK_TOTAL_BUDGET_MS: positiveInt.default(8000),
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: positiveInt.default(5),
     CIRCUIT_BREAKER_RESET_TIMEOUT_MS: positiveInt.default(30000),
     RATES_CACHE_TTL_SECONDS: positiveInt.default(300),

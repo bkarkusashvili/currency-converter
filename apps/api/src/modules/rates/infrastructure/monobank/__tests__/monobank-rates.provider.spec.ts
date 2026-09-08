@@ -1,17 +1,27 @@
 import { HttpService } from '@nestjs/axios';
 import { AxiosError, AxiosHeaders, AxiosResponse } from 'axios';
-import { of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../../../common/logging/__tests__/fake-pino-logger';
 import { CircuitBreaker } from '../../../../../common/resilience/circuit-breaker';
 import { CircuitOpenError } from '../../../../../common/resilience/circuit-open.error';
+import { TimeoutError } from '../../../../../common/utils/timeout.error';
 import { fakeConfig } from '../../../../../config/__tests__/fake-config';
 import { MonobankRatesProvider } from '../monobank-rates.provider';
 
 const API_URL = 'https://api.monobank.ua/bank/currency';
 const FAILURE_THRESHOLD = 2;
+const TOTAL_BUDGET_MS = 8000;
+
+const config = fakeConfig({
+  MONOBANK_API_URL: API_URL,
+  MONOBANK_RETRY_ATTEMPTS: 3,
+  // Real sleeps, kept to a millisecond so the suite does not wait.
+  MONOBANK_RETRY_BASE_DELAY_MS: 1,
+  MONOBANK_TOTAL_BUDGET_MS: TOTAL_BUDGET_MS,
+});
 
 const USD_UAH = {
   currencyCodeA: 840,
@@ -53,6 +63,15 @@ describe('MonobankRatesProvider', () => {
   let logger: FakePinoLogger;
   let provider: MonobankRatesProvider;
 
+  function buildProvider(withBreaker: CircuitBreaker): MonobankRatesProvider {
+    return new MonobankRatesProvider(
+      { get } as unknown as HttpService,
+      config,
+      withBreaker,
+      logger.asPinoLogger(),
+    );
+  }
+
   beforeEach(() => {
     get = jest.fn();
     breaker = new CircuitBreaker({
@@ -60,20 +79,7 @@ describe('MonobankRatesProvider', () => {
       resetTimeoutMs: 30_000,
     });
     logger = createFakePinoLogger();
-
-    const config = fakeConfig({
-      MONOBANK_API_URL: API_URL,
-      MONOBANK_RETRY_ATTEMPTS: 3,
-      // Real sleeps, kept to a millisecond so the suite does not wait.
-      MONOBANK_RETRY_BASE_DELAY_MS: 1,
-    });
-
-    provider = new MonobankRatesProvider(
-      { get } as unknown as HttpService,
-      config,
-      breaker,
-      logger.asPinoLogger(),
-    );
+    provider = buildProvider(breaker);
   });
 
   it('requests the configured url and maps the payload into a snapshot', async () => {
@@ -149,6 +155,56 @@ describe('MonobankRatesProvider', () => {
 
     expect(get).toHaveBeenCalledTimes(3);
     expect(breaker.state).toBe('CLOSED');
+  });
+
+  // MONOBANK_TIMEOUT_MS bounds one request, so a call that keeps failing slowly
+  // costs the attempts plus the backoff between them, and single-flight makes
+  // every concurrent caller wait out the same sum for a stale copy that was
+  // already in Redis. The budget is what ends that wait.
+  it('gives up on the whole call once the budget is spent', async () => {
+    jest.useFakeTimers();
+
+    try {
+      // Never emits and never completes: the upstream that accepted the
+      // request and answers nothing, which no per-request timeout here sees.
+      get.mockReturnValue(new Observable<never>(() => undefined));
+
+      const pending = provider.fetchRates();
+      const rejection = expect(pending).rejects.toBeInstanceOf(TimeoutError);
+
+      await jest.advanceTimersByTimeAsync(TOTAL_BUDGET_MS);
+      await rejection;
+
+      expect(get).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // Inside the breaker rather than around it: a budget that expired is the
+  // upstream being unusable, and a circuit that never hears about it keeps
+  // sending callers into the same wait.
+  it('counts an expired budget as one breaker failure', async () => {
+    jest.useFakeTimers();
+
+    try {
+      const oneStrike = new CircuitBreaker({
+        failureThreshold: 1,
+        resetTimeoutMs: 30_000,
+      });
+      get.mockReturnValue(new Observable<never>(() => undefined));
+
+      const rejection = expect(
+        buildProvider(oneStrike).fetchRates(),
+      ).rejects.toBeInstanceOf(TimeoutError);
+
+      await jest.advanceTimersByTimeAsync(TOTAL_BUDGET_MS);
+      await rejection;
+
+      expect(oneStrike.state).toBe('OPEN');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('opens the circuit at the threshold and then fails without calling out', async () => {

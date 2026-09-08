@@ -305,7 +305,14 @@ interface ConversionStrategy {
   `MONOBANK_CIRCUIT_BREAKER` token and exported by `MonobankModule`, so the
   health indicator reports the breaker the provider actually trips rather than
   one of its own that nothing ever opens.
-- **Timeout** on every upstream request (`MONOBANK_TIMEOUT_MS`).
+- **Timeout** on every upstream request (`MONOBANK_TIMEOUT_MS`), and an overall
+  budget on the whole call (`MONOBANK_TOTAL_BUDGET_MS`, 8 s):
+  `withTimeout(retry(...), budget)` inside the breaker. The per-request timeout
+  bounds one attempt, so the attempts plus the backoff between them add up to
+  far longer than any of them, and single-flight makes every concurrent caller
+  wait out the same sum — for a stale copy that was already in Redis when the
+  first one arrived. The budget sits inside the breaker so an expiry counts as
+  an upstream failure rather than passing through unnoticed.
 - **Throttling** via `@nestjs/throttler` on all routes.
 - **Single-flight** cache refresh (see §4) so a burst of misses produces one
   upstream call.
@@ -369,6 +376,7 @@ reads.
 | `MONOBANK_TIMEOUT_MS`               | `5000`                                    |
 | `MONOBANK_RETRY_ATTEMPTS`           | `3`                                       |
 | `MONOBANK_RETRY_BASE_DELAY_MS`      | `300`                                     |
+| `MONOBANK_TOTAL_BUDGET_MS`          | `8000`                                    |
 | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5`                                       |
 | `CIRCUIT_BREAKER_RESET_TIMEOUT_MS`  | `30000`                                   |
 | `RATES_CACHE_TTL_SECONDS`           | `300`                                     |
