@@ -70,7 +70,7 @@ function normaliseSeparators(text: string): string | null {
 }
 
 function isGrouped(text: string, separator: string): boolean {
-  return new RegExp(`^\\d{1,3}(?:${escape(separator)}\\d{3})+$`).test(text);
+  return new RegExp(`^\\d{1,3}(?:${escapeForRegExp(separator)}\\d{3})+$`).test(text);
 }
 
 function stripAll(text: string, separator: string): string {
@@ -81,6 +81,6 @@ function occurrences(text: string, character: string): number {
   return text.split(character).length - 1;
 }
 
-function escape(separator: string): string {
+function escapeForRegExp(separator: string): string {
   return separator === '.' ? '\\.' : separator;
 }
