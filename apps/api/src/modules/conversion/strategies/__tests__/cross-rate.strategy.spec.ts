@@ -1,4 +1,3 @@
-import { RateNotAvailableError } from '../../../../common/errors/rate-not-available.error';
 import { RATE_DECIMALS } from '../../../../common/money/money-decimals';
 import { roundHalfUp } from '../../../../common/money/round-half-up';
 import { ExchangeRate } from '../../../rates/domain/exchange-rate';
@@ -9,26 +8,26 @@ describe('CrossRateStrategy', () => {
   const strategy = new CrossRateStrategy();
 
   const rateOf = (from: string, to: string): number =>
-    roundHalfUp(strategy.rate(from, to, RATES), RATE_DECIMALS);
+    roundHalfUp(strategy.price(from, to, RATES)!, RATE_DECIMALS);
 
   it('is named after the pricing it does', () => {
     expect(strategy.name).toBe('cross');
   });
 
-  describe('supports', () => {
+  describe('the pairs it takes', () => {
     it('takes two currencies that only share the base currency', () => {
-      expect(strategy.supports('GBP', 'PLN', RATES)).toBe(true);
-      expect(strategy.supports('PLN', 'GBP', RATES)).toBe(true);
+      expect(strategy.price('GBP', 'PLN', RATES)).toBeDefined();
+      expect(strategy.price('PLN', 'GBP', RATES)).toBeDefined();
     });
 
     // It can price these, and the direct strategy prices them better; which one
     // answers is the resolver's ordering, not a claim made here.
     it('takes a pair the snapshot also publishes directly', () => {
-      expect(strategy.supports('EUR', 'USD', RATES)).toBe(true);
+      expect(strategy.price('EUR', 'USD', RATES)).toBeDefined();
     });
 
     it('leaves a currency converted to itself to the identity rate', () => {
-      expect(strategy.supports('GBP', 'GBP', RATES)).toBe(false);
+      expect(strategy.price('GBP', 'GBP', RATES)).toBeUndefined();
     });
 
     it('does not take a currency with no pair against the base currency', () => {
@@ -42,15 +41,15 @@ describe('CrossRateStrategy', () => {
         },
       ];
 
-      expect(strategy.supports('CHF', 'PLN', detached)).toBe(false);
+      expect(strategy.price('CHF', 'PLN', detached)).toBeUndefined();
     });
 
     it('does not take a currency the snapshot never mentions', () => {
-      expect(strategy.supports('XYZ', 'PLN', RATES)).toBe(false);
+      expect(strategy.price('XYZ', 'PLN', RATES)).toBeUndefined();
     });
   });
 
-  describe('rate', () => {
+  describe('the rate it prices with', () => {
     it('composes the leg into the base currency with the leg out of it', () => {
       expect(rateOf('GBP', 'PLN')).toBe(4.986802);
     });
@@ -64,12 +63,6 @@ describe('CrossRateStrategy', () => {
     it('is not the reciprocal of itself across a spread', () => {
       expect(rateOf('EUR', 'USD')).toBe(1.15322);
       expect(rateOf('USD', 'EUR')).toBe(0.845566);
-    });
-
-    it('answers the documented 422 when it is asked for a pair it does not support', () => {
-      expect(() => strategy.rate('XYZ', 'PLN', RATES)).toThrow(
-        RateNotAvailableError,
-      );
     });
   });
 });

@@ -19,9 +19,13 @@ export class HistoryQueryDto {
   // A query string is text, and the global pipe does not convert implicitly, so
   // the conversion is opted into here. `?limit=abc` then becomes NaN and fails
   // the integer check rather than reaching the query as a silent nothing.
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
+  //
+  // The integer check is declared last of the three so it is the first the pipe
+  // evaluates — constraints run bottom-up — and `?limit=abc` is reported as the
+  // integer it is not rather than as a number too large for the page.
   @Max(MAX_HISTORY_LIMIT)
+  @Min(1)
+  @IsInt()
+  @Type(() => Number)
   limit: number = DEFAULT_HISTORY_LIMIT;
 }

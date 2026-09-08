@@ -53,13 +53,35 @@ describe('RedisConnection', () => {
       await connection.onModuleInit();
 
       expect(logger.warn).toHaveBeenCalledTimes(1);
+      // The reason travels as the pino error field, which is what carries a
+      // stack into the JSON line; interpolating the message drops it.
       expect(logger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('ECONNREFUSED'),
+        {
+          err: expect.objectContaining({
+            message: expect.stringContaining('ECONNREFUSED') as string,
+          }) as Error,
+        },
+        expect.stringContaining('starts degraded'),
       );
     });
   });
 
   describe('shutdown', () => {
+    // Nest closes the HTTP listener between the destroy hooks and the shutdown
+    // hooks, so a teardown declared as the first one takes the cache away from
+    // the requests that are still being served.
+    it('tears down after the listener rather than before it', () => {
+      const connection = new RedisConnection(
+        new FakeRedisClient().asRedis(),
+        createFakePinoLogger().asPinoLogger(),
+      );
+
+      expect(
+        (connection as { onModuleDestroy?: unknown }).onModuleDestroy,
+      ).toBeUndefined();
+      expect(typeof connection.onApplicationShutdown).toBe('function');
+    });
+
     it('quits an open connection', async () => {
       const client = new FakeRedisClient();
       const logger = createFakePinoLogger();
@@ -69,7 +91,7 @@ describe('RedisConnection', () => {
       );
 
       await connection.onModuleInit();
-      await connection.onModuleDestroy();
+      await connection.onApplicationShutdown();
 
       expect(client.quitCalls).toBe(1);
       expect(client.status).toBe('end');
@@ -83,7 +105,7 @@ describe('RedisConnection', () => {
         logger.asPinoLogger(),
       );
 
-      await connection.onModuleDestroy();
+      await connection.onApplicationShutdown();
 
       expect(client.quitCalls).toBe(0);
       expect(client.disconnectCalls).toBe(1);
@@ -98,7 +120,7 @@ describe('RedisConnection', () => {
       );
 
       await connection.onModuleInit();
-      await connection.onModuleDestroy();
+      await connection.onApplicationShutdown();
 
       expect(client.quitCalls).toBe(1);
       expect(client.disconnectCalls).toBe(1);

@@ -8,6 +8,8 @@ import { HistoryService } from '../../history/history.service';
 import { RatesService } from '../../rates/application/rates.service';
 import { RatesLookup } from '../../rates/domain/rates-lookup';
 import { ConversionService } from '../conversion.service';
+import { ConversionRequest } from '../domain/conversion-request';
+import { ConversionResult } from '../domain/conversion-result';
 import { ConversionStrategyResolver } from '../strategies/conversion-strategy.resolver';
 import { CrossRateStrategy } from '../strategies/cross-rate.strategy';
 import { DirectPairStrategy } from '../strategies/direct-pair.strategy';
@@ -18,6 +20,7 @@ const FETCHED_AT = '2026-09-08T12:00:00.000Z';
 
 const LOOKUP: RatesLookup = {
   source: 'cache',
+  cacheDegraded: false,
   snapshot: { fetchedAt: FETCHED_AT, rates: [...RATES] },
 };
 
@@ -42,7 +45,7 @@ describe('ConversionService', () => {
   // asserting on the stub.
   beforeEach(() => {
     rates = { getSnapshot: jest.fn().mockResolvedValue(LOOKUP) };
-    history = { record: jest.fn().mockResolvedValue(undefined) };
+    history = { record: jest.fn().mockResolvedValue(true) };
     logger = createFakePinoLogger();
     service = new ConversionService(
       rates as unknown as RatesService,
@@ -56,9 +59,19 @@ describe('ConversionService', () => {
     );
   });
 
+  // Most of what follows is about the conversion the service priced; what
+  // answering it cost is asserted through `service.convert` itself below.
+  async function convert(
+    request: ConversionRequest,
+  ): Promise<ConversionResult> {
+    const { result } = await service.convert(request);
+
+    return result;
+  }
+
   it('answers with the whole documented result', async () => {
     await expect(
-      service.convert({ from: 'USD', to: 'UAH', amount: 100 }),
+      convert({ from: 'USD', to: 'UAH', amount: 100 }),
     ).resolves.toStrictEqual({
       from: 'USD',
       to: 'UAH',
@@ -71,9 +84,54 @@ describe('ConversionService', () => {
     });
   });
 
+  // The degradations travel beside the conversion rather than on it: what
+  // degraded is a fact about the request, and the controller is what turns
+  // these two flags into §3's `warnings` — the same place /rates does it.
+  describe('what it reports about the request that produced the answer', () => {
+    it('reports a healthy request as nothing having degraded', async () => {
+      await expect(
+        service.convert({ from: 'USD', to: 'UAH', amount: 100 }),
+      ).resolves.toMatchObject({ cacheDegraded: false, recorded: true });
+    });
+
+    it('reports a cache that could not be reached', async () => {
+      rates.getSnapshot.mockResolvedValue({ ...LOOKUP, cacheDegraded: true });
+
+      await expect(
+        service.convert({ from: 'USD', to: 'UAH', amount: 1 }),
+      ).resolves.toMatchObject({ cacheDegraded: true });
+    });
+
+    // The conversion is answered whatever the store did, and this is the part
+    // of that the client cannot see for itself: /history will not have it.
+    it('reports a record the store did not take', async () => {
+      history.record.mockResolvedValue(false);
+
+      await expect(
+        service.convert({ from: 'USD', to: 'UAH', amount: 1 }),
+      ).resolves.toMatchObject({ recorded: false });
+    });
+
+    // The record is what happened, not what the request cost: a stored
+    // conversion carrying a flag about the cache would be a record of the
+    // outage rather than of the conversion.
+    it('keeps what degraded out of the record it stores', async () => {
+      rates.getSnapshot.mockResolvedValue({ ...LOOKUP, cacheDegraded: true });
+
+      await service.convert({ from: 'USD', to: 'UAH', amount: 1 });
+
+      const [recorded] = history.record.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
+
+      expect(recorded).not.toHaveProperty('warnings');
+      expect(recorded).not.toHaveProperty('cacheDegraded');
+    });
+  });
+
   it('rounds the money half-up to two decimals', async () => {
     await expect(
-      service.convert({ from: 'UAH', to: 'USD', amount: 250.5 }),
+      convert({ from: 'UAH', to: 'USD', amount: 250.5 }),
     ).resolves.toMatchObject({ result: 5.59, rate: 0.022306 });
   });
 
@@ -82,13 +140,13 @@ describe('ConversionService', () => {
   // one a client can reconcile is the one the full-precision rate produces.
   it('computes the result from the unrounded rate', async () => {
     await expect(
-      service.convert({ from: 'GBP', to: 'PLN', amount: 1_000_000 }),
+      convert({ from: 'GBP', to: 'PLN', amount: 1_000_000 }),
     ).resolves.toMatchObject({ result: 4986801.71, rate: 4.986802 });
   });
 
   it('prices a currency against itself at one', async () => {
     await expect(
-      service.convert({ from: 'USD', to: 'USD', amount: 12.34 }),
+      convert({ from: 'USD', to: 'USD', amount: 12.34 }),
     ).resolves.toMatchObject({ result: 12.34, rate: 1, strategy: 'identity' });
   });
 
@@ -98,13 +156,13 @@ describe('ConversionService', () => {
   // rounding can have moved it.
   it('rounds a tie up rather than to the nearest float', async () => {
     await expect(
-      service.convert({ from: 'USD', to: 'USD', amount: 1.005 }),
+      convert({ from: 'USD', to: 'USD', amount: 1.005 }),
     ).resolves.toMatchObject({ result: 1.01 });
   });
 
   it('names the strategy that priced the pair', async () => {
     await expect(
-      service.convert({ from: 'GBP', to: 'PLN', amount: 1 }),
+      convert({ from: 'GBP', to: 'PLN', amount: 1 }),
     ).resolves.toMatchObject({ strategy: 'cross' });
   });
 
@@ -112,7 +170,7 @@ describe('ConversionService', () => {
     rates.getSnapshot.mockResolvedValue({ ...LOOKUP, source: 'stale-cache' });
 
     await expect(
-      service.convert({ from: 'USD', to: 'UAH', amount: 1 }),
+      convert({ from: 'USD', to: 'UAH', amount: 1 }),
     ).resolves.toMatchObject({
       source: 'stale-cache',
       ratesTimestamp: FETCHED_AT,
@@ -143,13 +201,9 @@ describe('ConversionService', () => {
 
   describe('the history it leaves behind', () => {
     it('records exactly what it answered', async () => {
-      const answer = await service.convert({
-        from: 'USD',
-        to: 'UAH',
-        amount: 100,
-      });
+      const result = await convert({ from: 'USD', to: 'UAH', amount: 100 });
 
-      expect(history.record).toHaveBeenCalledWith(answer);
+      expect(history.record).toHaveBeenCalledWith(result);
     });
 
     it('records a conversion once', async () => {

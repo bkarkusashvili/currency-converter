@@ -28,12 +28,7 @@ describe('rates (e2e)', () => {
   let redis: FakeRedisClient;
   let provider: ProviderStub;
 
-  // A fresh app per test: the cache and the upstream stub are both state that
-  // outlives a request, and every case here is about what the second one does.
-  beforeEach(async () => {
-    redis = new FakeRedisClient();
-    provider = { fetchRates: jest.fn().mockResolvedValue(RATES_SNAPSHOT) };
-
+  async function boot(): Promise<void> {
     app = await createE2eApp(
       { imports: [AppModule] },
       {
@@ -46,6 +41,15 @@ describe('rates (e2e)', () => {
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;
+  }
+
+  // A fresh app per test: the cache and the upstream stub are both state that
+  // outlives a request, and every case here is about what the second one does.
+  beforeEach(async () => {
+    redis = new FakeRedisClient();
+    provider = { fetchRates: jest.fn().mockResolvedValue(RATES_SNAPSHOT) };
+
+    await boot();
   });
 
   afterEach(async () => {
@@ -204,6 +208,72 @@ describe('rates (e2e)', () => {
       const response = await request(server).get(CURRENCIES_PATH).expect(200);
 
       expect(response.body).toStrictEqual({ currencies: SNAPSHOT_CURRENCIES });
+    });
+  });
+
+  // Redis down is a degradation, not a failure: the rates are fetched from the
+  // upstream and served, and the client is told what that cost.
+  describe('when the cache cannot be reached', () => {
+    beforeEach(async () => {
+      await app.close();
+      redis = new FakeRedisClient({ unreachable: true });
+
+      await boot();
+    });
+
+    it('answers the snapshot from the upstream and warns', async () => {
+      const response = await request(server).get(RATES_PATH).expect(200);
+
+      expect(response.body).toMatchObject({
+        source: 'provider',
+        fetchedAt: RATES_SNAPSHOT.fetchedAt,
+        warnings: [
+          {
+            code: 'CACHE_UNAVAILABLE',
+            message: expect.any(String) as string,
+          },
+        ],
+      });
+    });
+
+    // A 204 here would tell the operator the keys are gone while the stale
+    // rates they were clearing keep being served.
+    it('refuses to report an invalidation it could not perform', async () => {
+      const response = await request(server)
+        .delete(CACHE_PATH)
+        .set(API_KEY_HEADER, ADMIN_API_KEY)
+        .expect(503);
+
+      expect(response.body).toMatchObject({
+        statusCode: 503,
+        code: ErrorCode.CACHE_UNAVAILABLE,
+        path: CACHE_PATH,
+      });
+    });
+
+    // The currencies list is a projection of the same snapshot, read the same
+    // way, so it degrades the same way and says so on the same terms.
+    it('lists the currencies and warns on the same terms', async () => {
+      const response = await request(server).get(CURRENCIES_PATH).expect(200);
+
+      expect(response.body).toStrictEqual({
+        currencies: SNAPSHOT_CURRENCIES,
+        warnings: [
+          {
+            code: 'CACHE_UNAVAILABLE',
+            message: expect.any(String) as string,
+          },
+        ],
+      });
+    });
+
+    // Every request pays the upstream, because nothing could be written for the
+    // next one — which is the degradation the warning is about.
+    it('fetches again on the next request, having cached nothing', async () => {
+      await request(server).get(RATES_PATH).expect(200);
+      await request(server).get(RATES_PATH).expect(200);
+
+      expect(provider.fetchRates).toHaveBeenCalledTimes(2);
     });
   });
 

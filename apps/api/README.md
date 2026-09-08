@@ -32,7 +32,7 @@ npm run start:dev
 | ------ | ---- | ------------ |
 | `POST` | `/api/v1/convert` | Converts an amount between two currencies and reports the rate, the strategy that priced it and how old the rates were |
 | `GET` | `/api/v1/rates` | The current exchange rate snapshot, with the `source` it was served from: `cache`, `provider` or `stale-cache` |
-| `DELETE` | `/api/v1/rates/cache` | Drops both cache keys so the next read refetches. `204`; needs `x-api-key` when `ADMIN_API_KEY` is set |
+| `DELETE` | `/api/v1/rates/cache` | Drops both cache keys so the next read refetches. `204`, or `503 CACHE_UNAVAILABLE` when Redis could not be reached; needs `x-api-key` when `ADMIN_API_KEY` is set |
 | `GET` | `/api/v1/currencies` | The currencies of the current snapshot, with ISO 4217 names and numeric codes, sorted by code |
 | `GET` | `/api/v1/history` | The most recent conversions, newest first. `?limit=` is `1..50`, default `10` |
 | `GET` | `/health` | Terminus report with the `redis`, `mongodb` and `monobank` indicators. `503` when any of them is down |
@@ -41,7 +41,9 @@ npm run start:dev
 `source` is worth reading: `stale-cache` is a `200` served from the fallback key
 because the upstream could not be reached, so the rates are older than the cache
 TTL. When the upstream fails and no fallback exists, `/rates` and `/currencies`
-answer `503 RATES_UNAVAILABLE`.
+answer `503 RATES_UNAVAILABLE`. Redis being down is not a failure at all: the
+rates come from the upstream and the answer carries a `CACHE_UNAVAILABLE`
+warning saying the cache was not part of it (see **Warnings** below).
 
 Monobank allows one request per minute. A cache miss is de-duplicated, so a
 burst of concurrent callers produces one upstream call rather than one each, and
@@ -86,6 +88,33 @@ the zero.
 A pair the current snapshot cannot price answers `422`: `UNSUPPORTED_CURRENCY`
 when a code is not in the snapshot at all, `RATE_NOT_AVAILABLE` when both codes
 are quoted and there is no path between them.
+
+### Warnings
+
+`/convert`, `/rates` and `/currencies` add a `warnings` array when something
+degraded while the request was answered — and nothing at all when it did not, so a healthy
+response is exactly the one above:
+
+```json
+{
+  "result": 4435,
+  "source": "provider",
+  "warnings": [
+    {
+      "code": "CACHE_UNAVAILABLE",
+      "message": "The rates cache could not be reached during this request, so it was not used; `source` says where the rates came from."
+    }
+  ]
+}
+```
+
+| `code` | What it means |
+| ------ | ------------- |
+| `CACHE_UNAVAILABLE` | Redis could not be read or written while the request was answered, so the cache neither served this response nor kept it for the next one. `source` says where the rates did come from |
+| `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but not stored, so it will not appear in `/history` |
+
+The request succeeded either way — a warning is not an error, and the answer is
+the answer. `message` is safe to show to a user; a client switches on `code`.
 
 ## History
 
@@ -158,6 +187,16 @@ log that names the load balancer.
 Unit tests live in a `__tests__` folder beside the code they cover; the
 end-to-end suites live in `test/e2e` and boot the app the way `main.ts` does.
 
+The coverage report is the **unit** suites only, and the 85% gate is on those
+numbers. `npm run test:e2e` runs without instrumentation, so what only it
+exercises is missing from the report rather than uncovered: `configure-http.ts`
+and `setup-swagger.ts` read 0% while every e2e suite boots through both, and
+`main.ts` and the `*.module.ts` files are excluded outright — a module is
+wiring, and what a module decides lives in a file of its own beside it so that
+the gate does see it. Read the two numbers as what they are: the unit suites
+cover the logic, the e2e suites cover the surface, and only the first is
+counted.
+
 ## Errors
 
 Every non-2xx response uses one envelope:
@@ -185,8 +224,10 @@ A 4xx that has no documented code of its own is named after the failure, so a
 generic message and keeps the detail in the log.
 
 `/health` is the one exception to the envelope: it answers with the Terminus
-report so a failing indicator stays visible to monitoring, and it is exempt from
-the rate limit so a probe cannot throttle itself into a restart loop.
+report so a failing indicator stays visible to monitoring. It carries a limit of
+its own — 60 requests a minute, above any poll rate and still a bound on a route
+that pings Redis and Mongo for whoever asks; `/health/live` is the exempt one,
+so a probe cannot throttle itself into a restart loop.
 
 `/health/live` is the liveness probe, and it is the one Railway's
 `healthcheckPath`, the Dockerfile's `HEALTHCHECK` and the Compose healthcheck

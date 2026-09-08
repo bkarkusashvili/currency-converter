@@ -15,6 +15,13 @@ const CURRENCY_CODE = /^[A-Za-z]{3}$/;
 // a result the client can reconcile.
 const MAX_AMOUNT = 1_000_000_000_000;
 
+// Every field declares its type check *last*. The pipe stops at the first
+// failure a field records and class-validator evaluates constraints bottom-up,
+// so the type check is the one that runs first and the one a wrong-typed value
+// is reported against: declared the other way round, `amount: "100"` answers
+// "must not be greater than 1000000000000", which is a consequence of NaN
+// rather than the mistake.
+//
 // The codes are typed as the strings they are on the wire rather than as
 // CurrencyCode: an alias in a decorated signature erases to Object in the
 // metadata Swagger reads, which would document a code as an object.
@@ -28,8 +35,8 @@ export class ConvertRequestDto implements ConversionRequest {
     maxLength: 3,
     pattern: CURRENCY_CODE.source,
   })
-  @IsString()
   @Matches(CURRENCY_CODE)
+  @IsString()
   @Transform(toUpperCase)
   from!: string;
 
@@ -40,8 +47,8 @@ export class ConvertRequestDto implements ConversionRequest {
     maxLength: 3,
     pattern: CURRENCY_CODE.source,
   })
-  @IsString()
   @Matches(CURRENCY_CODE)
+  @IsString()
   @Transform(toUpperCase)
   to!: string;
 
@@ -55,8 +62,8 @@ export class ConvertRequestDto implements ConversionRequest {
     exclusiveMinimum: true,
     maximum: MAX_AMOUNT,
   })
-  @IsNumber({ allowNaN: false, allowInfinity: false })
-  @IsPositive()
   @Max(MAX_AMOUNT)
+  @IsPositive()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
   amount!: number;
 }

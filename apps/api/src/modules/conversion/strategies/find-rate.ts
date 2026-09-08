@@ -1,4 +1,4 @@
-import { CurrencyCode } from '../../rates/domain/currency-code';
+import { CurrencyCode } from '../../../common/currency/currency-code';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
 
 // A snapshot is a handful of pairs, so the lookup is a scan; it is a function

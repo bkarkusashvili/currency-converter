@@ -1,5 +1,5 @@
 import { PinoLogger } from 'nestjs-pino';
-import { alphaFromNumeric } from '../../../currencies/iso-4217';
+import { alphaFromNumeric } from '../../../../common/currency/iso-4217';
 import { ExchangeRate } from '../../domain/exchange-rate';
 import { MonobankRate } from './monobank-rate.schema';
 

@@ -85,6 +85,8 @@ Response `200`:
   Arithmetic uses `big.js`; floating point is never used for money.
 - `strategy`: `identity` | `direct` | `cross`.
 - `source`: `cache` | `provider` | `stale-cache`.
+- `warnings` is absent unless something degraded while the conversion was
+  answered — see **Warnings** below.
 
 ### GET `/api/v1/rates`
 
@@ -101,10 +103,20 @@ Returns the current snapshot the service would convert with:
 }
 ```
 
+`warnings` appears here on the same terms as on `/convert`.
+
 ### DELETE `/api/v1/rates/cache`
 
-Invalidates both cache keys. Returns `204`. If `ADMIN_API_KEY` is configured
-the request must carry it in the `x-api-key` header (`401` otherwise).
+Invalidates both cache keys. Returns `204`, whether or not the keys were there:
+the request states the wanted end state. If `ADMIN_API_KEY` is configured the
+request must carry it in the `x-api-key` header (`401` otherwise).
+
+A cache that could not be reached answers `503 CACHE_UNAVAILABLE` rather than
+`204`. This is the one place a Redis failure is not degraded away: the request
+is not a read on the way to an answer but a state change the caller commanded,
+and the only reason to command it is to force the next read to refetch —
+reporting success for keys that are still there tells an operator the cache is
+empty while the stale rates they were clearing keep being served.
 
 ### GET `/api/v1/currencies`
 
@@ -113,6 +125,11 @@ Currencies present in the current snapshot plus `UAH`, sorted by code:
 ```json
 { "currencies": [{ "code": "EUR", "numericCode": 978, "name": "Euro" }] }
 ```
+
+`warnings` appears here on the same terms as on `/rates`. The list is a
+projection of the same snapshot, read through the same service, so a cache that
+could not be reached costs this route exactly what it costs that one — and this
+is the route a client calls first, to fill a picker.
 
 ### GET `/api/v1/history?limit=10`
 
@@ -205,11 +222,61 @@ neither is a reason to fail a rollout or restart the container. Sending the
 probes here and monitoring there is what keeps `/health` free to report `503`
 honestly.
 
-Both routes are exempt from the throttler (`@SkipThrottle()` on the controller).
-A probe runs far more often than a client, and sharing a bucket with one would
-let the rate limit restart a healthy process. Both are excluded from the
-versioned prefix, and a successful probe of either is dropped from the request
-log (§7); a failing one is not.
+`/health/live` is exempt from the throttler (`@SkipThrottle()`): a probe runs
+far more often than a client, and sharing a bucket with one would let the rate
+limit restart a healthy process. `/health` is not exempt but generous — 60
+requests a minute per client, well above any monitoring poll rate — because it
+issues a Redis `PING` and a Mongo ping per request, and an unauthenticated
+route with no limit at all is an amplifier pointed at both. Both routes are
+excluded from the versioned prefix, and a successful probe of either is dropped
+from the request log (§7); a failing one is not.
+
+### Warnings
+
+`POST /api/v1/convert`, `GET /api/v1/rates` and `GET /api/v1/currencies` can
+carry a `warnings` array beside their answer:
+
+```json
+{
+  "warnings": [
+    {
+      "code": "CACHE_UNAVAILABLE",
+      "message": "The rates cache could not be reached during this request, so it was not used; `source` says where the rates came from."
+    }
+  ]
+}
+```
+
+The request succeeded — that is what separates a warning from the error
+envelope below — and each entry says what degraded while it was being answered.
+Both routes assemble the array the same way and in the same place: the service
+reports what degraded (`RatesLookup.cacheDegraded`, `ConversionOutcome`) and the
+controller turns that into the field, so a stored conversion is a record of what
+was converted rather than of the request that converted it.
+The field is **absent, not empty**, when nothing did: it exists to be noticed,
+and a healthy response is byte for byte the one it has always been.
+
+| `code`                 | When                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CACHE_UNAVAILABLE`    | Any of the three: Redis could not be read from or written to while the request was answered, so the cache neither served this response nor kept it for the next one |
+| `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but its record was dropped or timed out, so it will not appear in `/history`                                      |
+
+`message` is a sentence safe to show to a user; a client switches on `code`.
+`CACHE_UNAVAILABLE` says nothing about where the rates came from, because the
+flag behind it is raised by a failed read, a failed write, or both: a read that
+timed out and a write that then succeeded is one of them, a degraded read
+answered from the stale key is another, and neither is "fetched from the
+upstream and not cached". `source` is the field that answers that, and it is on
+the same response.
+`CACHE_UNAVAILABLE` is deliberately also an error `code` in the table below: it
+is the same condition, reported beside a successful answer when the request
+could still be served and in the envelope when it could not — which on
+`DELETE /rates/cache` it cannot.
+Both are the counterpart of the degradation model in §2: Redis being down and
+Mongo being down each cost something the client could not previously see, and a
+warning is where the answer says so. A cache that answered with an unreadable
+value is not `CACHE_UNAVAILABLE` — it was reached, the value is discarded and
+the request pays an upstream call, which is exactly what an expiry costs.
 
 ### Error envelope
 
@@ -237,8 +304,15 @@ Every non-2xx response has this shape:
 | 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                   |
 | 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                             |
 | 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists             |
+| 503  | `CACHE_UNAVAILABLE`    | The cache could not be reached to invalidate it      |
 | 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read          |
 | 500  | `INTERNAL_ERROR`       | Anything unexpected; message is generic              |
+
+`details.errors` carries one entry per field that failed and exactly one message
+per entry. The DTOs declare each field's type check last and the pipe stops at
+the first failure a field records, so `amount: "100"` is reported as the number
+it is not rather than as every bound `NaN` is also outside — a multi-field body
+still reports every field.
 
 Any other 4xx keeps its status and takes its `code` from the name the exception
 reports, upper-snake-cased, falling back to the status's own name: a 406 answers
@@ -286,11 +360,14 @@ const RATES_PROVIDER = Symbol('RATES_PROVIDER');
 interface RatesProvider { fetchRates(): Promise<RatesSnapshot>; }
 
 const RATES_REPOSITORY = Symbol('RATES_REPOSITORY');
+interface CachedSnapshot { snapshot: RatesSnapshot | null; degraded: boolean; }
+
 interface RatesRepository {
-  getFresh(): Promise<RatesSnapshot | null>;
-  getStale(): Promise<RatesSnapshot | null>;
-  save(snapshot: RatesSnapshot): Promise<void>;
-  clear(): Promise<void>;
+  getFresh(): Promise<CachedSnapshot>;   // degrades: { snapshot: null, degraded: true }
+  getStale(): Promise<CachedSnapshot>;   // degrades: { snapshot: null, degraded: true }
+  save(snapshot: RatesSnapshot): Promise<{ degraded: boolean }>;  // degrades: { degraded: true }
+  clear(): Promise<void>;                // rejects: CacheUnavailableError when
+                                         // the cache could not be reached
 }
 ```
 
@@ -304,6 +381,8 @@ miss → single-flight:
         return { snapshot, source: 'provider' }
   catch stale = repo.getStale()
         stale ? { snapshot: stale, source: 'stale-cache' } : throw RatesUnavailableError
+
+every branch also carries cacheDegraded: whether any of those cache calls failed
 ```
 
 - Concurrent callers during a miss share one in-flight promise, cleared in a
@@ -312,8 +391,11 @@ miss → single-flight:
   decision — `upstream circuit open` or `upstream request failed` — and never
   the upstream's own message, which travels to the client in the envelope and
   carries the url, the status text and sometimes the body.
-- Every `RatesRepository` method catches Redis errors, logs a warning with the
-  operation name, and degrades (`null` on reads, no-op on writes).
+- The request-path methods catch Redis errors, log a warning with the operation
+  name, and degrade (no snapshot on reads, no-op on writes) — and report that
+  they did, because `null` alone cannot tell an expiry from an outage. That flag
+  travels on `RatesLookup.cacheDegraded` and becomes §3's `CACHE_UNAVAILABLE`
+  warning on the response.
 
 ### Redis keys
 
@@ -323,7 +405,8 @@ miss → single-flight:
 | `rates:fallback`  | `RATES_STALE_TTL_SECONDS`  | 86400   |
 
 Both are written on every successful upstream fetch. `DELETE /rates/cache`
-removes both. Values are the JSON-serialised `RatesSnapshot`.
+removes both, or answers `503 CACHE_UNAVAILABLE` if it could not (§3). Values
+are the JSON-serialised `RatesSnapshot`.
 
 ## 5. Conversion semantics
 
@@ -355,7 +438,10 @@ Strategies, tried in order once both codes are known to be quoted:
 
 The direction rule above lives in one function, `directionalRate`, which both
 the direct and the cross strategy use — the cross one twice, once per leg — so
-"buy going out, sell coming back" has a single definition. A rate that is not
+"buy going out, sell coming back" has a single definition. When the snapshot
+holds the pair in both orientations, which Monobank's never does, the one quoted
+in the asked-for direction wins: picking one is what makes the answer
+independent of the order the upstream listed its pairs in. A rate that is not
 positive is read as absent: the upstream payload is validated positive at its
 boundary, but a cached snapshot outlives a deploy and is only checked for
 shape, and a zero would otherwise divide. `IdentityStrategy` is first in the
@@ -391,10 +477,15 @@ cannot move the answer either.
 ```ts
 interface ConversionStrategy {
   readonly name: 'identity' | 'direct' | 'cross';
-  supports(from: CurrencyCode, to: CurrencyCode, rates: readonly ExchangeRate[]): boolean;
-  rate(from: CurrencyCode, to: CurrencyCode, rates: readonly ExchangeRate[]): Big;
+  price(from: CurrencyCode, to: CurrencyCode, rates: readonly ExchangeRate[]): Big | undefined;
 }
 ```
+
+One method, not a `supports` predicate and a `rate` beside it: the pair was
+priced or it was not. `ConversionStrategyResolver.resolve` returns
+`{ strategy, rate }` — the first strategy of the chain that answered and the
+rate it answered with — so nothing prices the pair twice and "the precondition
+of `rate` is `supports`" is unrepresentable rather than commented.
 
 `result` is computed from the **unrounded** rate, and `rate` is rounded to six
 decimals separately: half a unit in the sixth decimal is 29 groszy on a million
@@ -428,9 +519,22 @@ float.
   wait out the same sum — for a stale copy that was already in Redis when the
   first one arrived. The budget sits inside the breaker so an expiry counts as
   an upstream failure rather than passing through unnoticed.
-- **Throttling** via `@nestjs/throttler` on all routes.
+- **A response ceiling** on the upstream client (`maxContentLength` /
+  `maxBodyLength`, 2 MB against a ~30 KB payload): the timeout bounds how long
+  a response may take and nothing bounded how large it may be.
+- **Throttling** via `@nestjs/throttler` on every route but the liveness
+  probe, which is exempt, and `/health`, which carries a generous limit of its
+  own (§3). The buckets live in the throttler's default in-process storage, so
+  the documented `THROTTLE_LIMIT` is per replica and a restart empties them —
+  correct for the single instance this deploys as.
 - **Single-flight** cache refresh (see §4) so a burst of misses produces one
   upstream call.
+- **Shutdown order.** `RedisConnection` and `MongoConnection` tear down in
+  `onApplicationShutdown`, not `onModuleDestroy`: Nest closes the HTTP listener
+  in `dispose()`, which runs between the two. Declared as destroy hooks they
+  took the cache and the history store away from the requests still in flight
+  during a rolling deploy, which is the one window where the degradation
+  promises above would have been broken by the shutdown itself.
 
 ## 7. Errors and logging
 
@@ -443,7 +547,8 @@ abstract class AppError extends Error {
 ```
 
 Concrete: `UnsupportedCurrencyError`, `RateNotAvailableError`,
-`RatesUnavailableError`, `HistoryUnavailableError`, `UnauthorizedError`.
+`RatesUnavailableError`, `CacheUnavailableError`, `HistoryUnavailableError`,
+`UnauthorizedError`.
 `CircuitOpenError` is internal and is translated to `RatesUnavailableError` by
 `RatesService`.
 
@@ -454,12 +559,25 @@ Concrete: `UnsupportedCurrencyError`, `RateNotAvailableError`,
   envelope with the codes from §3.
 - Anything else → `500 INTERNAL_ERROR`, generic message, full stack logged.
 
+Something that is down is observed again on every attempt, so the three places
+that watch a dependency — the Redis client's reconnect loop, the Mongo
+connection's state changes and the history writes being dropped — report
+through one `createOutageReporter`: a warning when the outage starts, a debug
+line for the repeats or nothing at all, and one line when it ends.
+
+A failure is logged as pino's `err` field rather than interpolated into the
+message, which is what serialises the stack into the JSON line; the two
+bootstrap paths that log before or during the logger's own flush use the Nest
+logger and `errorStack` instead.
+
 Logging uses `nestjs-pino`: JSON in production, `pino-pretty` in development,
-one log line per request carrying exactly `requestId`, method, path, client
+one log line per request carrying exactly the request id, method, path, client
 address, status and duration. Those fields are produced by custom
-`serializers.req` / `serializers.res`; no header is ever written, so a
-credential cannot reach the log by being forgotten in a denylist. Services use
-the injected `PinoLogger` with a context.
+`serializers.req` / `serializers.res`, which emit `req.id`, `req.method`,
+`req.url` and `req.remoteAddress` and `res.statusCode`; pino-http adds the
+duration as `responseTime`. The id is on the line once, inside `req`. No header
+is ever written, so a credential cannot reach the log by being forgotten in a
+denylist. Services use the injected `PinoLogger` with a context.
 
 The line is levelled by outcome: `error` for a 5xx or a thrown error, `warn` for
 a 4xx, `info` otherwise. A successful `/health` probe is dropped entirely — it
@@ -553,16 +671,25 @@ apps/api
 │   ├── app.module.ts
 │   ├── config/                  zod schema, typed AppConfig, ConfigModule setup
 │   ├── common/
+│   │   ├── http/                the paths the process serves: the api prefix, the two probe routes, the docs —
+│   │   │                        read by configure-http, setup-swagger and the request log level alike
+│   │   ├── conversion/          ConversionStrategyName and the OpenAPI option objects a conversion response
+│   │   │                        and a stored record of one publish identically
+│   │   ├── warnings/            ResponseWarning, its DTO and collectWarnings — the §3 codes
+│   │   ├── currency/            CurrencyCode, Currency and the ISO 4217 table, read by the
+│   │   │                        Monobank mapper and the currencies projection alike
 │   │   ├── errors/              AppError, ErrorCode, concrete errors
 │   │   ├── filters/             GlobalExceptionFilter, ErrorResponseDto, status → code mapping
 │   │   ├── guards/              ApiKeyGuard
-│   │   ├── logging/             nestjs-pino setup, request id middleware, log level, serializers
+│   │   ├── logging/             nestjs-pino setup, request id middleware, log level, serializers,
+│   │   │                        createOutageReporter for the once-per-outage lines, and
+│   │   │                        errorStack for the two bootstrap paths pino cannot serve
 │   │   ├── validation/          ValidationPipe options, error flattening, the upper-case transform
 │   │   ├── throttling/          buildThrottlerOptions and the global guard
 │   │   ├── swagger/             OpenAPI document, ApiErrorResponses decorator
 │   │   ├── resilience/          retry, CircuitBreaker, CircuitOpenError
 │   │   ├── money/               the Money constructor, roundHalfUp and the decimal scales §3 publishes (big.js)
-│   │   └── utils/               constant-time compare, withTimeout
+│   │   └── utils/               constant-time compare, withTimeout, TimeoutError, upperSnakeCase
 │   ├── infrastructure/
 │   │   ├── redis/               REDIS_CLIENT (ioredis) and the RedisConnection lifecycle
 │   │   └── mongo/               MongooseModule.forRootAsync, the connect options
@@ -570,8 +697,6 @@ apps/api
 │   └── modules/
 │       ├── currencies/
 │       │   ├── dto/             CurrencyDto, CurrenciesResponseDto
-│       │   ├── iso-4217.ts      numeric↔alpha mapping and the ISO 4217 description
-│       │   ├── currency.ts      Currency
 │       │   ├── collect-currencies.ts  snapshot → sorted currency list
 │       │   ├── currencies.controller.ts  GET /currencies
 │       │   └── currencies.module.ts
@@ -587,11 +712,12 @@ apps/api
 │       │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
 │       │   └── rates.module.ts
 │       ├── conversion/
-│       │   ├── domain/          ConversionRequest, ConversionResult
+│       │   ├── domain/          ConversionRequest, ConversionResult and the ConversionOutcome that
+│       │   │                    carries it out of the service with what degraded beside it
 │       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
 │       │   ├── strategies/      interface, identity, direct, cross, resolver + token,
-│       │   │                    findRate, requireRate and directionalRate, which is the
-│       │   │                    §5 table in one function
+│       │   │                    findRate and directionalRate, which is the §5
+│       │   │                    table in one function
 │       │   ├── conversion.service.ts
 │       │   ├── conversion.controller.ts  POST /convert
 │       │   └── conversion.module.ts
@@ -604,13 +730,46 @@ apps/api
 │       │   ├── history.service.ts
 │       │   ├── history.controller.ts  GET /history
 │       │   └── history.module.ts
-│       └── health/              controller, HealthIndicatorPort + Redis / Mongo / Monobank indicators
+│       └── health/              controller, HealthExceptionFilter, HEALTH_INDICATORS,
+│                             pingIndicator with the probe budget,
+│                             HealthIndicatorPort + Redis / Mongo / Monobank indicators
 └── test
     ├── e2e/                     supertest suites over the real HTTP surface
     │   ├── env/                 per-suite environment, imported before AppModule
     │   └── fixtures/            snapshots the suites assert against
     └── jest-e2e.json
 ```
+
+The dependencies between the feature modules run one way, and these are all of
+them:
+
+| Edge | What crosses it |
+| ---- | --------------- |
+| `conversion → rates` | `RatesModule` and `RatesService` for the snapshot, `ExchangeRate` and `BASE_CURRENCY` for the strategies, `RatesSource` on the result |
+| `conversion → history` | `HistoryModule` and `HistoryService.record`, the side effect of a conversion (§2) |
+| `currencies → rates` | `RatesModule` and `RatesService` for the snapshot, `ExchangeRate` and `BASE_CURRENCY` for the projection |
+| `health → rates` | `MONOBANK_CIRCUIT_BREAKER`, taken from that module's exports rather than from its infrastructure folder |
+| `history → rates` | `RatesSource`, because a record carries the provenance the conversion was answered with (§3) |
+
+Every one of them points at `rates`, or from `conversion` at `history`, and
+`rates` imports from no other feature module: the graph has no cycle, which is
+what makes "one way" a fact rather than an intention. `apps/api` has no test
+that enforces it; a grep of the relative imports under `modules/` is what
+reproduces the table.
+
+What is shared by more than one of them is vocabulary, and vocabulary lives in
+`common/`: the ISO 4217 table and `CurrencyCode` the Monobank mapper and the
+currencies projection both read, `ConversionStrategyName`, which a record names
+as well as a conversion, and the `@ApiProperty` option objects the convert
+response and the record DTO publish their eight common fields with. Nothing
+under `common/` imports from `modules/`, which is what keeps that a one-way
+street too — the `docs` and probe paths moved there for the same reason, so
+`setup-swagger.ts` and `resolve-log-level.ts` no longer reach back into the
+application root for them.
+
+`ConversionRecordDto` declares its own properties rather than inheriting the
+convert response's: a DTO of one module extending another's is an edge like any
+other, and it was one this table could not have named.
 
 Unit tests are not in that tree: each one lives in a `__tests__` folder beside
 the code it covers, so `src/common/filters/global-exception.filter.ts` is tested
@@ -619,8 +778,9 @@ by `src/common/filters/__tests__/global-exception.filter.spec.ts`.
 Conversion persists a `ConversionRecord` after a successful conversion. The
 write is awaited, so a client that reads `/history` straight after a conversion
 finds it there. It is not guarded again at the call site: `HistoryService.record`
-never rejects — a store that cannot take the record logs it and resolves — so a
-Mongo failure costs a log line and the response is still returned.
+never rejects — a store that cannot take the record logs it and resolves `false`
+— so a Mongo failure costs a log line, a `HISTORY_NOT_RECORDED` warning on the
+response (§3) and nothing else.
 
 Awaiting is only safe because nothing on that path waits for a database that is
 down, which is what the Mongo module is built for:
@@ -631,7 +791,9 @@ down, which is what the Mongo module is built for:
   command from queueing or from spending the driver's default 30 seconds;
 - the repository checks the connection state before issuing one at all, because
   even a fast failure costs the server-selection budget. A skipped record warns
-  once per outage rather than once per conversion;
+  once per outage rather than once per conversion. `withTimeout` stops waiting
+  but cannot cancel the work, so a write that timed out may still land: a
+  conversion reported as not recorded can appear in `/history` a moment later;
 - `MongoConnection` logs the state on change and retries an initial connection
   that never opened. The driver restores a connection it has opened before but
   not one that failed first, so without the retry the history would stay down
@@ -708,9 +870,22 @@ newest-first page and the retention ride on the same key rather than on two.
 | E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history` with a store that is up and one that is down, `/health`, `/health/live` while the dependencies report down |
 | Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
 
+A `*.module.ts` is wiring and is excluded from coverage, so anything a module
+*decides* lives in a file of its own beside it — `buildMonobankHttpOptions`,
+`buildMonobankCircuitBreaker`, `buildConfiguredConversionRecordSchema` — where
+the gate can see it. A factory that only hands back what was injected into it
+decides nothing, and a spec asserting that it does so is a tautology, so the
+two of those stay inline in their modules: the order of `CONVERSION_STRATEGIES`
+is asserted by resolving the token through a testing module, which is where the
+`inject` list and the parameters it fills can actually disagree.
+
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
 90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
-runs the coverage script, not the plain one, plus `format:check`.
+runs the coverage script, not the plain one, plus `format:check`. The API
+report covers the unit suites alone: `test:e2e` runs uninstrumented, so
+`configure-http.ts` and `setup-swagger.ts` read 0% in it while every e2e suite
+boots through both. The gate is on the unit numbers, and the e2e suites are the
+surface they cannot reach.
 Unit tests never touch the network, Redis or Mongo. The e2e suites do not
 either: the shared factory swaps the Redis client, the Mongo connection and the
 history repository for in-process fakes, and the environment points every url

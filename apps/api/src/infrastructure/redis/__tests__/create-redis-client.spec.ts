@@ -62,11 +62,16 @@ describe('createRedisClient', () => {
     configured.disconnect();
   });
 
+  // The failure travels as a pino field, not inside the sentence: interpolating
+  // `error.message` is what drops the stack from the JSON line.
   it('reports a connection error as a warning instead of letting it escape', () => {
-    expect(() => client.emit('error', new Error('ECONNREFUSED'))).not.toThrow();
+    const failure = new Error('ECONNREFUSED');
+
+    expect(() => client.emit('error', failure)).not.toThrow();
 
     expect(logger.warn).toHaveBeenCalledWith(
-      'Redis connection error: ECONNREFUSED',
+      { err: failure },
+      'Redis connection error',
     );
   });
 

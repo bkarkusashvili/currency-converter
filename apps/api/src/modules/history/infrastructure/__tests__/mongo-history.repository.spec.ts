@@ -106,7 +106,7 @@ describe('MongoHistoryRepository', () => {
     });
 
     it('writes the record it was given', async () => {
-      await repository.record(ENTRY);
+      await expect(repository.record(ENTRY)).resolves.toBe(true);
 
       expect(model.create).toHaveBeenCalledWith(ENTRY);
     });
@@ -150,7 +150,9 @@ describe('MongoHistoryRepository', () => {
     it('swallows a write that fails, with the reason', async () => {
       model.create.mockRejectedValue(new Error('E11000 duplicate key'));
 
-      await expect(repository.record(ENTRY)).resolves.toBeUndefined();
+      // Not recorded, and it says so: /history will not have this conversion,
+      // which is the one part of the outage the client cannot see.
+      await expect(repository.record(ENTRY)).resolves.toBe(false);
       expect(logger.warn).toHaveBeenCalledWith(
         { err: expect.any(Error) as Error },
         'Conversion history write failed, dropping the record',
@@ -177,7 +179,7 @@ describe('MongoHistoryRepository', () => {
       it('drops the write rather than waiting the driver out', async () => {
         model.create.mockReturnValue(NEVER_ANSWERS);
 
-        await expect(repository.record(ENTRY)).resolves.toBeUndefined();
+        await expect(repository.record(ENTRY)).resolves.toBe(false);
       });
 
       // The same outage as a disconnected store, so the same one line: a hung
@@ -190,6 +192,7 @@ describe('MongoHistoryRepository', () => {
 
         expect(logger.warn).toHaveBeenCalledTimes(1);
         expect(logger.warn).toHaveBeenCalledWith(
+          { err: undefined },
           'MongoDB is not connected, conversions are answered but not recorded',
         );
       });
@@ -228,7 +231,7 @@ describe('MongoHistoryRepository', () => {
 
   describe('with the connection not ready', () => {
     it('skips the write without touching the driver', async () => {
-      await expect(repository.record(ENTRY)).resolves.toBeUndefined();
+      await expect(repository.record(ENTRY)).resolves.toBe(false);
 
       expect(model.create).not.toHaveBeenCalled();
     });
@@ -242,6 +245,7 @@ describe('MongoHistoryRepository', () => {
 
       expect(logger.warn).toHaveBeenCalledTimes(1);
       expect(logger.warn).toHaveBeenCalledWith(
+        { err: undefined },
         'MongoDB is not connected, conversions are answered but not recorded',
       );
     });

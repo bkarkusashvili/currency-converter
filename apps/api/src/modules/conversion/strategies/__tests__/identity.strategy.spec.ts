@@ -9,16 +9,12 @@ describe('IdentityStrategy', () => {
     expect(strategy.name).toBe('identity');
   });
 
-  it('supports a currency converted to itself', () => {
-    expect(strategy.supports('USD', 'USD')).toBe(true);
+  it('prices a currency converted to itself at one', () => {
+    expect(strategy.price('USD', 'USD')?.toString()).toBe('1');
   });
 
-  it('does not support two different currencies', () => {
-    expect(strategy.supports('USD', 'UAH')).toBe(false);
-  });
-
-  it('prices the pair at one', () => {
-    expect(strategy.rate().toString()).toBe('1');
+  it('declines two different currencies', () => {
+    expect(strategy.price('USD', 'UAH')).toBeUndefined();
   });
 
   // Through the port, with the snapshot the other strategies read: identity is
@@ -30,7 +26,6 @@ describe('IdentityStrategy', () => {
   it('stays ignorant of the snapshot it is handed', () => {
     const port: ConversionStrategy = strategy;
 
-    expect(port.supports('XYZ', 'XYZ', RATES)).toBe(true);
-    expect(port.rate('XYZ', 'XYZ', RATES).toString()).toBe('1');
+    expect(port.price('XYZ', 'XYZ', RATES)?.toString()).toBe('1');
   });
 });

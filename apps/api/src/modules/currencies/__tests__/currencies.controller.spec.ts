@@ -4,6 +4,7 @@ import { CurrenciesController } from '../currencies.controller';
 
 const LOOKUP: RatesLookup = {
   source: 'cache',
+  cacheDegraded: false,
   snapshot: {
     fetchedAt: '2026-09-08T12:00:00.000Z',
     rates: [
@@ -52,6 +53,24 @@ describe('CurrenciesController', () => {
     await controller.list();
 
     expect(service.getSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  // The same read as /rates, so the same degradation: the list was served, and
+  // reaching the cache is what it cost. Without this the one route of the three
+  // that reads a snapshot silently would be the one a picker calls first.
+  it('reports a cache that could not be reached as a warning', async () => {
+    service.getSnapshot.mockResolvedValue({ ...LOOKUP, cacheDegraded: true });
+
+    await expect(controller.list()).resolves.toMatchObject({
+      warnings: [
+        { code: 'CACHE_UNAVAILABLE', message: expect.any(String) as string },
+      ],
+    });
+  });
+
+  // Absent rather than empty, so a healthy answer is exactly what it was.
+  it('carries no warnings field at all when nothing degraded', async () => {
+    await expect(controller.list()).resolves.not.toHaveProperty('warnings');
   });
 
   it('lets an unavailable snapshot through to the exception filter', async () => {

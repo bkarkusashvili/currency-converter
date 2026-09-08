@@ -19,7 +19,7 @@ export class InMemoryHistoryRepository implements HistoryRepository {
 
   constructor(private readonly options: InMemoryHistoryOptions = {}) {}
 
-  record(entry: NewConversionRecord): Promise<void> {
+  record(entry: NewConversionRecord): Promise<boolean> {
     if (this.options.failsWith) {
       return Promise.reject(this.options.failsWith);
     }
@@ -30,7 +30,7 @@ export class InMemoryHistoryRepository implements HistoryRepository {
       createdAt: new Date().toISOString(),
     });
 
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
 
   findRecent(limit: number): Promise<ConversionRecord[]> {

@@ -1,10 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CONVERSION_STRATEGY_NAMES } from '../../conversion/strategies/conversion-strategy-name';
-import type { ConversionStrategyName } from '../../conversion/strategies/conversion-strategy-name';
+import { CONVERSION_PROPERTIES } from '../../../common/conversion/conversion-api-properties';
+import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
 import { RATES_SOURCES } from '../../rates/domain/rates-source';
 import type { RatesSource } from '../../rates/domain/rates-source';
 import { ConversionRecord } from '../domain/conversion-record';
 
+// A record is the conversion that was answered plus the two fields the store
+// owns. It declares its own properties rather than inheriting the convert
+// response's: a DTO of one feature module extending another's is a runtime edge
+// between the two, and §9's graph has none. What the two responses genuinely
+// publish the same way is shared as option objects in `common/`, so the eight
+// descriptions still exist once.
+//
+// `warnings` is the one part of an answer that is not part of the conversion:
+// it says what degraded while the request ran, which is a fact about that
+// request rather than about what was converted. The record has never carried it
+// and `NewConversionRecord` has no place for it — `swagger.e2e-spec.ts` pins
+// the property set this publishes.
 export class ConversionRecordDto implements ConversionRecord {
   @ApiProperty({
     description: 'Identifier of the stored record.',
@@ -12,64 +24,42 @@ export class ConversionRecordDto implements ConversionRecord {
   })
   id!: string;
 
-  @ApiProperty({
-    description: 'The code that was converted from, upper-cased.',
-    example: 'EUR',
-  })
+  @ApiProperty(CONVERSION_PROPERTIES.from)
   from!: string;
 
-  @ApiProperty({
-    description: 'The code that was converted to, upper-cased.',
-    example: 'GBP',
-  })
+  @ApiProperty(CONVERSION_PROPERTIES.to)
   to!: string;
 
-  @ApiProperty({
-    description: 'The amount that was converted.',
-    example: 100,
-  })
+  @ApiProperty(CONVERSION_PROPERTIES.amount)
   amount!: number;
 
-  @ApiProperty({
-    description: 'The converted amount, as it was answered.',
-    example: 84.73,
-  })
+  @ApiProperty(CONVERSION_PROPERTIES.result)
   result!: number;
 
-  @ApiProperty({
-    description: 'The effective `to` per `from` rate the conversion used.',
-    example: 0.847312,
-  })
+  @ApiProperty(CONVERSION_PROPERTIES.rate)
   rate!: number;
 
-  @ApiProperty({
-    description: 'How the rate was arrived at.',
-    enum: CONVERSION_STRATEGY_NAMES,
-    example: 'cross',
-  })
+  @ApiProperty(CONVERSION_PROPERTIES.strategy)
   strategy!: ConversionStrategyName;
 
   @ApiProperty({
     description:
-      'Where the rates came from. `stale-cache` means the conversion was ' +
-      'priced from the fallback copy because the upstream could not be ' +
-      'reached, which is what explains a rate that does not match the ones ' +
-      'published around it.',
+      'Where the rates came from. `stale-cache` means the upstream could not ' +
+      'be reached and the fallback copy priced this conversion, so the rate ' +
+      'is older than the cache TTL — which is what explains a stored rate ' +
+      'that does not match the ones published around it.',
     enum: RATES_SOURCES,
     example: 'cache',
   })
   source!: RatesSource;
 
-  @ApiProperty({
-    description:
-      'When the upstream fetch that produced the rates ran, ISO 8601. Read ' +
-      'with `createdAt` it is how old the quote was when it was used.',
-    example: '2026-09-08T12:00:00.000Z',
-  })
+  @ApiProperty(CONVERSION_PROPERTIES.ratesTimestamp)
   ratesTimestamp!: string;
 
   @ApiProperty({
-    description: 'When the conversion was recorded, ISO 8601.',
+    description:
+      'When the conversion was recorded, ISO 8601. Read with ' +
+      '`ratesTimestamp` it is how old the quote was when it was used.',
     example: '2026-09-08T12:00:05.000Z',
   })
   createdAt!: string;

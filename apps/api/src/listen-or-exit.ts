@@ -1,4 +1,5 @@
 import { INestApplication, Logger } from '@nestjs/common';
+import { errorStack } from './common/logging/error-stack';
 
 // Every interface, which is what makes the process reachable from outside its
 // container.
@@ -33,7 +34,7 @@ export async function listenOrExit(
 
     new Logger('Bootstrap').error(
       `Cannot listen on port ${port}`,
-      error instanceof Error ? error.stack : String(error),
+      errorStack(error),
     );
 
     await app.close().catch(() => undefined);

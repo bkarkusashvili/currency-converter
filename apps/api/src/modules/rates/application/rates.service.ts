@@ -9,9 +9,17 @@ import { RATES_REPOSITORY } from '../domain/rates-repository.token';
 import { RatesSnapshot } from '../domain/rates-snapshot';
 import { describeRatesFailure } from './describe-rates-failure';
 
+// A fetch and what caching it cost: the snapshot the upstream answered with,
+// and whether the write of it degraded. Both halves belong to the same flight,
+// so concurrent callers share the report as they share the snapshot.
+interface RefreshedSnapshot {
+  snapshot: RatesSnapshot;
+  degraded: boolean;
+}
+
 @Injectable()
 export class RatesService {
-  private inFlight: Promise<RatesSnapshot> | null = null;
+  private inFlight: Promise<RefreshedSnapshot> | null = null;
 
   constructor(
     @Inject(RATES_PROVIDER) private readonly provider: RatesProvider,
@@ -24,14 +32,27 @@ export class RatesService {
   async getSnapshot(): Promise<RatesLookup> {
     const fresh = await this.repository.getFresh();
 
-    if (fresh !== null) {
-      return { snapshot: fresh, source: 'cache' };
+    if (fresh.snapshot !== null) {
+      return {
+        snapshot: fresh.snapshot,
+        source: 'cache',
+        cacheDegraded: fresh.degraded,
+      };
     }
 
     try {
-      return { snapshot: await this.refresh(), source: 'provider' };
+      const refreshed = await this.refresh();
+
+      return {
+        snapshot: refreshed.snapshot,
+        source: 'provider',
+        // Either half of the round trip can have failed on its own: a read that
+        // could not be served and a write that could not be stored are the same
+        // outage to the client and the same warning on the answer.
+        cacheDegraded: fresh.degraded || refreshed.degraded,
+      };
     } catch (error) {
-      return this.serveStale(error);
+      return this.serveStale(error, fresh.degraded);
     }
   }
 
@@ -42,7 +63,7 @@ export class RatesService {
   // One upstream call per miss however many callers arrive during it: on a
   // source that allows one request a minute, a burst that each fetched for
   // itself would spend the whole budget on a single cache expiry.
-  private refresh(): Promise<RatesSnapshot> {
+  private refresh(): Promise<RefreshedSnapshot> {
     this.inFlight ??= this.fetchAndCache().finally(() => {
       this.inFlight = null;
     });
@@ -50,24 +71,31 @@ export class RatesService {
     return this.inFlight;
   }
 
-  private async fetchAndCache(): Promise<RatesSnapshot> {
+  private async fetchAndCache(): Promise<RefreshedSnapshot> {
     const snapshot = await this.provider.fetchRates();
-    await this.repository.save(snapshot);
+    const { degraded } = await this.repository.save(snapshot);
 
-    return snapshot;
+    return { snapshot, degraded };
   }
 
-  private async serveStale(error: unknown): Promise<RatesLookup> {
+  private async serveStale(
+    error: unknown,
+    cacheDegraded: boolean,
+  ): Promise<RatesLookup> {
     const reason = describeRatesFailure(error);
     const stale = await this.repository.getStale();
 
-    if (stale !== null) {
+    if (stale.snapshot !== null) {
       this.logger.warn(
         { err: error },
-        `Serving stale rates fetched at ${stale.fetchedAt}: ${reason}`,
+        `Serving stale rates fetched at ${stale.snapshot.fetchedAt}: ${reason}`,
       );
 
-      return { snapshot: stale, source: 'stale-cache' };
+      return {
+        snapshot: stale.snapshot,
+        source: 'stale-cache',
+        cacheDegraded: cacheDegraded || stale.degraded,
+      };
     }
 
     this.logger.error(
