@@ -716,8 +716,8 @@ apps/api
 │       │   │                    carries it out of the service with what degraded beside it
 │       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
 │       │   ├── strategies/      interface, identity, direct, cross, resolver + token,
-│       │   │                    orderStrategies, findRate and directionalRate,
-│       │   │                    which is the §5 table in one function
+│       │   │                    findRate and directionalRate, which is the §5
+│       │   │                    table in one function
 │       │   ├── conversion.service.ts
 │       │   ├── conversion.controller.ts  POST /convert
 │       │   └── conversion.module.ts
@@ -731,7 +731,7 @@ apps/api
 │       │   ├── history.controller.ts  GET /history
 │       │   └── history.module.ts
 │       └── health/              controller, HealthExceptionFilter, HEALTH_INDICATORS,
-│                             collectIndicators, pingIndicator with the probe budget,
+│                             pingIndicator with the probe budget,
 │                             HealthIndicatorPort + Redis / Mongo / Monobank indicators
 └── test
     ├── e2e/                     supertest suites over the real HTTP surface
@@ -871,11 +871,13 @@ newest-first page and the retention ride on the same key rather than on two.
 | Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
 
 A `*.module.ts` is wiring and is excluded from coverage, so anything a module
-decides lives in a file of its own beside it — `orderStrategies`,
-`collectIndicators`, `buildMonobankHttpOptions`,
+*decides* lives in a file of its own beside it — `buildMonobankHttpOptions`,
 `buildMonobankCircuitBreaker`, `buildConfiguredConversionRecordSchema` — where
-the gate can see it. A factory inline in a module is logic the number does not
-cover.
+the gate can see it. A factory that only hands back what was injected into it
+decides nothing, and a spec asserting that it does so is a tautology, so the
+two of those stay inline in their modules: the order of `CONVERSION_STRATEGIES`
+is asserted by resolving the token through a testing module, which is where the
+`inject` list and the parameters it fills can actually disagree.
 
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
 90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI

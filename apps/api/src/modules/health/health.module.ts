@@ -2,9 +2,9 @@ import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { RedisModule } from '../../infrastructure/redis/redis.module';
 import { RatesModule } from '../rates/rates.module';
-import { collectIndicators } from './collect-indicators';
 import { HealthController } from './health.controller';
 import { HEALTH_INDICATORS } from './health-indicators.token';
+import type { HealthIndicatorPort } from './health-indicator.port';
 import { MongoHealthIndicator } from './mongo-health.indicator';
 import { MonobankHealthIndicator } from './monobank-health.indicator';
 import { RedisHealthIndicator } from './redis-health.indicator';
@@ -23,13 +23,18 @@ import { RedisHealthIndicator } from './redis-health.indicator';
     MongoHealthIndicator,
     MonobankHealthIndicator,
     {
+      // The token is exactly what is injected into it, so registering an
+      // indicator is adding it to this list and nowhere else: the controller
+      // runs whatever the token holds and has no reason to change.
       provide: HEALTH_INDICATORS,
       inject: [
         RedisHealthIndicator,
         MongoHealthIndicator,
         MonobankHealthIndicator,
       ],
-      useFactory: collectIndicators,
+      useFactory: (
+        ...indicators: HealthIndicatorPort[]
+      ): HealthIndicatorPort[] => indicators,
     },
   ],
 })
