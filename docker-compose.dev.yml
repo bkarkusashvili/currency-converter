@@ -2,9 +2,10 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 #
-# Redis and Mongo publish their ports on the host, and the api and web
-# containers move behind a profile so they stay out of `up` unless asked for
-# explicitly (`--profile containers`).
+# Redis and Mongo publish their ports on the host loopback only — both run
+# unauthenticated, so binding 0.0.0.0 would serve them to any shared network.
+# The api and web containers move behind a profile so they stay out of `up`
+# unless asked for explicitly.
 services:
   api:
     profiles: ['containers']
@@ -14,8 +15,8 @@ services:
 
   redis:
     ports:
-      - '${REDIS_PORT:-6379}:6379'
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
 
   mongo:
     ports:
-      - '${MONGO_PORT:-27017}:27017'
+      - '127.0.0.1:${MONGO_PORT:-27017}:27017'
