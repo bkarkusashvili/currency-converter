@@ -1,0 +1,30 @@
+{
+  "name": "currency-converter",
+  "version": "0.1.0",
+  "description": "Root scripts that run the API and the web app together. Each app stays an independent npm package with its own lockfile; this is not a workspace.",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "setup": "concurrently --group --kill-others-on-fail --names api,web -c blue,magenta \"npm --prefix apps/api ci\" \"npm --prefix apps/web ci\"",
+    "dev": "npm run infra:up && concurrently --kill-others --names api,web -c blue,magenta \"npm --prefix apps/api run start:dev\" \"npm --prefix apps/web run dev\"",
+    "dev:api": "npm --prefix apps/api run start:dev",
+    "dev:web": "npm --prefix apps/web run dev",
+    "infra:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait redis mongo",
+    "infra:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
+    "lint": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api run lint\" \"npm --prefix apps/web run lint\"",
+    "typecheck": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api run typecheck\" \"npm --prefix apps/web run typecheck\"",
+    "format:check": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api run format:check\" \"npm --prefix apps/web run format:check\"",
+    "test": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api test\" \"npm --prefix apps/web test\"",
+    "build": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api run build\" \"npm --prefix apps/web run build\"",
+    "up": "docker compose up --build -d --wait",
+    "down": "docker compose down",
+    "down:clean": "docker compose down -v",
+    "logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -95,3 +95,33 @@ jobs:
       # longer builds has to fail here rather than at deploy time.
       - name: Docker image
         run: docker build -t currency-web:ci .
+
+  # The root package and the deployment descriptors belong to neither app, so
+  # nothing above would catch a compose file that stopped parsing, a root
+  # lockfile out of sync, or a railway.json typo. Config validation only — no
+  # image builds, so it stays a few seconds long.
+  orchestration:
+    name: orchestration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Compose config
+        run: docker compose -f docker-compose.yml config -q
+
+      - name: Compose config (dev overlay)
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
+
+      - name: Railway config
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('apps/api/railway.json', 'utf8'))"
+          node -e "JSON.parse(require('fs').readFileSync('apps/web/railway.json', 'utf8'))"
