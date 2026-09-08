@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
+import { CacheUnavailableError } from '../../../common/errors/cache-unavailable.error';
 import type { TypedConfigService } from '../../../config/typed-config.service';
 import { REDIS_CLIENT } from '../../../infrastructure/redis/redis-client.token';
 import { CachedSnapshot, CacheWrite } from '../domain/cache-outcome';
@@ -88,11 +89,20 @@ export class RedisRatesRepository implements RatesRepository {
     return { degraded: false };
   }
 
+  // The one method that does not degrade. An invalidation is a state change
+  // the caller commanded rather than a read on the way to an answer, and the
+  // only reason to command it is to force the next read to refetch: reporting
+  // success for keys that are still there tells an operator the cache is empty
+  // while the stale rates they were clearing keep being served.
   async clear(): Promise<void> {
     try {
       await this.client.del(RATES_CACHE_KEYS.fresh, RATES_CACHE_KEYS.stale);
     } catch (error) {
-      this.degrade('clear', error);
+      this.logger.warn({ err: error }, 'Rates cache clear failed');
+
+      throw new CacheUnavailableError({
+        reason: 'the cache refused the command',
+      });
     }
   }
 

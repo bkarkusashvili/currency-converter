@@ -236,6 +236,21 @@ describe('rates (e2e)', () => {
       });
     });
 
+    // A 204 here would tell the operator the keys are gone while the stale
+    // rates they were clearing keep being served.
+    it('refuses to report an invalidation it could not perform', async () => {
+      const response = await request(server)
+        .delete(CACHE_PATH)
+        .set(API_KEY_HEADER, ADMIN_API_KEY)
+        .expect(503);
+
+      expect(response.body).toMatchObject({
+        statusCode: 503,
+        code: ErrorCode.CACHE_UNAVAILABLE,
+        path: CACHE_PATH,
+      });
+    });
+
     // Every request pays the upstream, because nothing could be written for the
     // next one — which is the degradation the warning is about.
     it('fetches again on the next request, having cached nothing', async () => {

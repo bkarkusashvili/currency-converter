@@ -1,4 +1,5 @@
 import type Redis from 'ioredis';
+import { CacheUnavailableError } from '../../../../common/errors/cache-unavailable.error';
 import {
   createFakePinoLogger,
   FakePinoLogger,
@@ -238,10 +239,16 @@ describe('RedisRatesRepository', () => {
       expect(client.stored(RATES_CACHE_KEYS.stale)).toBeUndefined();
     });
 
-    it('degrades and warns when redis is unreachable', async () => {
+    // The one method that does not degrade: an invalidation is a state change
+    // the caller commanded, and answering success for keys that are still
+    // there tells an operator the cache is empty while the rates they were
+    // clearing keep being served.
+    it('refuses to report an invalidation redis never performed', async () => {
       const offline = build(new FakeRedisClient().asRedis());
 
-      await expect(offline.clear()).resolves.toBeUndefined();
+      await expect(offline.clear()).rejects.toBeInstanceOf(
+        CacheUnavailableError,
+      );
 
       expect(logger.warn).toHaveBeenCalledWith(
         { err: expect.any(Error) as Error },

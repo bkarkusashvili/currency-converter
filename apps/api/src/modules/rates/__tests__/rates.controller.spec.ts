@@ -1,3 +1,4 @@
+import { CacheUnavailableError } from '../../../common/errors/cache-unavailable.error';
 import { RatesLookup } from '../domain/rates-lookup';
 import { RatesService } from '../application/rates.service';
 import { RatesController } from '../rates.controller';
@@ -91,6 +92,17 @@ describe('RatesController', () => {
       await expect(controller.invalidate()).resolves.toBeUndefined();
 
       expect(service.invalidate).toHaveBeenCalledTimes(1);
+    });
+
+    // A 204 the cache never performed is the one answer this route must not
+    // give: the operator is told the keys are gone and the stale rates keep
+    // being served.
+    it('lets a cache that refused the command through to the filter', async () => {
+      service.invalidate.mockRejectedValue(new CacheUnavailableError());
+
+      await expect(controller.invalidate()).rejects.toBeInstanceOf(
+        CacheUnavailableError,
+      );
     });
   });
 });

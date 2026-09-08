@@ -66,11 +66,14 @@ export class RatesController {
   @ApiNoContentResponse({
     description:
       'Both the fresh and the fallback key are gone. Answered even when they ' +
-      'were already absent: the request states the wanted end state.',
+      'were already absent: the request states the wanted end state. A cache ' +
+      'that could not be reached answers `503 CACHE_UNAVAILABLE` instead, ' +
+      'because the keys are still there.',
   })
   @ApiErrorResponses(
     HttpStatus.UNAUTHORIZED,
     HttpStatus.TOO_MANY_REQUESTS,
+    HttpStatus.SERVICE_UNAVAILABLE,
     HttpStatus.INTERNAL_SERVER_ERROR,
   )
   invalidate(): Promise<void> {

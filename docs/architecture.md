@@ -107,8 +107,16 @@ Returns the current snapshot the service would convert with:
 
 ### DELETE `/api/v1/rates/cache`
 
-Invalidates both cache keys. Returns `204`. If `ADMIN_API_KEY` is configured
-the request must carry it in the `x-api-key` header (`401` otherwise).
+Invalidates both cache keys. Returns `204`, whether or not the keys were there:
+the request states the wanted end state. If `ADMIN_API_KEY` is configured the
+request must carry it in the `x-api-key` header (`401` otherwise).
+
+A cache that could not be reached answers `503 CACHE_UNAVAILABLE` rather than
+`204`. This is the one place a Redis failure is not degraded away: the request
+is not a read on the way to an answer but a state change the caller commanded,
+and the only reason to command it is to force the next read to refetch —
+reporting success for keys that are still there tells an operator the cache is
+empty while the stale rates they were clearing keep being served.
 
 ### GET `/api/v1/currencies`
 
@@ -245,6 +253,10 @@ and a healthy response is byte for byte the one it has always been.
 | `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but its record was dropped or timed out, so it will not appear in `/history`                                      |
 
 `message` is a sentence safe to show to a user; a client switches on `code`.
+`CACHE_UNAVAILABLE` is deliberately also an error `code` in the table below: it
+is the same condition, reported beside a successful answer when the request
+could still be served and in the envelope when it could not — which on
+`DELETE /rates/cache` it cannot.
 Both are the counterpart of the degradation model in §2: Redis being down and
 Mongo being down each cost something the client could not previously see, and a
 warning is where the answer says so. A cache that answered with an unreadable
@@ -277,6 +289,7 @@ Every non-2xx response has this shape:
 | 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                   |
 | 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                             |
 | 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists             |
+| 503  | `CACHE_UNAVAILABLE`    | The cache could not be reached to invalidate it      |
 | 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read          |
 | 500  | `INTERNAL_ERROR`       | Anything unexpected; message is generic              |
 
@@ -376,7 +389,8 @@ every branch also carries cacheDegraded: whether any of those cache calls failed
 | `rates:fallback`  | `RATES_STALE_TTL_SECONDS`  | 86400   |
 
 Both are written on every successful upstream fetch. `DELETE /rates/cache`
-removes both. Values are the JSON-serialised `RatesSnapshot`.
+removes both, or answers `503 CACHE_UNAVAILABLE` if it could not (§3). Values
+are the JSON-serialised `RatesSnapshot`.
 
 ## 5. Conversion semantics
 
@@ -514,7 +528,8 @@ abstract class AppError extends Error {
 ```
 
 Concrete: `UnsupportedCurrencyError`, `RateNotAvailableError`,
-`RatesUnavailableError`, `HistoryUnavailableError`, `UnauthorizedError`.
+`RatesUnavailableError`, `CacheUnavailableError`, `HistoryUnavailableError`,
+`UnauthorizedError`.
 `CircuitOpenError` is internal and is translated to `RatesUnavailableError` by
 `RatesService`.
 

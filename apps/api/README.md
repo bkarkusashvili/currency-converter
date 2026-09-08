@@ -32,7 +32,7 @@ npm run start:dev
 | ------ | ---- | ------------ |
 | `POST` | `/api/v1/convert` | Converts an amount between two currencies and reports the rate, the strategy that priced it and how old the rates were |
 | `GET` | `/api/v1/rates` | The current exchange rate snapshot, with the `source` it was served from: `cache`, `provider` or `stale-cache` |
-| `DELETE` | `/api/v1/rates/cache` | Drops both cache keys so the next read refetches. `204`; needs `x-api-key` when `ADMIN_API_KEY` is set |
+| `DELETE` | `/api/v1/rates/cache` | Drops both cache keys so the next read refetches. `204`, or `503 CACHE_UNAVAILABLE` when Redis could not be reached; needs `x-api-key` when `ADMIN_API_KEY` is set |
 | `GET` | `/api/v1/currencies` | The currencies of the current snapshot, with ISO 4217 names and numeric codes, sorted by code |
 | `GET` | `/api/v1/history` | The most recent conversions, newest first. `?limit=` is `1..50`, default `10` |
 | `GET` | `/health` | Terminus report with the `redis`, `mongodb` and `monobank` indicators. `503` when any of them is down |
