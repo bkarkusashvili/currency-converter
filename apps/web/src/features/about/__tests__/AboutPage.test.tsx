@@ -63,6 +63,18 @@ describe('AboutPage', () => {
     expect(screen.getByText('API reports every dependency up')).toBeInTheDocument();
   });
 
+  it('renders an indicator status it does not know as it arrived', async () => {
+    renderAbout({
+      health: {
+        status: 'shutting_down',
+        details: { redis: { status: 'up' }, monobank: { status: 'degraded' } },
+      },
+    });
+
+    expect(await screen.findByText('degraded')).toBeInTheDocument();
+    expect(screen.getByText('API reports a degraded dependency')).toBeInTheDocument();
+  });
+
   it('shows a degraded API as degraded, not as a failure', async () => {
     renderAbout({
       health: {
