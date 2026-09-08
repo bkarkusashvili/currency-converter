@@ -26,6 +26,7 @@ export function useConvertWithFallback(): ConversionState {
       error: conversion.error,
       request: conversion.variables,
       snapshot: snapshot.data,
+      snapshotStatus: snapshot.status,
     }),
     isPending: conversion.isPending,
     convert: conversion.mutate,

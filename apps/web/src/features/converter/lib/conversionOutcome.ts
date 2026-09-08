@@ -1,3 +1,4 @@
+import type { QueryStatus } from '@tanstack/react-query';
 import type { ApiError } from '../../../api/http/ApiError';
 import type { ConvertRequest, ConvertResponse, RatesSnapshotResponse } from '../../../api/types';
 import { convertOffline } from './convertOffline';
@@ -22,6 +23,12 @@ interface ConversionInput {
   /** The request the mutation carried, which is what an estimate re-prices. */
   request: ConvertRequest | undefined;
   snapshot: RatesSnapshotResponse | undefined;
+  /**
+   * Where the snapshot query is. `pending` is not the same as nothing stored:
+   * without it a first load says "nothing has been cached" for as long as the
+   * request takes, about a browser that may be about to have a snapshot.
+   */
+  snapshotStatus: QueryStatus;
 }
 
 export interface ConversionOutcomeState {
@@ -42,6 +49,7 @@ export function resolveConversionOutcome({
   error,
   request,
   snapshot,
+  snapshotStatus,
 }: ConversionInput): ConversionOutcomeState {
   if (data !== undefined) {
     return { outcome: data, error: null, withoutSnapshot: false };
@@ -55,7 +63,11 @@ export function resolveConversionOutcome({
     request === undefined || snapshot === undefined ? undefined : convertOffline(request, snapshot);
 
   if (estimate === undefined) {
-    return { outcome: undefined, error, withoutSnapshot: snapshot === undefined };
+    return {
+      outcome: undefined,
+      error,
+      withoutSnapshot: snapshot === undefined && snapshotStatus !== 'pending',
+    };
   }
 
   return {
