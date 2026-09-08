@@ -5,6 +5,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { API_KEY_HEADER } from '../../src/common/guards/api-key.constant';
 import { ADMIN_SECURITY_SCHEME } from '../../src/common/swagger/build-swagger-config';
+import { RATES_SOURCES } from '../../src/modules/rates/domain/rates-source';
 import { createE2eApp } from './create-e2e-app';
 
 // Every route the API serves, with the method it answers. A route that is
@@ -12,10 +13,16 @@ import { createE2eApp } from './create-e2e-app';
 // PRs extend this list as they add routes.
 const EXPECTED_PATHS: ReadonlyArray<readonly [string, string]> = [
   ['/health', 'get'],
+  ['/api/v1/rates', 'get'],
+  ['/api/v1/rates/cache', 'delete'],
 ];
 
 // Every schema the document has to describe by name.
-const EXPECTED_SCHEMAS: readonly string[] = ['ErrorResponseDto'];
+const EXPECTED_SCHEMAS: readonly string[] = [
+  'ErrorResponseDto',
+  'ExchangeRateDto',
+  'RatesSnapshotResponseDto',
+];
 
 describe('OpenAPI document (e2e)', () => {
   let app: INestApplication;
@@ -103,5 +110,35 @@ describe('OpenAPI document (e2e)', () => {
 
   it('summarises the health route', () => {
     expect(document.paths['/health']?.get?.summary).toEqual(expect.any(String));
+  });
+
+  it('enumerates the sources a snapshot can be served from', () => {
+    expect(
+      document.components?.schemas?.RatesSnapshotResponseDto,
+    ).toMatchObject({
+      properties: {
+        source: { type: 'string', enum: [...RATES_SOURCES] },
+      },
+    });
+  });
+
+  it('declares every failure the rates lookup can answer with', () => {
+    expect(
+      Object.keys(document.paths['/api/v1/rates']?.get?.responses ?? {}).sort(),
+    ).toStrictEqual(['200', '429', '500', '503']);
+  });
+
+  it('puts the cache invalidation behind the admin key scheme', () => {
+    const invalidate = document.paths['/api/v1/rates/cache']?.delete;
+
+    expect(invalidate?.security).toStrictEqual([
+      { [ADMIN_SECURITY_SCHEME]: [] },
+    ]);
+    expect(Object.keys(invalidate?.responses ?? {}).sort()).toStrictEqual([
+      '204',
+      '401',
+      '429',
+      '500',
+    ]);
   });
 });

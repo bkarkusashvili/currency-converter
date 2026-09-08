@@ -7,6 +7,7 @@ import { validationPipeOptions } from './common/validation/validation-pipe.optio
 import { AppConfigModule } from './config/app-config.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { HealthModule } from './modules/health/health.module';
+import { RatesModule } from './modules/rates/rates.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { HealthModule } from './modules/health/health.module';
     LoggingModule,
     ThrottlingModule,
     RedisModule,
+    RatesModule,
     HealthModule,
   ],
   providers: [
