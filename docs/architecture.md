@@ -126,6 +126,9 @@ Most recent conversions, newest first. `limit` is `1..50`, default `10`.
 
 - `redis` — `PING` under a short budget of its own. `up`, or `down` with the
   reason `ping failed` or `timeout`.
+- `mongodb` — not registered yet. It lands with the history module, which is
+  what introduces Mongo; until then the response carries `redis` and `monobank`
+  only.
 - `monobank` — the circuit-breaker state; it does **not** call the upstream,
   which allows one request per minute and would be starved by a probe running
   every few seconds. `CLOSED` is `up`, `HALF_OPEN` is `up` with the reason
