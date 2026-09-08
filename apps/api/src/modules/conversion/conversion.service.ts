@@ -1,0 +1,60 @@
+import { Injectable } from '@nestjs/common';
+import Big from 'big.js';
+import { PinoLogger } from 'nestjs-pino';
+import {
+  RATE_DECIMALS,
+  RESULT_DECIMALS,
+} from '../../common/money/money-decimals';
+import { roundHalfUp } from '../../common/money/round-half-up';
+import { RatesService } from '../rates/application/rates.service';
+import { ConversionRequest } from './domain/conversion-request';
+import { ConversionResult } from './domain/conversion-result';
+import { ConversionStrategyResolver } from './strategies/conversion-strategy.resolver';
+
+@Injectable()
+export class ConversionService {
+  constructor(
+    private readonly rates: RatesService,
+    private readonly resolver: ConversionStrategyResolver,
+    private readonly logger: PinoLogger,
+  ) {
+    this.logger.setContext(ConversionService.name);
+  }
+
+  // One snapshot prices the whole conversion: reading the rates twice could
+  // cross a cache expiry and compose two legs from two different sets.
+  //
+  // The result is computed from the unrounded rate and the published rate is
+  // rounded separately, so a large amount is not multiplied by an error of up
+  // to half a unit in the sixth decimal — a million pounds crossed to zloty
+  // differ by 29 groszy between the two. §5 records the choice.
+  async convert({
+    from,
+    to,
+    amount,
+  }: ConversionRequest): Promise<ConversionResult> {
+    const { snapshot, source } = await this.rates.getSnapshot();
+    const strategy = this.resolver.resolve(from, to, snapshot.rates);
+    const rate = strategy.rate(from, to, snapshot.rates);
+    const result = roundHalfUp(new Big(amount).times(rate), RESULT_DECIMALS);
+
+    this.logger.info(
+      `Converted ${from} to ${to} at the ${strategy.name} rate from ${source} rates`,
+    );
+    // The amount is the one part of a conversion that says something about the
+    // caller rather than about the rates, so the line that is on in production
+    // carries the pair and how it was priced, and this one carries the money.
+    this.logger.debug(`Converted ${amount} ${from} to ${result} ${to}`);
+
+    return {
+      from,
+      to,
+      amount,
+      result,
+      rate: roundHalfUp(rate, RATE_DECIMALS),
+      strategy: strategy.name,
+      source,
+      ratesTimestamp: snapshot.fetchedAt,
+    };
+  }
+}

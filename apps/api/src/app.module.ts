@@ -6,6 +6,7 @@ import { ThrottlingModule } from './common/throttling/throttling.module';
 import { validationPipeOptions } from './common/validation/validation-pipe.options';
 import { AppConfigModule } from './config/app-config.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
+import { ConversionModule } from './modules/conversion/conversion.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { HealthModule } from './modules/health/health.module';
 import { RatesModule } from './modules/rates/rates.module';
@@ -17,6 +18,7 @@ import { RatesModule } from './modules/rates/rates.module';
     ThrottlingModule,
     RedisModule,
     RatesModule,
+    ConversionModule,
     CurrenciesModule,
     HealthModule,
   ],
