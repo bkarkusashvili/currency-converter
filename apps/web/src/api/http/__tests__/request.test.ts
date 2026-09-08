@@ -94,6 +94,59 @@ describe('request', () => {
     });
   });
 
+  it('reports a 2xx body it cannot read instead of resolving undefined', async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+
+    const error = await request('/api/v1/currencies').catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+      statusCode: 200,
+      code: 'INTERNAL_ERROR',
+      message:
+        'The API at https://api.test/api/v1/currencies returned a body this client could not read.',
+    });
+  });
+
+  it('accepts a listed non-2xx status and returns its body', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ status: 'error' }, 503));
+
+    await expect(request('/health', { acceptStatuses: [200, 503] })).resolves.toEqual({
+      status: 'error',
+    });
+  });
+
+  it('still throws on a status outside the accepted list', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ statusCode: 500, code: 'INTERNAL_ERROR', message: 'boom' }, 500),
+    );
+
+    const error = await request('/health', { acceptStatuses: [200, 503] }).catch(
+      (thrown: unknown) => thrown,
+    );
+
+    expect(error).toMatchObject({ statusCode: 500, code: 'INTERNAL_ERROR', message: 'boom' });
+  });
+
+  it('reports the status a rejected body arrived on, not a hardcoded 200', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ nothing: 'like a report' }, 503));
+
+    const error = await request('/health', {
+      acceptStatuses: [200, 503],
+      parse: () => null,
+    }).catch((thrown: unknown) => thrown);
+
+    expect(error).toMatchObject({ statusCode: 503, code: 'INTERNAL_ERROR' });
+  });
+
+  it('returns what parse made of an accepted body', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ status: 'ok' }));
+
+    await expect(
+      request<{ checked: boolean }>('/health', { parse: () => ({ checked: true }) }),
+    ).resolves.toEqual({ checked: true });
+  });
+
   it('uses the fallback API URL when none is configured', async () => {
     window.__APP_CONFIG__ = undefined;
     fetchMock.mockResolvedValue(jsonResponse({ items: [] }));

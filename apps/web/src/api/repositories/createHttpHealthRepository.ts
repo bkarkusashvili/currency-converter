@@ -1,24 +1,26 @@
-import { ApiError } from '../http/ApiError';
-import { apiUrl } from '../http/apiUrl';
-import { requestAllowingStatuses } from '../http/requestAllowingStatuses';
+import { request } from '../http/request';
 import type { HealthIndicator, HealthResponse } from '../types';
 import type { HealthRepository } from './HealthRepository';
 
 const HEALTH_PATH = '/health';
+
+/** Both statuses carry the terminus report; only the report itself says what is down. */
 const REPORTED_STATUSES = [200, 503] as const;
 
 export function createHttpHealthRepository(): HealthRepository {
   return {
-    async report(signal?: AbortSignal): Promise<HealthResponse> {
-      const body = await requestAllowingStatuses(HEALTH_PATH, REPORTED_STATUSES, signal);
-
-      if (!isHealthReport(body)) {
-        throw ApiError.unreadableBody(apiUrl(HEALTH_PATH), 200);
-      }
-
-      return body;
+    report(signal?: AbortSignal): Promise<HealthResponse> {
+      return request<HealthResponse>(HEALTH_PATH, {
+        signal,
+        acceptStatuses: REPORTED_STATUSES,
+        parse: toHealthReport,
+      });
     },
   };
+}
+
+function toHealthReport(body: unknown): HealthResponse | null {
+  return isHealthReport(body) ? body : null;
 }
 
 function isHealthReport(body: unknown): body is HealthResponse {

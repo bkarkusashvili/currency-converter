@@ -102,6 +102,7 @@ describe('createHttpHealthRepository', () => {
       method: 'GET',
       signal: undefined,
       headers: { Accept: 'application/json' },
+      body: undefined,
     });
   });
 
