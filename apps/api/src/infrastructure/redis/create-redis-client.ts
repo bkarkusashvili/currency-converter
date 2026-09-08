@@ -1,0 +1,45 @@
+import Redis from 'ioredis';
+import { PinoLogger } from 'nestjs-pino';
+import type { TypedConfigService } from '../../config/typed-config.service';
+
+export function createRedisClient(
+  config: TypedConfigService,
+  logger: PinoLogger,
+): Redis {
+  logger.setContext('RedisClient');
+
+  const client = new Redis(config.get('REDIS_URL', { infer: true }), {
+    // RedisConnection opens the socket on module init, so nothing is sent
+    // before then, and a command issued while the socket is down fails fast
+    // instead of queueing up behind a Redis that may never come back.
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+    enableOfflineQueue: false,
+  });
+
+  // Redis is a cache, not a hard dependency: a connection problem degrades the
+  // rates lookup and is reported on /health, it does not take the process down.
+  // ioredis reconnects on its own and emits an error for every failed attempt,
+  // so only the first failure of an outage is worth a warning; repeating it
+  // once a second would drown the log for as long as Redis stays down.
+  let outageReported = false;
+
+  client.on('error', (error: Error) => {
+    if (outageReported) {
+      logger.debug(`Redis reconnect attempt failed: ${error.message}`);
+      return;
+    }
+
+    outageReported = true;
+    logger.warn(`Redis connection error: ${error.message}`);
+  });
+
+  client.on('ready', () => {
+    if (outageReported) {
+      outageReported = false;
+      logger.info('Redis connection restored');
+    }
+  });
+
+  return client;
+}

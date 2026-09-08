@@ -126,6 +126,21 @@ Most recent conversions, newest first. `limit` is `1..50`, default `10`.
 The Monobank indicator reports the circuit-breaker state and does **not** call
 the upstream (Monobank allows one request per minute).
 
+Indicators are injected through the `HEALTH_INDICATORS` token as
+`HealthIndicatorPort`s, so adding one does not touch the controller. This route
+is the one exception to the error envelope below: a failing indicator answers
+`503` with the Terminus report itself, because collapsing it into the envelope
+would hide which dependency is down.
+
+Because that report is public, an indicator reports only a `status` and, when it
+is down, a short sanitised `reason` it chose itself. A driver error is never
+passed through: a Mongo or Redis connection failure carries the connection
+string, credentials included, in its message.
+
+`/health` is also exempt from the throttler (`@SkipThrottle()`). A liveness probe
+runs far more often than a client, and sharing a bucket with one would let the
+rate limit restart a healthy process.
+
 ### Error envelope
 
 Every non-2xx response has this shape:
@@ -146,12 +161,19 @@ Every non-2xx response has this shape:
 | ---- | ---------------------- | ------------------------------------------------- |
 | 400  | `VALIDATION_ERROR`     | DTO validation failed; `details.errors` lists fields |
 | 401  | `UNAUTHORIZED`         | Missing/invalid admin API key                     |
+| 403  | `FORBIDDEN`            | The caller may not perform this operation         |
 | 404  | `NOT_FOUND`            | Unknown route                                     |
 | 422  | `UNSUPPORTED_CURRENCY` | Code is not in the snapshot                       |
 | 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                |
 | 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                          |
 | 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists          |
 | 500  | `INTERNAL_ERROR`       | Anything unexpected; message is generic           |
+
+Any other 4xx keeps its status and takes its `code` from the name the exception
+reports, upper-snake-cased, falling back to the status's own name: a 406 answers
+`NOT_ACCEPTABLE` and a 409 `CONFLICT`. A 4xx never answers `INTERNAL_ERROR`,
+which would contradict its status. Every 5xx does: the status is kept, the code
+is `INTERNAL_ERROR` and the message is generic, so nothing internal leaks.
 
 ## 4. Rates domain
 
@@ -287,8 +309,22 @@ and is translated to `RatesUnavailableError` by `RatesService`.
 - Anything else → `500 INTERNAL_ERROR`, generic message, full stack logged.
 
 Logging uses `nestjs-pino`: JSON in production, `pino-pretty` in development,
-one request-scoped log line per request with `requestId`, method, path, status
-and duration. Services use the injected `PinoLogger` with a context.
+one log line per request carrying exactly `requestId`, method, path, client
+address, status and duration. Those fields are produced by custom
+`serializers.req` / `serializers.res`; no header is ever written, so a
+credential cannot reach the log by being forgotten in a denylist. Services use
+the injected `PinoLogger` with a context.
+
+The line is levelled by outcome: `error` for a 5xx or a thrown error, `warn` for
+a 4xx, `info` otherwise. A successful `/health` probe is dropped entirely — it
+runs every few seconds and says nothing — while a failing one still takes the
+`error` branch.
+
+The `requestId` is assigned by a middleware registered first in `configureHttp`,
+before Nest's body parser, so a request that dies in the parser still gets an
+envelope, an `x-request-id` header and a log line. An inbound `x-request-id` is
+honoured when it is at most 128 characters of `[A-Za-z0-9._-]`, and replaced by
+a generated UUID otherwise.
 
 ## 8. Configuration
 
@@ -302,6 +338,7 @@ reads.
 | `PORT`                              | `3000`                                    |
 | `LOG_LEVEL`                         | `info`                                    |
 | `CORS_ORIGINS`                      | `http://localhost:5173,http://localhost:8080` |
+| `TRUST_PROXY`                       | `false`                                   |
 | `REDIS_URL`                         | `redis://localhost:6379`                  |
 | `MONGO_URL`                         | `mongodb://localhost:27017/currency_converter` |
 | `MONOBANK_API_URL`                  | `https://api.monobank.ua/bank/currency`   |
@@ -316,47 +353,65 @@ reads.
 | `THROTTLE_LIMIT`                    | `60`                                      |
 | `ADMIN_API_KEY`                     | *(unset → cache invalidation is open)*    |
 
+`TRUST_PROXY` feeds Express's `trust proxy`: `false` trusts nobody, `true` trusts
+every hop, and a number is how many proxies sit in front of the process. It
+decides whether the client address comes from `X-Forwarded-For`, which both the
+rate-limit buckets and the request log depend on — behind nginx or on Railway,
+leaving it `false` collapses every client into the proxy's address.
+
 ## 9. API module layout
 
 ```
-apps/api/src
-├── main.ts                      bootstrap: pino logger, helmet, cors, validation pipe, swagger, shutdown hooks
-├── app.module.ts
-├── config/                      zod schema, typed AppConfig, ConfigModule setup
-├── common/
-│   ├── errors/                  AppError, ErrorCode, concrete errors
-│   ├── filters/                 GlobalExceptionFilter
-│   ├── guards/                  ApiKeyGuard
-│   ├── resilience/              retry, CircuitBreaker, CircuitOpenError
-│   └── utils/                   money rounding helpers (big.js)
-├── infrastructure/
-│   ├── redis/                   RedisModule → REDIS_CLIENT (ioredis) with lifecycle hooks
-│   └── mongo/                   MongoModule (MongooseModule.forRootAsync)
-├── modules/
-│   ├── currencies/              ISO 4217 numeric↔alpha mapping, GET /currencies
-│   ├── rates/
-│   │   ├── domain/              ExchangeRate, RatesSnapshot, ports + tokens
-│   │   ├── infrastructure/
-│   │   │   ├── monobank/        MonobankRatesProvider, raw types, mapper
-│   │   │   └── redis-rates.repository.ts
-│   │   ├── application/         RatesService
-│   │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
-│   │   └── rates.module.ts
-│   ├── conversion/
-│   │   ├── dto/                 ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
-│   │   ├── strategies/          interface, identity, direct, cross, resolver
-│   │   ├── conversion.service.ts
-│   │   ├── conversion.controller.ts  POST /convert
-│   │   └── conversion.module.ts
-│   ├── history/
-│   │   ├── schemas/             ConversionRecord (Mongoose)
-│   │   ├── history.repository.ts  port + MongoHistoryRepository
-│   │   ├── history.service.ts
-│   │   ├── history.controller.ts  GET /history
-│   │   └── history.module.ts
-│   └── health/                  controller + Redis / Mongo / Monobank indicators
-└── test/                        e2e (supertest, ioredis-mock, stubbed provider & history repo)
+apps/api
+├── src
+│   ├── main.ts                  bootstrap: pino logger, swagger, shutdown hooks
+│   ├── configure-http.ts        trust proxy, request id, helmet, CORS and the api/v1 prefix, shared with the e2e suite
+│   ├── app.module.ts
+│   ├── config/                  zod schema, typed AppConfig, ConfigModule setup
+│   ├── common/
+│   │   ├── errors/              AppError, ErrorCode, concrete errors
+│   │   ├── filters/             GlobalExceptionFilter, ErrorResponseDto, status → code mapping
+│   │   ├── guards/              ApiKeyGuard
+│   │   ├── logging/             nestjs-pino setup, request id middleware, log level, serializers
+│   │   ├── validation/          ValidationPipe options, validation error flattening
+│   │   ├── throttling/          ThrottlerModule setup and the global guard
+│   │   ├── swagger/             OpenAPI document, ApiErrorResponses decorator
+│   │   ├── resilience/          retry, CircuitBreaker, CircuitOpenError
+│   │   └── utils/               money rounding helpers (big.js), constant-time compare
+│   ├── infrastructure/
+│   │   ├── redis/               REDIS_CLIENT (ioredis) and the RedisConnection lifecycle
+│   │   └── mongo/               MongoModule (MongooseModule.forRootAsync)
+│   └── modules/
+│       ├── currencies/          ISO 4217 numeric↔alpha mapping, GET /currencies
+│       ├── rates/
+│       │   ├── domain/          ExchangeRate, RatesSnapshot, ports + tokens
+│       │   ├── infrastructure/
+│       │   │   ├── monobank/    MonobankRatesProvider, raw types, mapper
+│       │   │   └── redis-rates.repository.ts
+│       │   ├── application/     RatesService
+│       │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
+│       │   └── rates.module.ts
+│       ├── conversion/
+│       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
+│       │   ├── strategies/      interface, identity, direct, cross, resolver
+│       │   ├── conversion.service.ts
+│       │   ├── conversion.controller.ts  POST /convert
+│       │   └── conversion.module.ts
+│       ├── history/
+│       │   ├── schemas/         ConversionRecord (Mongoose)
+│       │   ├── history.repository.ts  port + MongoHistoryRepository
+│       │   ├── history.service.ts
+│       │   ├── history.controller.ts  GET /history
+│       │   └── history.module.ts
+│       └── health/              controller, HealthIndicatorPort + Redis / Mongo / Monobank indicators
+└── test
+    ├── e2e/                     supertest suites over the real HTTP surface
+    └── jest-e2e.json
 ```
+
+Unit tests are not in that tree: each one lives in a `__tests__` folder beside
+the code it covers, so `src/common/filters/global-exception.filter.ts` is tested
+by `src/common/filters/__tests__/global-exception.filter.spec.ts`.
 
 Conversion persists a `ConversionRecord` after a successful conversion. The
 write is awaited but wrapped: a Mongo failure is logged and the response is
@@ -364,16 +419,18 @@ still returned.
 
 ## 10. Web app
 
-- React 19, Vite, TypeScript strict, Tailwind CSS, React Router, TanStack Query.
+- React 19, Vite, TypeScript strict, Tailwind CSS, React Router, TanStack Query,
+  i18next for every user-visible string.
 - Routes: `/` converter (form, result card, recent conversions), `/about`
   reviewer page (what was built, why, links to repo / API docs / health).
 - Runtime configuration: `public/config.js` sets `window.__APP_CONFIG__.apiUrl`;
   the Docker image regenerates it from `API_URL` at container start so the same
   image runs locally and on Railway.
-- `src/api/` is the only place that knows about HTTP; components consume typed
-  hooks (`useConvert`, `useCurrencies`, `useHistory`).
+- `src/api/` is the only place that knows about HTTP, layered
+  `http` → `repositories` → `hooks`; components consume the typed hooks
+  (`useConvert`, `useCurrencies`, `useHistory`). See §12.
 - Tests: Vitest + Testing Library for the form, result rendering and error
-  states, with the API client mocked.
+  states, with a fake repository injected through the provider.
 
 ## 11. Testing strategy
 
@@ -383,8 +440,9 @@ still returned.
 | E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history`, `/health` |
 | Unit (web)           | Vitest + Testing Library     | form validation, result display, error display, history list |
 
-Coverage threshold for `apps/api`: 85% lines/branches enforced in Jest config.
-Unit tests never touch the network, Redis or Mongo.
+Coverage threshold for `apps/api`: 85% lines/branches enforced in Jest config;
+nothing under a `__tests__` folder counts as source. Unit tests never touch the
+network, Redis or Mongo.
 
 ## 12. Conventions
 
@@ -393,3 +451,47 @@ Unit tests never touch the network, Redis or Mongo.
 - ESLint + Prettier, `noImplicitAny`, `strictNullChecks`, no `any`, no
   non-null assertions outside tests.
 - Files are small and named after the single thing they export.
+
+### Tests
+
+- Unit tests live in a `__tests__` folder next to the code they cover:
+  `src/common/filters/__tests__/global-exception.filter.spec.ts`.
+- End-to-end tests live in `apps/api/test/e2e` and boot through `createE2eApp`,
+  which applies the same `configureHttp` and `setupSwagger` that `main.ts` does,
+  so the surface under test is the one the process serves.
+- A test asserts behaviour, not the literal it imported. A spec that reads a
+  configuration object back cannot fail when the wiring around it is wrong,
+  which is how a Redis client that could never serve its first command passed
+  its own suite.
+
+### API documentation
+
+`test/e2e/swagger.e2e-spec.ts` is what keeps `/docs` honest, and every new route
+extends it:
+
+- add the route to its `EXPECTED_PATHS` list (`[['/health', 'get']]`). A route
+  the API serves but does not document — or documents but does not serve —
+  fails the test.
+- every DTO property carries `@ApiProperty` / `@ApiPropertyOptional` with a
+  description and an example.
+- every failure a route can answer with is declared through
+  `@ApiErrorResponses(...statuses)`, which points each entry at
+  `ErrorResponseDto`; the envelope is never re-described per route.
+- a route behind `ApiKeyGuard` carries `@ApiSecurity('admin')`, the scheme
+  `buildSwaggerConfig` registers for the `x-api-key` header.
+
+### Web
+
+- Every user-visible string lives in `src/i18n/en.json` and is read through
+  i18next (`useTranslation`). The key type is derived from that file, so a
+  missing or misspelled key is a compile error. No copy is written inline in a
+  component.
+- Data access is layered and each layer is the only one that knows its concern:
+  `src/api/http` is the fetch client (base url, headers, decoding the error
+  envelope), `src/api/repositories` holds one interface per resource with its
+  implementation (`RatesRepository`, `ConversionRepository`,
+  `HistoryRepository`) handed to the tree through a provider, and
+  `src/api/hooks` exposes the TanStack Query hooks components consume
+  (`useConvert`, `useCurrencies`, `useHistory`). A component never fetches.
+- Tests inject a fake repository through that same provider rather than mocking
+  `fetch` or the network, so a component test never depends on the transport.
