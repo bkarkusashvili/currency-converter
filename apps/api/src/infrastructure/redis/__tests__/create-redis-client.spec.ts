@@ -1,7 +1,10 @@
 import type Redis from 'ioredis';
+import {
+  createFakePinoLogger,
+  FakePinoLogger,
+} from '../../../common/logging/__tests__/fake-pino-logger';
 import type { TypedConfigService } from '../../../config/typed-config.service';
 import { createRedisClient } from '../create-redis-client';
-import { createFakePinoLogger, FakePinoLogger } from './fake-pino-logger';
 
 function createConfig(redisUrl: string): TypedConfigService {
   return { get: () => redisUrl } as unknown as TypedConfigService;
