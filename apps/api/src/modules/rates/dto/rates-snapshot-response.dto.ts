@@ -24,6 +24,21 @@ export class RatesSnapshotResponseDto {
   @ApiProperty({
     description: 'Every pair the upstream published that this API can quote.',
     type: [ExchangeRateDto],
+    example: [
+      {
+        base: 'USD',
+        quote: 'UAH',
+        buy: 44.35,
+        sell: 44.831,
+        date: '2026-09-08T11:00:00.000Z',
+      },
+      {
+        base: 'BTC',
+        quote: 'USD',
+        cross: 60.7562,
+        date: '2026-09-08T11:00:00.000Z',
+      },
+    ],
   })
   rates!: ExchangeRateDto[];
 }
