@@ -28,5 +28,9 @@ export function useRatesSnapshot(): UseQueryResult<RatesSnapshotResponse, ApiErr
     // believes about the network, and a failure leaves the persisted copy in
     // place for the estimate to be priced from.
     networkMode: 'always',
+    // The other half of not parking: a retry waits for the tab to be focused
+    // again, so a failure in a background tab would sit unreported until
+    // someone looked at it. The next interval is the retry.
+    retry: 0,
   });
 }

@@ -17,5 +17,8 @@ export function useCurrencies(): UseQueryResult<CurrenciesResponse, ApiError> {
     // form falls back to the persisted list instead of waiting on a query that
     // never ran.
     networkMode: 'always',
+    // As with the snapshot: one attempt, reported, rather than a retry parked
+    // behind the tab being focused.
+    retry: 0,
   });
 }
