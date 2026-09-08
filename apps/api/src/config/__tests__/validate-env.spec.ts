@@ -53,13 +53,36 @@ describe('validateEnv', () => {
     });
 
     it('keeps a provided value over the default', () => {
-      expect(validateEnv({ NODE_ENV: 'production' }).NODE_ENV).toBe(
-        'production',
-      );
+      expect(validateEnv({ LOG_LEVEL: 'debug' }).LOG_LEVEL).toBe('debug');
       expect(validateEnv({ ADMIN_API_KEY: 'secret' }).ADMIN_API_KEY).toBe(
         'secret',
       );
     });
+  });
+
+  // ApiKeyGuard is open while the key is unset, which is what makes a local run
+  // need no secret and what makes a deployment without one a lever on an
+  // upstream that allows one request a minute.
+  describe('admin key', () => {
+    it('refuses a production configuration that names no key', () => {
+      expect(() => validateEnv({ NODE_ENV: 'production' })).toThrow(
+        /- ADMIN_API_KEY: is required when NODE_ENV is production/,
+      );
+    });
+
+    it('accepts a production configuration that names one', () => {
+      expect(
+        validateEnv({ NODE_ENV: 'production', ADMIN_API_KEY: 'secret' })
+          .ADMIN_API_KEY,
+      ).toBe('secret');
+    });
+
+    it.each(['development', 'test'])(
+      'leaves %s permissive so a local run needs no secret',
+      (nodeEnv) => {
+        expect(validateEnv({ NODE_ENV: nodeEnv }).ADMIN_API_KEY).toBeNull();
+      },
+    );
   });
 
   describe('trust proxy', () => {

@@ -375,7 +375,16 @@ reads.
 | `RATES_STALE_TTL_SECONDS`           | `86400`                                   |
 | `THROTTLE_TTL_SECONDS`              | `60`                                      |
 | `THROTTLE_LIMIT`                    | `60`                                      |
-| `ADMIN_API_KEY`                     | *(unset → cache invalidation is open)*    |
+| `ADMIN_API_KEY`                     | *(unset → cache invalidation is open; required in production)* |
+
+`ADMIN_API_KEY` is optional in development and test, where an unset key makes
+`ApiKeyGuard` a no-op so a local run needs no secret, and required when
+`NODE_ENV=production`: the schema's `superRefine` fails startup without one.
+`DELETE /rates/cache` clears the snapshot every instance reads, so leaving it
+open on a deployment hands anyone who can reach it a lever on an upstream that
+allows one request a minute — alternating `DELETE` and `GET` spends exactly the
+budget the cache exists to protect. Swagger also advertises the route as
+secured, which is only true once the key is set.
 
 `REDIS_COMMAND_TIMEOUT_MS` is the deadline on a single Redis command.
 `maxRetriesPerRequest` bounds the reconnects that follow a socket error and
