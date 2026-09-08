@@ -2,6 +2,29 @@ export type ConversionStrategy = 'identity' | 'direct' | 'cross';
 
 export type RateSource = 'cache' | 'provider' | 'stale-cache';
 
+/**
+ * The list is the value and the type is read off it, as the API does: the suite
+ * has to iterate the codes to check every one has a sentence, and a second copy
+ * of the literals is one that can disagree with this one.
+ */
+export const WARNING_CODES = ['CACHE_UNAVAILABLE', 'HISTORY_NOT_RECORDED'] as const;
+
+export type ResponseWarningCode = (typeof WARNING_CODES)[number];
+
+/**
+ * §3: something that degraded while a successful request was answered. The
+ * request has an answer — that is what separates a warning from the error
+ * envelope — and this says what it cost. `message` is a sentence safe to show;
+ * a client switches on `code`.
+ *
+ * The field is **absent, not empty**, when nothing degraded, so a healthy
+ * response is byte for byte the one it has always been.
+ */
+export interface ResponseWarning {
+  code: ResponseWarningCode;
+  message: string;
+}
+
 export interface ConvertRequest {
   from: string;
   to: string;
@@ -17,6 +40,7 @@ export interface ConvertResponse {
   strategy: ConversionStrategy;
   source: RateSource;
   ratesTimestamp: string;
+  warnings?: ResponseWarning[];
 }
 
 export interface Currency {
@@ -27,8 +51,14 @@ export interface Currency {
 
 export interface CurrenciesResponse {
   currencies: Currency[];
+  warnings?: ResponseWarning[];
 }
 
+/**
+ * §3: an entry carries the provenance the conversion was answered with as well
+ * as its numbers. `source` and `ratesTimestamp` are what explain a stored rate
+ * that does not match the ones published around it.
+ */
 export interface HistoryItem {
   id: string;
   from: string;
@@ -37,6 +67,8 @@ export interface HistoryItem {
   result: number;
   rate: number;
   strategy: ConversionStrategy;
+  source: RateSource;
+  ratesTimestamp: string;
   createdAt: string;
 }
 
@@ -81,4 +113,5 @@ export interface RatesSnapshotResponse {
   source: RateSource;
   fetchedAt: string;
   rates: ExchangeRate[];
+  warnings?: ResponseWarning[];
 }

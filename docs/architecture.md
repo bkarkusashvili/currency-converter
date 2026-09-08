@@ -846,6 +846,38 @@ newest-first page and the retention ride on the same key rather than on two.
   other envelope code is left as the API answered it, and an estimate is never
   added to the history. The currency selects fall back the same way: the API's
   list, then the persisted copy, then the two defaults.
+- **The amount field.** `formatAmountInput(raw, caret)` is the one rule for what
+  the field may hold: everything that is not a digit or the locale's decimal
+  separator is dropped — letters, signs, a second separator, a third decimal —
+  the integer part is capped at the width of `MAX_AMOUNT`, thousands are grouped
+  with the separator `Intl` reports for the active language, and the caret is
+  put back after the same number of significant characters it had passed, so
+  typing inside a grouped number does not throw it to the end. Backspace and
+  Delete landing on a group separator take the digit beside it, which the
+  regrouping would otherwise put straight back. What an amount *means* is still
+  `parseAmount`'s rule alone, and it is what answers `tooLarge`; the field only
+  keeps characters no amount can contain from being typed at all.
+  The two do not read the same string, so one step stands between them:
+  `canonicalAmount(value, separators)` drops the group mark, normalises the
+  decimal mark to `.` and drops a decimal mark with no digits behind it, and the
+  form parses **that**. Without it the field's own output is ambiguous — under
+  `{group: '.', decimal: ','}` the `1.234` it writes for 1234 parses as 1.234, a
+  silent 1000× error — and a half-typed `12.` submitted with Enter, which does
+  not blur, parses as nothing at all. Blur still trims a dangling separator, but
+  only so the field looks finished; correctness does not depend on it.
+- **Provenance in the client.** The result card prints the rate in both
+  directions — the API publishes one, and `inverseRate` computes the other on
+  the same `big.js` constructor, rounded half-up to the six places §3 uses — and
+  draws the hops the strategy took. The history panel shows each entry's
+  `source` for the same reason §3 stores it.
+- **Warnings.** §3's `warnings` array is a successful answer saying what
+  degraded while it was produced, so it is rendered as a footnote and never as
+  a failure: warn-tone notes at the foot of the result card for a conversion's,
+  and one line under the form — beside the currency-list hint — for the ones
+  `/currencies` and `/rates` carry, deduplicated by code because a cache that is
+  down is down for both. The sentence shown is the translated one for a code
+  this client knows (`warnings.*` in `en.json`) and the server's own for a code
+  it does not, the same bargain the error envelope makes.
 - **Internationalisation.** Every user-facing string lives in
   `src/i18n/en.json`, loaded through `react-i18next`; the `CustomTypeOptions`
   augmentation type-checks keys against the JSON. Numbers and dates are
@@ -868,7 +900,7 @@ newest-first page and the retention ride on the same key rather than on two.
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
 | E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history` with a store that is up and one that is down, `/health`, `/health/live` while the dependencies report down |
-| Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
+| Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, error display, history list and its loading and empty states, health rendering, every HTTP repository |
 
 A `*.module.ts` is wiring and is excluded from coverage, so anything a module
 *decides* lives in a file of its own beside it — `buildMonobankHttpOptions`,

@@ -41,6 +41,30 @@ provider is wired to the HTTP implementations in `main.tsx`; tests inject
 in-memory fakes through the same provider, so nothing in the suite touches the
 network.
 
+## The amount field
+
+`features/converter/lib/formatAmountInput.ts` is the one rule for what the
+field may hold. Every edit — a keystroke, a paste, a drop — goes through it:
+anything that is not a digit or the active locale's decimal separator is
+dropped, the integer part is capped at the width of the API's maximum, at most
+two decimals survive, thousands are grouped with the separator `Intl` reports
+for the language, and the caret is placed after the same number of significant
+characters it had passed, so typing inside a grouped number does not throw it
+to the end. Backspace and Delete landing on a group separator take the digit
+beside it, which the regrouping would otherwise restore.
+
+It decides what may be _typed_, not what an amount _means_: `parseAmount` is
+still the single rule for that, and it is what answers `Amount must be
+1,000,000,000,000 or less.`
+
+The two do not read the same string, so `lib/canonicalAmount.ts` stands between
+them: it drops the group mark, normalises the decimal mark to `.` and drops a
+decimal mark with nothing behind it, and the form parses that. It is what keeps
+`12.` submitted with Enter — which never blurs — from being read as no number
+at all, and what stops the `1.234` the field writes for 1234 in a
+`.`-grouping locale from being read as 1.234. Blur still trims a dangling
+separator, but only so the field looks finished.
+
 ## Internationalisation
 
 Every user-facing string lives in `src/i18n/en.json` and is read through
@@ -55,6 +79,17 @@ API failures are shown by mapping the envelope `code` to a translated message,
 falling back to the server `message` for a code this client does not know.
 Field messages from `details.errors` are shown exactly as the server returned
 them; the ones naming `amount`, `from` or `to` are routed onto that input.
+
+## Warnings
+
+A `warnings` array on a `200` is the API saying what degraded while it answered
+(`docs/architecture.md` §3) — the cache it could not reach, the history record
+it could not write. It is a footnote on an answer, not a failure, so it renders
+as warn-tone notes at the foot of the result card, and as one line under the
+form for the ones `/currencies` and `/rates` carry, deduplicated by code.
+`src/i18n/warningMessageKey.ts` maps a code to a translated sentence and falls
+back to the server's own for a code this client has not been taught, exactly as
+the error envelope does. Absent means nothing to say, which is the usual case.
 
 ## Offline fallback
 

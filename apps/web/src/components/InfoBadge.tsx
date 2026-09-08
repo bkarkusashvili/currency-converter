@@ -1,7 +1,8 @@
 export type BadgeTone = 'neutral' | 'accent' | 'warn';
 
 interface InfoBadgeProps {
-  label: string;
+  /** What the value is. Omitted where the surrounding row already says it. */
+  label?: string;
   value: string;
   tone?: BadgeTone;
 }
@@ -16,7 +17,7 @@ const TONE_CLASS: Record<BadgeTone, string> = {
 export function InfoBadge({ label, value, tone = 'neutral' }: InfoBadgeProps) {
   return (
     <span className={TONE_CLASS[tone]}>
-      <span className="text-faint">{label}</span>
+      {label !== undefined && <span className="text-faint">{label}</span>}
       {value}
     </span>
   );

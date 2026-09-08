@@ -22,7 +22,9 @@ export function AboutPage() {
   return (
     <div className="shell pt-10 pb-4 sm:pt-16">
       <p className="eyebrow">{t('about.eyebrow')}</p>
-      <h1 className="mt-3 max-w-2xl text-[clamp(1.9rem,5.5vw,2.75rem)]">{t('about.heading')}</h1>
+      <h1 className="mt-3 max-w-2xl text-[clamp(1.9rem,5.5vw,2.75rem)] text-balance">
+        {t('about.heading')}
+      </h1>
       <ParagraphList paragraphs={purpose} />
 
       <section aria-labelledby="live-heading" className="card mt-10 p-5 sm:p-7">

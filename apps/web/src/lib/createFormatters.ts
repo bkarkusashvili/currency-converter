@@ -1,12 +1,24 @@
+import type { AmountSeparators } from '../features/converter/lib/formatAmountInput';
+
+/** §3 publishes an effective rate to six places; a rate never needs more. */
 const RATE_DECIMALS = 6;
+const MIN_RATE_DECIMALS = 2;
 const SIGNIFICANT_RATE_DECIMALS = 2;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RELATIVE_DAY_LIMIT = 7;
+
+/**
+ * Which shape `text` took. A sentence in front of it needs a preposition for a
+ * clock time and a date and none at all for "yesterday", and only the formatter
+ * knows which one it produced.
+ */
+export type TimestampKind = 'clock' | 'relative' | 'calendar';
 
 export interface FormattedTimestamp {
   iso: string;
   text: string;
   title: string;
+  kind: TimestampKind;
 }
 
 export interface Formatters {
@@ -15,6 +27,8 @@ export interface Formatters {
   rate(value: number): string;
   splitRate(value: number): { lead: string; tail: string };
   timestamp(isoTimestamp: string, now?: Date): FormattedTimestamp | null;
+  /** The grouping and decimal marks of this locale, for the amount field to reuse. */
+  separators: AmountSeparators;
 }
 
 export function createFormatters(locale: string): Formatters {
@@ -23,10 +37,11 @@ export function createFormatters(locale: string): Formatters {
     maximumFractionDigits: 2,
   });
   const integer = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+  // Trailing zeros are noise on a rate — `44.35` is the published number and
+  // `44.350000` only looks like more precision than Monobank quoted.
   const rate = new Intl.NumberFormat(locale, {
-    minimumFractionDigits: RATE_DECIMALS,
+    minimumFractionDigits: MIN_RATE_DECIMALS,
     maximumFractionDigits: RATE_DECIMALS,
-    useGrouping: false,
   });
   const timeOnly = new Intl.DateTimeFormat(locale, { timeStyle: 'short' });
   const dateAndTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
@@ -43,8 +58,9 @@ export function createFormatters(locale: string): Formatters {
       let tail = '';
       for (const part of rate.formatToParts(value)) {
         if (part.type === 'fraction') {
-          lead += part.value.slice(0, SIGNIFICANT_RATE_DECIMALS);
-          tail += part.value.slice(SIGNIFICANT_RATE_DECIMALS);
+          const cut = significantThrough(part.value, value);
+          lead += part.value.slice(0, cut);
+          tail += part.value.slice(cut);
         } else if (tail === '') {
           lead += part.value;
         } else {
@@ -61,15 +77,49 @@ export function createFormatters(locale: string): Formatters {
       }
 
       const days = calendarDaysBetween(now, date);
+      const kind: TimestampKind =
+        days === 0 ? 'clock' : Math.abs(days) < RELATIVE_DAY_LIMIT ? 'relative' : 'calendar';
       const text =
-        days === 0
+        kind === 'clock'
           ? timeOnly.format(date)
-          : Math.abs(days) < RELATIVE_DAY_LIMIT
+          : kind === 'relative'
             ? relative.format(days, 'day')
             : dateAndTime.format(date);
 
-      return { iso: date.toISOString(), text, title: full.format(date) };
+      return { iso: date.toISOString(), text, title: full.format(date), kind };
     },
+
+    separators: separatorsOf(integer),
+  };
+}
+
+/**
+ * How much of the fraction is the number the reader came for. Two decimals for
+ * a rate of one or more, but a rate below one carries no information until its
+ * leading zeros are past: dimming everything after `0.00` of `0.002255` dims
+ * the whole rate, so the count starts at the first digit that is not a zero.
+ */
+function significantThrough(fraction: string, value: number): number {
+  if (Math.abs(value) >= 1) {
+    return SIGNIFICANT_RATE_DECIMALS;
+  }
+
+  const firstSignificant = fraction.search(/[1-9]/);
+  return firstSignificant === -1 ? fraction.length : firstSignificant + SIGNIFICANT_RATE_DECIMALS;
+}
+
+/**
+ * Read off a formatted number rather than hardcoded per language, so the field
+ * groups the way every other number on the page does.
+ */
+function separatorsOf(format: Intl.NumberFormat): AmountSeparators {
+  const parts = new Intl.NumberFormat(format.resolvedOptions().locale, {
+    minimumFractionDigits: 1,
+  }).formatToParts(1111.1);
+
+  return {
+    group: parts.find((part) => part.type === 'group')?.value ?? '',
+    decimal: parts.find((part) => part.type === 'decimal')?.value ?? '.',
   };
 }
 

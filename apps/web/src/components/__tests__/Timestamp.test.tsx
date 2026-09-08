@@ -13,6 +13,22 @@ describe('Timestamp', () => {
     expect(time.getAttribute('title')).toContain('2024');
   });
 
+  it('takes the preposition a date needs and a relative day does not', () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const { rerender } = renderWithProviders(
+      <Timestamp value="2024-03-05T12:00:00.000Z" withPreposition />,
+    );
+    expect(screen.getByText(/^on .*2024/)).toBeInTheDocument();
+
+    rerender(<Timestamp value={yesterday.toISOString()} withPreposition />);
+    expect(screen.getByText('yesterday')).toBeInTheDocument();
+
+    rerender(<Timestamp value={new Date().toISOString()} withPreposition />);
+    expect(screen.getByText(/^at \d{1,2}:\d{2}/)).toBeInTheDocument();
+  });
+
   it('shows a dash when the value is not a date', () => {
     renderWithProviders(<Timestamp value="whenever" />);
 

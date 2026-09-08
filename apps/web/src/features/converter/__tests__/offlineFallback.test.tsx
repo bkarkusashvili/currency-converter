@@ -74,10 +74,11 @@ describe('converting while the API is unreachable', () => {
 
     const card = await screen.findByRole('region', { name: 'Result' });
     expect(card).toHaveTextContent('4,435.00 UAH');
-    expect(card).toHaveTextContent('1 USD = 44.350000 UAH');
+    expect(card).toHaveTextContent('1 USD = 44.35 UAH');
+    expect(card).toHaveTextContent('1 UAH = 0.022548 USD');
     expect(within(card).getByText('offline estimate')).toBeInTheDocument();
 
-    const note = within(card).getByText(/API unreachable; estimated from rates fetched/);
+    const note = within(card).getByText(/priced in the browser from rates fetched/);
     expect(note.querySelector('time')).not.toBeNull();
     // The age of the rates is on the card once, in the sentence that warns about it.
     expect(card.querySelectorAll('time')).toHaveLength(1);

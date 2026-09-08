@@ -77,10 +77,15 @@ export function sourceCopy(source: string) {
     : UNKNOWN_SOURCE;
 }
 
-/** An unknown strategy falls back to the two endpoints rather than inventing a hop. */
+/**
+ * The hops the rate was priced through. Identity has none — nothing was
+ * converted, and a diagram of one node is a diagram of nothing — so it gets an
+ * empty path and no drawing. An unknown strategy falls back to the two
+ * endpoints rather than inventing a hop.
+ */
 export function conversionPath(from: string, to: string, strategy: string): string[] {
   if (strategy === 'identity') {
-    return [from];
+    return [];
   }
   return strategy === 'cross' ? [from, HUB_CURRENCY, to] : [from, to];
 }
