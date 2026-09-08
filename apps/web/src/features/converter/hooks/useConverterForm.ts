@@ -5,8 +5,8 @@ import { useFormatters } from '../../../lib/useFormatters';
 import { MAX_AMOUNT, parseAmount, type AmountErrorCode } from '../lib/parseAmount';
 import type { FormField, FormFieldErrors } from '../lib/serverFieldErrors';
 
-export const DEFAULT_FROM = 'USD';
-export const DEFAULT_TO = 'UAH';
+const DEFAULT_FROM = 'USD';
+const DEFAULT_TO = 'UAH';
 const DEFAULT_AMOUNT = '100';
 
 interface UseConverterFormOptions {
@@ -33,9 +33,15 @@ export function useConverterForm({
   const { t } = useTranslation();
   const formatters = useFormatters();
   const [amount, setAmountValue] = useState(DEFAULT_AMOUNT);
-  const [from, setFrom] = useState(DEFAULT_FROM);
-  const [to, setTo] = useState(DEFAULT_TO);
+  const [from, setFromValue] = useState(DEFAULT_FROM);
+  const [to, setToValue] = useState(DEFAULT_TO);
   const [amountErrorCode, setAmountErrorCode] = useState<AmountErrorCode | null>(null);
+  /**
+   * Fields edited since the last submit. The server's answer describes the values
+   * it was sent, so a field the user has already changed must not keep wearing
+   * `aria-invalid` until the next mutation settles.
+   */
+  const [editedFields, setEditedFields] = useState<ReadonlySet<FormField>>(EMPTY_FIELDS);
 
   function amountMessage(code: AmountErrorCode): string {
     switch (code) {
@@ -50,14 +56,30 @@ export function useConverterForm({
     }
   }
 
+  function markEdited(...fields: FormField[]) {
+    setEditedFields((edited) => new Set([...edited, ...fields]));
+  }
+
   function setAmount(value: string) {
     setAmountValue(value);
     setAmountErrorCode(null);
+    markEdited('amount');
+  }
+
+  function setFrom(value: string) {
+    setFromValue(value);
+    markEdited('from');
+  }
+
+  function setTo(value: string) {
+    setToValue(value);
+    markEdited('to');
   }
 
   function swap() {
-    setFrom(to);
-    setTo(from);
+    setFromValue(to);
+    setToValue(from);
+    markEdited('from', 'to');
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -70,17 +92,24 @@ export function useConverterForm({
     }
 
     setAmountErrorCode(null);
+    setEditedFields(EMPTY_FIELDS);
     onSubmit({ from: from.toUpperCase(), to: to.toUpperCase(), amount: parsed.value });
   }
 
+  function serverMessage(field: FormField): string | null {
+    return editedFields.has(field) ? null : joined(serverErrors[field]);
+  }
+
   const errors: Record<FormField, string | null> = {
-    amount: amountErrorCode === null ? joined(serverErrors.amount) : amountMessage(amountErrorCode),
-    from: joined(serverErrors.from),
-    to: joined(serverErrors.to),
+    amount: amountErrorCode === null ? serverMessage('amount') : amountMessage(amountErrorCode),
+    from: serverMessage('from'),
+    to: serverMessage('to'),
   };
 
   return { amount, from, to, errors, setAmount, setFrom, setTo, swap, handleSubmit };
 }
+
+const EMPTY_FIELDS: ReadonlySet<FormField> = new Set();
 
 function joined(messages: string[] | undefined): string | null {
   return messages === undefined || messages.length === 0 ? null : messages.join(' ');

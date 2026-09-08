@@ -187,6 +187,72 @@ describe('ConverterPage', () => {
     expect(notice).toHaveTextContent('request req-42');
   });
 
+  it('clears a server error on the field the user has since edited', async () => {
+    const user = userEvent.setup();
+    renderPage({
+      convert: new ApiError({
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Request validation failed',
+        details: {
+          errors: [
+            { field: 'amount', messages: ['amount must be a positive number'] },
+            { field: 'to', messages: ['to must be an ISO 4217 code'] },
+          ],
+        },
+      }),
+    });
+    await screen.findAllByRole('option', { name: 'EUR — Euro' });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const amount = await screen.findByLabelText('Amount');
+    await waitFor(() => {
+      expect(amount).toHaveAttribute('aria-invalid', 'true');
+    });
+
+    await user.type(amount, '5');
+
+    expect(amount).toHaveAttribute('aria-invalid', 'false');
+    expect(amount).not.toHaveAttribute('aria-describedby');
+    expect(document.getElementById('amount-error')).toBeNull();
+
+    // The untouched field still carries what the server said about it.
+    expect(screen.getByLabelText('To')).toHaveAttribute('aria-invalid', 'true');
+
+    await user.selectOptions(screen.getByLabelText('To'), 'PLN');
+
+    expect(screen.getByLabelText('To')).toHaveAttribute('aria-invalid', 'false');
+  });
+
+  it('puts the server errors back when the corrected values fail again', async () => {
+    const user = userEvent.setup();
+    renderPage({
+      convert: new ApiError({
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Request validation failed',
+        details: { errors: [{ field: 'amount', messages: ['amount must be a positive number'] }] },
+      }),
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const amount = await screen.findByLabelText('Amount');
+    await waitFor(() => {
+      expect(amount).toHaveAttribute('aria-invalid', 'true');
+    });
+
+    await user.type(amount, '5');
+    expect(amount).toHaveAttribute('aria-invalid', 'false');
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    await waitFor(() => {
+      expect(amount).toHaveAttribute('aria-invalid', 'true');
+    });
+  });
+
   it('stays usable when the currency list fails to load', async () => {
     const user = userEvent.setup();
     const fake = renderPage({
