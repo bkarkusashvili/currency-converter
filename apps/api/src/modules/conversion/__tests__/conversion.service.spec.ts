@@ -4,6 +4,7 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../common/logging/__tests__/fake-pino-logger';
+import { HistoryService } from '../../history/history.service';
 import { RatesService } from '../../rates/application/rates.service';
 import { RatesLookup } from '../../rates/domain/rates-lookup';
 import { ConversionService } from '../conversion.service';
@@ -26,8 +27,13 @@ interface RatesServiceDouble {
   getSnapshot: jest.Mock;
 }
 
+interface HistoryServiceDouble {
+  record: jest.Mock;
+}
+
 describe('ConversionService', () => {
   let rates: RatesServiceDouble;
+  let history: HistoryServiceDouble;
   let logger: FakePinoLogger;
   let service: ConversionService;
 
@@ -36,6 +42,7 @@ describe('ConversionService', () => {
   // asserting on the stub.
   beforeEach(() => {
     rates = { getSnapshot: jest.fn().mockResolvedValue(LOOKUP) };
+    history = { record: jest.fn().mockResolvedValue(undefined) };
     logger = createFakePinoLogger();
     service = new ConversionService(
       rates as unknown as RatesService,
@@ -44,6 +51,7 @@ describe('ConversionService', () => {
         new DirectPairStrategy(),
         new CrossRateStrategy(),
       ]),
+      history as unknown as HistoryService,
       logger.asPinoLogger(),
     );
   });
@@ -131,6 +139,39 @@ describe('ConversionService', () => {
     await expect(
       service.convert({ from: 'USD', to: 'UAH', amount: 1 }),
     ).rejects.toBeInstanceOf(RatesUnavailableError);
+  });
+
+  describe('the history it leaves behind', () => {
+    it('records exactly what it answered', async () => {
+      const answer = await service.convert({
+        from: 'USD',
+        to: 'UAH',
+        amount: 100,
+      });
+
+      expect(history.record).toHaveBeenCalledWith(answer);
+    });
+
+    it('records a conversion once', async () => {
+      await service.convert({ from: 'GBP', to: 'PLN', amount: 1 });
+
+      expect(history.record).toHaveBeenCalledTimes(1);
+    });
+
+    // What keeps a store that is down from turning a priced conversion into a
+    // 500 is HistoryService.record never rejecting, which its own suite
+    // asserts. Restating it here would mean mocking the service into breaking
+    // a promise it does not break, and calling the result coverage.
+
+    // A pair the rates cannot price is not a conversion, so there is nothing
+    // to record.
+    it('records nothing when the conversion failed', async () => {
+      await expect(
+        service.convert({ from: 'XYZ', to: 'UAH', amount: 1 }),
+      ).rejects.toBeInstanceOf(UnsupportedCurrencyError);
+
+      expect(history.record).not.toHaveBeenCalled();
+    });
   });
 
   describe('logging', () => {

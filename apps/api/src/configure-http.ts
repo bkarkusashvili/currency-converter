@@ -5,6 +5,8 @@ import { requestIdMiddleware } from './common/logging/request-id.middleware';
 import type { TypedConfigService } from './config/typed-config.service';
 
 export const GLOBAL_PREFIX = 'api/v1';
+export const HEALTH_PATH = 'health';
+export const HEALTH_LIVE_PATH = 'health/live';
 export const DOCS_PATH = 'docs';
 export const DOCS_JSON_PATH = 'docs-json';
 
@@ -40,8 +42,10 @@ export function configureHttp(
   app.enableCors({ origin: config.get('CORS_ORIGINS', { infer: true }) });
 
   // Health and the docs stay unversioned so probes and tooling keep working
-  // across future API versions.
+  // across future API versions. The exclusions match a path exactly, so the
+  // liveness route needs its own entry: excluding `health` does not cover
+  // anything below it.
   app.setGlobalPrefix(GLOBAL_PREFIX, {
-    exclude: ['health', DOCS_PATH, DOCS_JSON_PATH],
+    exclude: [HEALTH_PATH, HEALTH_LIVE_PATH, DOCS_PATH, DOCS_JSON_PATH],
   });
 }

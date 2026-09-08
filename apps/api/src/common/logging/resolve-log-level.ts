@@ -1,8 +1,8 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 
-// The unversioned liveness route. Kept local so the logger does not depend on
-// the HTTP wiring; configureHttp excludes the same path from the api prefix.
-const HEALTH_PATH = '/health';
+// The unversioned probe routes. Kept local so the logger does not depend on the
+// HTTP wiring; configureHttp excludes the same paths from the api prefix.
+const PROBE_PATHS: readonly string[] = ['/health', '/health/live'];
 
 // Narrower than pino's LevelWithSilent, which is what pino-http asks for; every
 // member here is one of its levels.
@@ -16,9 +16,10 @@ function pathOf(request: IncomingMessage): string {
 // otherwise, so a 401, a 429 or a 503 would sit at the same level as a healthy
 // 200 and nothing would stand out in an alert.
 //
-// A successful liveness probe is the opposite problem: it runs every few
-// seconds and says nothing. It is dropped, and only while it succeeds — a
-// failing probe still takes the warn or error branch above.
+// A successful probe is the opposite problem: it runs every few seconds and
+// says nothing. Both are dropped — the liveness route is polled harder than the
+// dependency report, not less — and only while they succeed: a failing probe
+// still takes the warn or error branch above.
 export function resolveLogLevel(
   request: IncomingMessage,
   response: ServerResponse,
@@ -32,5 +33,5 @@ export function resolveLogLevel(
     return 'warn';
   }
 
-  return pathOf(request) === HEALTH_PATH ? 'silent' : 'info';
+  return PROBE_PATHS.includes(pathOf(request)) ? 'silent' : 'info';
 }

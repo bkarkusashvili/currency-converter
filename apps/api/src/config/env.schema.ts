@@ -43,6 +43,20 @@ export const envSchema = z
     // that never answers, and the cache is on the request path.
     REDIS_COMMAND_TIMEOUT_MS: positiveInt.default(300),
     MONGO_URL: z.url().default('mongodb://localhost:27017/currency_converter'),
+    // How long the driver looks for a reachable server before giving up. The
+    // default of 30s is a deadline for a conversion that only writes a history
+    // record; §2 keeps that request answering while Mongo is down.
+    MONGO_SERVER_SELECTION_TIMEOUT_MS: positiveInt.default(3000),
+    // Deadline for a single history query. Server selection bounds looking for
+    // a server, not a server that answers slowly or stops answering mid
+    // command, and `readyState` stays `connected` until mongoose notices the
+    // topology is gone. This is what makes a hung Mongo degrade like an absent
+    // one instead of holding a conversion open.
+    HISTORY_OPERATION_TIMEOUT_MS: positiveInt.default(1000),
+    // How long a conversion record is kept. A demo collection nobody prunes
+    // grows without bound, and nothing in the product reads a month-old
+    // conversion; the TTL index is what enforces it.
+    HISTORY_TTL_DAYS: positiveInt.default(30),
     MONOBANK_API_URL: z.url().default('https://api.monobank.ua/bank/currency'),
     MONOBANK_TIMEOUT_MS: positiveInt.default(5000),
     MONOBANK_RETRY_ATTEMPTS: positiveInt.default(3),

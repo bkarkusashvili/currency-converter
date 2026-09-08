@@ -5,10 +5,12 @@ import { LoggingModule } from './common/logging/logging.module';
 import { ThrottlingModule } from './common/throttling/throttling.module';
 import { validationPipeOptions } from './common/validation/validation-pipe.options';
 import { AppConfigModule } from './config/app-config.module';
+import { MongoModule } from './infrastructure/mongo/mongo.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { ConversionModule } from './modules/conversion/conversion.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { HealthModule } from './modules/health/health.module';
+import { HistoryModule } from './modules/history/history.module';
 import { RatesModule } from './modules/rates/rates.module';
 
 @Module({
@@ -17,9 +19,11 @@ import { RatesModule } from './modules/rates/rates.module';
     LoggingModule,
     ThrottlingModule,
     RedisModule,
+    MongoModule,
     RatesModule,
     ConversionModule,
     CurrenciesModule,
+    HistoryModule,
     HealthModule,
   ],
   providers: [

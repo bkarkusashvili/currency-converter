@@ -5,6 +5,7 @@ import { RatesModule } from '../rates/rates.module';
 import { HealthController } from './health.controller';
 import type { HealthIndicatorPort } from './health-indicator.port';
 import { HEALTH_INDICATORS } from './health-indicators.token';
+import { MongoHealthIndicator } from './mongo-health.indicator';
 import { MonobankHealthIndicator } from './monobank-health.indicator';
 import { RedisHealthIndicator } from './redis-health.indicator';
 
@@ -22,15 +23,21 @@ function collectIndicators(
   // indicator reports that instance's state and never calls the upstream. Which
   // adapter binds the breaker is the rates module's business, so this module
   // takes it from that module's exports rather than reaching into its
-  // infrastructure folder.
+  // infrastructure folder. The Mongo connection needs no import at all:
+  // MongooseModule registers it globally.
   imports: [TerminusModule, RedisModule, RatesModule],
   controllers: [HealthController],
   providers: [
     RedisHealthIndicator,
+    MongoHealthIndicator,
     MonobankHealthIndicator,
     {
       provide: HEALTH_INDICATORS,
-      inject: [RedisHealthIndicator, MonobankHealthIndicator],
+      inject: [
+        RedisHealthIndicator,
+        MongoHealthIndicator,
+        MonobankHealthIndicator,
+      ],
       useFactory: collectIndicators,
     },
   ],

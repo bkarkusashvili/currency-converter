@@ -6,6 +6,7 @@ import {
 } from '../../common/money/money-decimals';
 import { Money } from '../../common/money/money';
 import { roundHalfUp } from '../../common/money/round-half-up';
+import { HistoryService } from '../history/history.service';
 import { RatesService } from '../rates/application/rates.service';
 import { ConversionRequest } from './domain/conversion-request';
 import { ConversionResult } from './domain/conversion-result';
@@ -16,6 +17,7 @@ export class ConversionService {
   constructor(
     private readonly rates: RatesService,
     private readonly resolver: ConversionStrategyResolver,
+    private readonly history: HistoryService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(ConversionService.name);
@@ -50,7 +52,7 @@ export class ConversionService {
     // carries the pair and how it was priced, and this one carries the money.
     this.logger.debug(`Converted ${amount} ${from} to ${result} ${to}`);
 
-    return {
+    const answer: ConversionResult = {
       from,
       to,
       amount,
@@ -60,5 +62,14 @@ export class ConversionService {
       source,
       ratesTimestamp: snapshot.fetchedAt,
     };
+
+    // Awaited so a client that reads /history straight after a conversion finds
+    // it there. Nothing is caught here: HistoryService.record never rejects —
+    // that is the promise it exists to keep, because the conversion is the
+    // answer and the record is a side effect of it (§2) — and a second guard
+    // over it would only be a branch no test can reach honestly.
+    await this.history.record(answer);
+
+    return answer;
   }
 }
