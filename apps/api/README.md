@@ -183,7 +183,7 @@ log that names the load balancer.
 | `npm test` | Unit tests |
 | `npm run test:cov` | Unit tests with the 85% line and branch gate |
 | `npm run test:e2e` | End-to-end tests over the real HTTP surface |
-| `npm run test:integration` | The Redis and Mongo adapters against real servers; skipped unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set |
+| `npm run test:integration` | The Redis and Mongo adapters against real servers; skipped with a `SKIPPED:` line unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI` |
 | `npm run openapi:write` | Regenerates `docs/openapi.json` from the decorators |
 
 Unit tests live in a `__tests__` folder beside the code they cover; the
@@ -193,7 +193,9 @@ end-to-end suites live in `test/e2e` and boot the app the way `main.ts` does.
 Every other test of those two adapters runs against a hand-written fake, which
 can only confirm the assumption its author had about the driver; these check the
 TTLs both cache keys are actually written with, the index Mongo actually holds
-and the order a page actually comes back in. Point them at a running pair:
+and the order a page actually comes back in. They write the application's own
+key names, so the Redis suite works on database 15 and empties only that one.
+Point them at a running pair:
 
 ```bash
 npm run infra:up   # from the repository root

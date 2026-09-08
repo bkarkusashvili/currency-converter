@@ -520,7 +520,7 @@ apps/
 docs/architecture.md    the design contract
 docs/openapi.json       the published API contract, generated (`openapi:write`)
 fixtures/               the rates snapshot and golden conversions both suites price against
-scripts/check-fixtures.mjs  validates them; `npm run check:fixtures`
+scripts/check-fixtures.mjs  validates and re-prices them; `npm run check:fixtures`
 package.json            root scripts + `concurrently`; not a workspace
 docker-compose.yml      api, web, redis, mongo
 docker-compose.dev.yml  overlay: backing services only, published on loopback
@@ -535,10 +535,10 @@ Four suites, all green on this commit:
 | --------------- | ---------------------------------------- | ------------------------- | ------------------------------------------------------------------------ | -------------------------- |
 | API unit        | `apps/api: npm run test:cov`             | 65 suites, **661** tests  | stmts 98.13% · branches 88.78% · funcs 98.40% · lines 98.02%              | 85% lines + branches       |
 | API e2e         | `apps/api: npm run test:e2e`             | 8 suites, **124** tests   | not instrumented — see below                                             | none                       |
-| API integration | `apps/api: npm run test:integration`     | 2 suites, **12** tests    | not instrumented; skipped unless the two `INTEGRATION_*_URL` are set     | none                       |
-| Web             | `apps/web: npm run test:coverage`        | 27 files, **233** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
+| API integration | `apps/api: npm run test:integration`     | 2 suites, **12** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
+| Web             | `apps/web: npm run test:coverage`        | 27 files, **234** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
 
-**1030 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
+**1031 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
 `npm run typecheck`, `npm run format:check` and `npm run build` run the same
 checks across both apps and let both report, so a failure in one does not hide
 the other. Coverage gates and the e2e suite stay per-app.
@@ -567,8 +567,17 @@ fake, which can only confirm the assumption its author had about the driver.
 TTLs both cache keys are actually written with, the index Mongo actually holds,
 the order the page actually comes back in. It runs only when
 `INTEGRATION_REDIS_URL` and `INTEGRATION_MONGO_URL` point at one, and otherwise
-reports each suite as skipped with the variable that would have run it in the
-title, so the gap is visible rather than silent:
+prints a line per suite naming the variable that would have run it — Jest says
+nothing about a file whose every suite is skipped, so the gap has to say so
+itself:
+
+```text
+SKIPPED: RedisRatesRepository against a real Redis — set INTEGRATION_REDIS_URL to run it against a real service
+```
+
+Under `CI` a missing variable is an error rather than a skip: the
+`orchestration` job starts both services and points the suite at them, so
+dropping that has to go red rather than quietly stop testing the drivers.
 
 ```bash
 npm run infra:up                      # redis + mongo on the loopback
@@ -582,8 +591,11 @@ estimate re-prices a conversion with the same rules the API applies, and each
 side used to carry its own copy of the rates table — which had drifted on two of
 the five pairs. Both now read `fixtures/rates-snapshot.json` and assert every
 row of `fixtures/golden-conversions.json`, twelve vectors computed once by hand
-from the §5 rules. `npm run check:fixtures` validates both files and
-cross-references every vector's currencies against the snapshot.
+from the §5 rules. `npm run check:fixtures` validates both files,
+cross-references every vector's currencies against the snapshot, and re-prices
+all twelve from it in exact integer arithmetic — a third derivation of §5, so a
+slip in the hand-computed table is caught rather than agreed with by both
+suites.
 
 CI runs three jobs on every pull request. `api` and `web` each do lint, format
 check, typecheck, build, unit tests with coverage, `npm audit` and a
@@ -678,7 +690,7 @@ test name, or a live URL; every row was re-verified against this commit.
 
 | #  | Requirement                     | Status | Evidence                                                                                                                             |
 | -- | ------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 4a | Cache rates for a set duration  | met    | `redis-rates.repository.ts` `save()` writes `rates:latest` with `EX RATES_CACHE_TTL_SECONDS`. Tests: “writes both keys with the configured expiries”, “answers the second call from the cache without calling out again”, and against a real Redis “writes both keys in one transaction with the configured expiries” (`test/integration/`) |
+| 4a | Cache rates for a set duration  | met    | `redis-rates.repository.ts` `save()` writes `rates:latest` with `EX RATES_CACHE_TTL_SECONDS`. Tests: “writes both keys with the configured expiries”, “answers the second call from the cache without calling out again”, and against a real Redis “writes both keys with their TTLs” (`test/integration/`) |
 | 4b | Use Redis                       | met    | `infrastructure/redis/create-redis-client.ts` (ioredis), `redis.module.ts`, `redis-connection.ts`; `docker-compose.yml` `redis:7.4-alpine`; managed Redis on Railway. Live: `/health` → `"redis":{"status":"up"}` |
 | 4c | Configurable expiry             | met    | `RATES_CACHE_TTL_SECONDS` (300) and `RATES_STALE_TTL_SECONDS` (86400) in `env.schema.ts`, both in the table above and in `.env.example` |
 | 4d | Cache-aside pattern             | met    | `rates.service.ts` `getSnapshot()`: `getFresh()` → miss → `fetchRates()` → `save()`. Tests: “answers from the cache without reaching the upstream”, “fetches, caches and reports the provider as the source”, “serves concurrent callers from one upstream call” (single-flight) |

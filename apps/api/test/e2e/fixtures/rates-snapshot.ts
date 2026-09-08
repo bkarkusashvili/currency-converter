@@ -8,7 +8,7 @@ import {
 
 // The rates and the conversions of them both live at the repository root, in
 // JSON, because the web app's offline estimate is tested against exactly the
-// same numbers (apps/web/src/test/golden-fixtures.ts reads these two files
+// same numbers (apps/web/src/test/goldenFixtures.ts reads these two files
 // too). They used to be two hand-copied tables and two of the five pairs had
 // already drifted apart, so neither suite was checking what its comment said it
 // was. Read rather than imported: the API's build has `rootDir: ./src`, and a

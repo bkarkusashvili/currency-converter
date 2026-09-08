@@ -764,7 +764,7 @@ apps/api
     │   ├── setup-e2e-env.ts     the environment every suite starts from
     │   ├── env/                 per-suite environment, imported before AppModule
     │   └── fixtures/            reads the shared snapshot and golden vectors at the repo root
-    ├── integration/             the two adapters against a real Redis and Mongo; skipped unless
+    ├── integration/             the two adapters against a real Redis and Mongo; skipped, visibly, unless
     │                            INTEGRATION_REDIS_URL / INTEGRATION_MONGO_URL are set
     ├── openapi-document.ts      generates and serialises the document docs/openapi.json holds
     ├── write-openapi.ts         `npm run openapi:write`
@@ -940,9 +940,9 @@ newest-first page and the retention ride on the same key rather than on two.
 | Layer                | Tool                         | What is covered                                   |
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
-| E2E (api)            | Jest + supertest             | seven suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger` |
+| E2E (api)            | Jest + supertest             | eight suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger`, `openapi-contract` |
 | Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, error display, history list and its loading and empty states, health rendering, every HTTP repository |
-| Integration (api)    | Jest against real servers    | the two adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp. Skipped unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set; CI's `orchestration` job points them at the stack it already starts |
+| Integration (api)    | Jest against real servers    | the two adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp. Each suite runs on its own database — Redis 15, a Mongo database of its own — so a URL pointed at a running stack is never flushed. Skipped, with a `SKIPPED:` line naming the variable, unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI`, whose `orchestration` job points them at the stack it already starts |
 | Contract             | Jest (api) + ajv (web)       | `docs/openapi.json` regenerated from the application's decorators and compared with the committed file; on the web side every sample response the suite renders validated against the schema that document publishes for its route |
 
 A `*.module.ts` is wiring and is excluded from coverage, so anything a module
@@ -981,8 +981,12 @@ drifted on two of the five pairs. Both now read
 covering identity, both directions of a spread pair, both directions of a
 cross, a result below half a cent, and the million-hryvnia case that only
 passes if the money is computed from the unrounded rate. `npm run
-check:fixtures` at the root validates both files and cross-references every
-vector's currencies against the pairs the snapshot publishes.
+check:fixtures` at the root validates both files, cross-references every
+vector's currencies against the pairs the snapshot publishes, and re-prices all
+twelve from the snapshot in exact integer arithmetic. That re-pricing is a third
+derivation of the rule above rather than a copy of either implementation: with
+only the two, a transcription slip in the table is something both suites would
+agree on and both would have wrong.
 
 ## 12. Conventions
 
@@ -1013,9 +1017,11 @@ vector's currencies against the pairs the snapshot publishes.
   so the surface under test is the one the process serves.
 - Integration tests live in `apps/api/test/integration` and are the only ones
   that reach a real Redis or MongoDB. They run when
-  `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` point at one and skip with
-  the variable named in the suite title otherwise, so the gap is visible rather
-  than silent.
+  `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` point at one; otherwise each
+  writes a `SKIPPED: … set <VARIABLE> …` line to stdout, because Jest reports
+  nothing per suite for a file whose every suite is skipped. Under `CI` a
+  missing variable throws instead, so deleting the workflow's env block fails
+  rather than silently stopping.
 - A test asserts behaviour, not the literal it imported. A spec that reads a
   configuration object back cannot fail when the wiring around it is wrong,
   which is how a Redis client that could never serve its first command passed
