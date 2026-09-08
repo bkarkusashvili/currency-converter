@@ -7,7 +7,6 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
 import { createE2eApp } from './create-e2e-app';
-import { overrideRedis } from './override-redis';
 
 const THROTTLE_LIMIT = 2;
 const REQUEST_ID_HEADER = 'x-request-id';
@@ -29,10 +28,10 @@ describe('throttling (e2e)', () => {
   // A fresh app per test, because the throttler's buckets are state that
   // outlives a single request.
   beforeEach(async () => {
-    app = await createE2eApp(
-      { imports: [AppModule], controllers: [ProbeController] },
-      { customise: overrideRedis },
-    );
+    app = await createE2eApp({
+      imports: [AppModule],
+      controllers: [ProbeController],
+    });
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;

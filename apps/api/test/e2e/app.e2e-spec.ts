@@ -18,10 +18,7 @@ describe('API (e2e)', () => {
   let server: Server;
 
   beforeAll(async () => {
-    app = await createE2eApp(
-      { imports: [AppModule] },
-      { customise: overrideRedis },
-    );
+    app = await createE2eApp({ imports: [AppModule] });
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;
