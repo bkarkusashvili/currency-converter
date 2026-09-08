@@ -3,6 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
+import { FakeRedisClient } from '../../src/infrastructure/redis/__tests__/fake-redis-client';
+import { REDIS_CLIENT } from '../../src/infrastructure/redis/redis-client.token';
 import { createE2eApp } from './create-e2e-app';
 
 const REQUEST_ID_HEADER = 'x-request-id';
@@ -14,7 +16,17 @@ describe('API (e2e)', () => {
   let server: Server;
 
   beforeAll(async () => {
-    app = await createE2eApp({ imports: [AppModule] });
+    // The suite has no Redis to talk to, and /health reporting the cache down
+    // would say more about the runner than about the app.
+    app = await createE2eApp(
+      { imports: [AppModule] },
+      {
+        customise: (builder) =>
+          builder
+            .overrideProvider(REDIS_CLIENT)
+            .useValue(new FakeRedisClient().asRedis()),
+      },
+    );
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;
@@ -29,7 +41,13 @@ describe('API (e2e)', () => {
       const response = await request(server).get('/health');
 
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ status: 'ok', details: {} });
+      expect(response.body).toMatchObject({
+        status: 'ok',
+        details: {
+          redis: { status: 'up' },
+          monobank: { status: 'up' },
+        },
+      });
     });
 
     it('is not exposed under the api/v1 prefix', async () => {
