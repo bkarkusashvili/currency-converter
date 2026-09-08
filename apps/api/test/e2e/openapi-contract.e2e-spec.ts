@@ -12,16 +12,18 @@ import {
 describe('the committed OpenAPI document (e2e)', () => {
   it('matches the document the application generates', async () => {
     const generated = await generateOpenApiDocument();
+    const committed = readCommittedOpenApiDocument();
 
-    // A bare toBe on a thousand-line string is unreadable when it fails, so
-    // the instruction comes first and the diff second.
-    if (readCommittedOpenApiDocument() !== generated) {
-      throw new Error(
+    // What to do about it is logged rather than thrown, so the `expect` below
+    // is what fails: throwing first would replace Jest's diff of the two
+    // documents — the only thing that says *what* drifted — with a sentence.
+    if (committed !== generated) {
+      console.error(
         `docs/openapi.json is out of date with the application's decorators. ` +
           `Run \`${WRITE_COMMAND}\` and commit the result.`,
       );
     }
 
-    expect(readCommittedOpenApiDocument()).toBe(generated);
+    expect(committed).toBe(generated);
   }, 30_000);
 });
