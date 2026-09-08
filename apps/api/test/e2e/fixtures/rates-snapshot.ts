@@ -23,3 +23,15 @@ export const SNAPSHOT_CURRENCIES = [
   { code: 'UAH', numericCode: 980, name: 'Hryvnia' },
   { code: 'USD', numericCode: 840, name: 'US Dollar' },
 ];
+
+// A snapshot with a currency the API knows and cannot price: CHF is quoted, but
+// only against the dollar, so it has no leg to the hryvnia to cross through.
+// Both codes of CHF/PLN are in the snapshot and there is still no path between
+// them, which is the difference between the two 422s in §3.
+export const DETACHED_RATES_SNAPSHOT: RatesSnapshot = {
+  fetchedAt: '2026-09-08T12:00:00.000Z',
+  rates: [
+    { base: 'CHF', quote: 'USD', cross: 1.2543, date: QUOTED_AT },
+    { base: 'PLN', quote: 'UAH', cross: 12.1834, date: QUOTED_AT },
+  ],
+};
