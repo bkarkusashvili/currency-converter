@@ -6,6 +6,7 @@ import { AppModule } from './app.module';
 import { setupSwagger } from './common/swagger/setup-swagger';
 import type { TypedConfigService } from './config/typed-config.service';
 import { configureHttp } from './configure-http';
+import { listenOrExit } from './listen-or-exit';
 
 async function bootstrap(): Promise<void> {
   // Startup logs are buffered until the pino logger takes over, so nothing is
@@ -21,7 +22,7 @@ async function bootstrap(): Promise<void> {
 
   app.enableShutdownHooks();
 
-  await app.listen(config.get('PORT', { infer: true }), '0.0.0.0');
+  await listenOrExit(app, config.get('PORT', { infer: true }));
 }
 
 bootstrap().catch((error: unknown) => {
