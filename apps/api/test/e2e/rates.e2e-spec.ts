@@ -251,6 +251,22 @@ describe('rates (e2e)', () => {
       });
     });
 
+    // The currencies list is a projection of the same snapshot, read the same
+    // way, so it degrades the same way and says so on the same terms.
+    it('lists the currencies and warns on the same terms', async () => {
+      const response = await request(server).get(CURRENCIES_PATH).expect(200);
+
+      expect(response.body).toStrictEqual({
+        currencies: SNAPSHOT_CURRENCIES,
+        warnings: [
+          {
+            code: 'CACHE_UNAVAILABLE',
+            message: expect.any(String) as string,
+          },
+        ],
+      });
+    });
+
     // Every request pays the upstream, because nothing could be written for the
     // next one — which is the degradation the warning is about.
     it('fetches again on the next request, having cached nothing', async () => {

@@ -159,8 +159,12 @@ describe('OpenAPI document (e2e)', () => {
     });
   });
 
-  it('describes the warnings as an optional array on both responses', () => {
-    for (const schema of ['ConvertResponseDto', 'RatesSnapshotResponseDto']) {
+  it('describes the warnings as an optional array on every route that reads a snapshot', () => {
+    for (const schema of [
+      'ConvertResponseDto',
+      'RatesSnapshotResponseDto',
+      'CurrenciesResponseDto',
+    ]) {
       expect(document.components?.schemas?.[schema]).toMatchObject({
         properties: {
           warnings: {

@@ -126,6 +126,11 @@ Currencies present in the current snapshot plus `UAH`, sorted by code:
 { "currencies": [{ "code": "EUR", "numericCode": 978, "name": "Euro" }] }
 ```
 
+`warnings` appears here on the same terms as on `/rates`. The list is a
+projection of the same snapshot, read through the same service, so a cache that
+could not be reached costs this route exactly what it costs that one — and this
+is the route a client calls first, to fill a picker.
+
 ### GET `/api/v1/history?limit=10`
 
 Most recent conversions, newest first. `limit` is `1..50`, default `10`, and it
@@ -228,8 +233,8 @@ from the request log (§7); a failing one is not.
 
 ### Warnings
 
-`POST /api/v1/convert` and `GET /api/v1/rates` can carry a `warnings` array
-beside their answer:
+`POST /api/v1/convert`, `GET /api/v1/rates` and `GET /api/v1/currencies` can
+carry a `warnings` array beside their answer:
 
 ```json
 {
@@ -253,7 +258,7 @@ and a healthy response is byte for byte the one it has always been.
 
 | `code`                 | When                                                                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CACHE_UNAVAILABLE`    | Redis could not be read from or written to while the request was answered, so the cache neither served this response nor kept it for the next one |
+| `CACHE_UNAVAILABLE`    | Any of the three: Redis could not be read from or written to while the request was answered, so the cache neither served this response nor kept it for the next one |
 | `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but its record was dropped or timed out, so it will not appear in `/history`                                      |
 
 `message` is a sentence safe to show to a user; a client switches on `code`.

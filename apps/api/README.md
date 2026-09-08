@@ -91,8 +91,8 @@ are quoted and there is no path between them.
 
 ### Warnings
 
-`/convert` and `/rates` add a `warnings` array when something degraded while
-the request was answered — and nothing at all when it did not, so a healthy
+`/convert`, `/rates` and `/currencies` add a `warnings` array when something
+degraded while the request was answered — and nothing at all when it did not, so a healthy
 response is exactly the one above:
 
 ```json
