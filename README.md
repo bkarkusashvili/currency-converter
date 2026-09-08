@@ -85,12 +85,17 @@ docker compose down      # npm run down — stop, keep the Redis and Mongo volum
 docker compose down -v   # npm run down:clean — stop and wipe them
 ```
 
-If a port is taken on your machine, copy [`.env.example`](.env.example) to
-`.env` and set `API_PORT`, `WEB_PORT`, `REDIS_PORT` or `MONGO_PORT`; everything
-that depends on them — the web app's `API_URL`, the API's `CORS_ORIGINS` —
-follows automatically. Those apply to Compose; the port `npm run dev` gives the
-API is `PORT` in `apps/api/.env`, and Vite picks the next free port after 5173
-on its own.
+If `3000` or `8080` is taken on your machine, copy
+[`.env.example`](.env.example) to `.env` and set `API_PORT` or `WEB_PORT`;
+everything that depends on them follows automatically — the web app's `API_URL`
+from `API_PORT`, the API's `CORS_ORIGINS` from `WEB_PORT`. Redis and MongoDB
+stay unpublished here, so `REDIS_PORT` and `MONGO_PORT` do nothing in this
+stack; they belong to the dev overlay below.
+
+Those apply to Compose. Under `npm run dev` the API's port is `PORT` in
+`apps/api/.env`, and Vite is pinned to 5173 (`strictPort`) — it refuses to
+start if the port is taken rather than moving to 5174, which would leave the
+dev server on an origin the API's CORS does not allow.
 
 ## Local development
 
