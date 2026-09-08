@@ -2,9 +2,9 @@ import i18next, { type i18n } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import en from './en.json';
 
-export const defaultNS = 'translation';
+const defaultNS = 'translation';
 
-export const resources = { en: { translation: en } } as const;
+const resources = { en: { translation: en } } as const;
 
 void i18next.use(initReactI18next).init({
   resources,

@@ -1,7 +1,7 @@
 import type { ApiError } from '../../../api/http/ApiError';
 import { extractFieldErrors, type FieldError } from '../../../api/http/fieldErrors';
 
-export const FORM_FIELDS = ['amount', 'from', 'to'] as const;
+const FORM_FIELDS = ['amount', 'from', 'to'] as const;
 
 export type FormField = (typeof FORM_FIELDS)[number];
 

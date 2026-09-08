@@ -1,6 +1,6 @@
 import type { ErrorEnvelope } from './errorEnvelope';
 
-export const NETWORK_ERROR_CODE = 'NETWORK_ERROR';
+const NETWORK_ERROR_CODE = 'NETWORK_ERROR';
 export const VALIDATION_ERROR_CODE = 'VALIDATION_ERROR';
 
 export class ApiError extends Error {
