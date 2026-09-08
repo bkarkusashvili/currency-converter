@@ -25,5 +25,10 @@
     "noFallthroughCasesInSwitch": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The suite is checked by tsconfig.test.json instead, which is the project
+  // that gets Node's types: the shared fixtures at the repository root are read
+  // with `fs`, and app code that could see `process` or `Buffer` would compile
+  // here and then fail in a browser.
+  "exclude": ["src/test", "src/**/__tests__", "src/**/*.test.ts", "src/**/*.test.tsx"]
 }

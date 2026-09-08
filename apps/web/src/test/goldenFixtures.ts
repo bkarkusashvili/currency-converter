@@ -1,5 +1,6 @@
-import goldenConversionsFixture from '../../../../fixtures/golden-conversions.json';
-import ratesSnapshotFixture from '../../../../fixtures/rates-snapshot.json';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ConversionStrategy, ExchangeRate, RatesSnapshotResponse } from '../api/types';
 
 /**
@@ -9,14 +10,12 @@ import type { ConversionStrategy, ExchangeRate, RatesSnapshotResponse } from '..
  * They used to be copied, and two of the five pairs had drifted: the offline
  * estimate's fixture said EUR/UAH was 51.47 while the API priced it at 51.7,
  * so the comment claiming "same input, same output" was not true and nothing
- * in CI could have noticed. The files are JSON and imported rather than read
- * with `fs` for one reason: `tsconfig.app.json` deliberately types this project
- * with `vite/client` alone, and pulling in Node's globals to call
- * `readFileSync` would let browser code reach for `process` and still compile.
- * The API side, which has no `resolveJsonModule` and a `rootDir`, reads them
- * with `fs` and zod instead. `npm run check:fixtures` validates both files for
- * both readers.
+ * in CI could have noticed. Read with `fs` rather than imported as JSON,
+ * because the web image builds from `apps/web` alone: an import would be a
+ * module the production build cannot resolve, while a path is only a string
+ * until a test runs. `npm run check:fixtures` validates both files.
  */
+const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../../fixtures');
 
 export interface GoldenConversion {
   from: string;
@@ -34,37 +33,70 @@ function fail(name: string, why: string): never {
   throw new Error(`fixtures/${name} is not usable: ${why}. Run \`npm run check:fixtures\`.`);
 }
 
+function readFixture(name: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));
+
+  if (typeof parsed !== 'object' || parsed === null) {
+    fail(name, 'it is not a JSON object');
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 /** The shared snapshot, in the shape `GET /rates` answers with. */
 export function goldenSnapshot(): RatesSnapshotResponse {
-  // Every published pair carries a spread or a mid rate; `check:fixtures` is
-  // what enforces that, and TypeScript reads it off the file here.
-  const rates: ExchangeRate[] = ratesSnapshotFixture.rates;
+  const { fetchedAt, rates } = readFixture('rates-snapshot.json');
+
+  if (typeof fetchedAt !== 'string' || !Array.isArray(rates) || rates.length === 0) {
+    fail('rates-snapshot.json', 'it has no fetchedAt or no published pairs');
+  }
 
   return {
     // The file is a snapshot, not a response; `source` is what a persisted copy
     // of one carries, and the estimate reads it back the same way.
     source: 'cache',
-    fetchedAt: ratesSnapshotFixture.fetchedAt,
-    rates,
+    fetchedAt,
+    rates: rates.map((rate: unknown): ExchangeRate => {
+      if (
+        !isRecord(rate) ||
+        typeof rate.base !== 'string' ||
+        typeof rate.quote !== 'string' ||
+        typeof rate.date !== 'string'
+      ) {
+        fail('rates-snapshot.json', 'a published pair is missing base, quote or date');
+      }
+
+      return rate as unknown as ExchangeRate;
+    }),
   };
 }
 
 /** Every conversion of that snapshot both implementations have to agree on. */
 export function goldenConversions(): GoldenConversion[] {
-  const { vectors } = goldenConversionsFixture;
+  const { vectors } = readFixture('golden-conversions.json');
 
-  if (vectors.length < 8) {
-    fail(
-      'golden-conversions.json',
-      `it carries ${String(vectors.length)} vectors, fewer than eight`,
-    );
+  if (!Array.isArray(vectors) || vectors.length < 8) {
+    fail('golden-conversions.json', 'it carries fewer than eight vectors');
   }
 
-  return vectors.map((vector) => {
-    if (!STRATEGIES.includes(vector.strategy)) {
-      fail('golden-conversions.json', `${vector.strategy} is not a strategy this client knows`);
+  return vectors.map((vector: unknown): GoldenConversion => {
+    if (
+      !isRecord(vector) ||
+      typeof vector.from !== 'string' ||
+      typeof vector.to !== 'string' ||
+      typeof vector.amount !== 'number' ||
+      typeof vector.rate !== 'number' ||
+      typeof vector.result !== 'number' ||
+      typeof vector.strategy !== 'string' ||
+      !STRATEGIES.includes(vector.strategy)
+    ) {
+      fail('golden-conversions.json', `a vector is incomplete: ${JSON.stringify(vector)}`);
     }
 
-    return vector as GoldenConversion;
+    return vector as unknown as GoldenConversion;
   });
 }

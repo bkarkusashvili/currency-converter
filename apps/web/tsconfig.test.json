@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    // Everything the app is checked with, plus Node: the suite runs there, and
+    // `src/test/goldenFixtures.ts` reads the fixtures the API's e2e suite also
+    // reads straight off disk. Keeping this to the test project is what stops
+    // a component from reaching for `process` and still compiling.
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src"],
+  "exclude": []
+}
