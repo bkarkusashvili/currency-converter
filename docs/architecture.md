@@ -656,6 +656,10 @@ apps/api
 │   ├── app.module.ts
 │   ├── config/                  zod schema, typed AppConfig, ConfigModule setup
 │   ├── common/
+│   │   ├── http/                the paths the process serves: the api prefix, the two probe routes, the docs —
+│   │   │                        read by configure-http, setup-swagger and the request log level alike
+│   │   ├── conversion/          ConversionStrategyName and the OpenAPI option objects a conversion response
+│   │   │                        and a stored record of one publish identically
 │   │   ├── warnings/            ResponseWarning, its DTO and collectWarnings — the §3 codes
 │   │   ├── currency/            CurrencyCode, Currency and the ISO 4217 table, read by the
 │   │   │                        Monobank mapper and the currencies projection alike
@@ -720,16 +724,36 @@ apps/api
     └── jest-e2e.json
 ```
 
-The dependencies between the feature modules run one way: `currencies` and
-`conversion` read the snapshot through `rates`, `conversion` records through
-`history`, and `health` takes the breaker from the rates module's exports.
-Nothing points back. The two edges that did are gone: the ISO 4217 table the
-Monobank mapper needs is shared vocabulary in `common/currency/` rather than the
-currencies module's, and `HistoryService.record` takes the port's own
-`NewConversionRecord` rather than the conversion module's `ConversionResult`,
-which is structurally the same thing. What a record still borrows from the
-conversion module is `ConversionStrategyName`, which is the price of a record
-that mirrors a conversion.
+The dependencies between the feature modules run one way, and these are all of
+them:
+
+| Edge | What crosses it |
+| ---- | --------------- |
+| `conversion → rates` | `RatesModule` and `RatesService` for the snapshot, `ExchangeRate` and `BASE_CURRENCY` for the strategies, `RatesSource` on the result |
+| `conversion → history` | `HistoryModule` and `HistoryService.record`, the side effect of a conversion (§2) |
+| `currencies → rates` | `RatesModule` and `RatesService` for the snapshot, `ExchangeRate` and `BASE_CURRENCY` for the projection |
+| `health → rates` | `MONOBANK_CIRCUIT_BREAKER`, taken from that module's exports rather than from its infrastructure folder |
+| `history → rates` | `RatesSource`, because a record carries the provenance the conversion was answered with (§3) |
+
+Every one of them points at `rates`, or from `conversion` at `history`, and
+`rates` imports from no other feature module: the graph has no cycle, which is
+what makes "one way" a fact rather than an intention. `apps/api` has no test
+that enforces it; a grep of the relative imports under `modules/` is what
+reproduces the table.
+
+What is shared by more than one of them is vocabulary, and vocabulary lives in
+`common/`: the ISO 4217 table and `CurrencyCode` the Monobank mapper and the
+currencies projection both read, `ConversionStrategyName`, which a record names
+as well as a conversion, and the `@ApiProperty` option objects the convert
+response and the record DTO publish their eight common fields with. Nothing
+under `common/` imports from `modules/`, which is what keeps that a one-way
+street too — the `docs` and probe paths moved there for the same reason, so
+`setup-swagger.ts` and `resolve-log-level.ts` no longer reach back into the
+application root for them.
+
+`ConversionRecordDto` declares its own properties rather than inheriting the
+convert response's: a DTO of one module extending another's is an edge like any
+other, and it was one this table could not have named.
 
 Unit tests are not in that tree: each one lives in a `__tests__` folder beside
 the code it covers, so `src/common/filters/global-exception.filter.ts` is tested

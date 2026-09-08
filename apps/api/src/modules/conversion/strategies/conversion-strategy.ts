@@ -1,7 +1,7 @@
 import type Big from 'big.js';
 import { CurrencyCode } from '../../../common/currency/currency-code';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
-import { ConversionStrategyName } from './conversion-strategy-name';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
 
 // One way of pricing a pair: the `to`-per-`from` rate for the pairs it can
 // price from the snapshot it is handed, and `undefined` for the ones it cannot.

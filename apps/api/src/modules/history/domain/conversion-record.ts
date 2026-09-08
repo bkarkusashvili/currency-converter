@@ -1,5 +1,5 @@
 import { CurrencyCode } from '../../../common/currency/currency-code';
-import { ConversionStrategyName } from '../../conversion/strategies/conversion-strategy-name';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
 import { RatesSource } from '../../rates/domain/rates-source';
 
 // A conversion as the API answered it. The provenance travels with the numbers:

@@ -1,14 +1,15 @@
 import { INestApplication } from '@nestjs/common';
 import type { Application } from 'express';
 import helmet from 'helmet';
+import {
+  DOCS_JSON_PATH,
+  DOCS_PATH,
+  GLOBAL_PREFIX,
+  HEALTH_LIVE_PATH,
+  HEALTH_PATH,
+} from './common/http/paths';
 import { requestIdMiddleware } from './common/logging/request-id.middleware';
 import type { TypedConfigService } from './config/typed-config.service';
-
-export const GLOBAL_PREFIX = 'api/v1';
-export const HEALTH_PATH = 'health';
-export const HEALTH_LIVE_PATH = 'health/live';
-export const DOCS_PATH = 'docs';
-export const DOCS_JSON_PATH = 'docs-json';
 
 // Shared by main.ts and the e2e suite so both exercise the same HTTP surface
 // and the routing contract cannot drift between them.

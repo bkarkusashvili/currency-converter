@@ -1,6 +1,6 @@
 import { ResponseWarning } from '../../../common/warnings/response-warning';
 import { RatesSource } from '../../rates/domain/rates-source';
-import { ConversionStrategyName } from '../strategies/conversion-strategy-name';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
 import { ConversionRequest } from './conversion-request';
 
 // A whole conversion: the request it answered, the numbers it produced, and the

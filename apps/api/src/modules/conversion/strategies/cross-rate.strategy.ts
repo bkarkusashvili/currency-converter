@@ -4,7 +4,7 @@ import { CurrencyCode } from '../../../common/currency/currency-code';
 import { BASE_CURRENCY } from '../../rates/domain/base-currency';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
 import { ConversionStrategy } from './conversion-strategy';
-import { ConversionStrategyName } from './conversion-strategy-name';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
 import { directionalRate } from './directional-rate';
 
 // Two legs through the currency every published pair has in common, which for

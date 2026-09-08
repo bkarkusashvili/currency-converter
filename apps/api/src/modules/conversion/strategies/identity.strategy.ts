@@ -3,7 +3,7 @@ import type Big from 'big.js';
 import { Money } from '../../../common/money/money';
 import { CurrencyCode } from '../../../common/currency/currency-code';
 import { ConversionStrategy } from './conversion-strategy';
-import { ConversionStrategyName } from './conversion-strategy-name';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
 
 // A currency converted to itself is worth itself. It is first in the chain
 // rather than an early return in the service because the snapshot does hold a

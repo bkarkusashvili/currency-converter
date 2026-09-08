@@ -6,7 +6,7 @@ import { AppModule } from '../../src/app.module';
 import { API_KEY_HEADER } from '../../src/common/guards/api-key.constant';
 import { ADMIN_SECURITY_SCHEME } from '../../src/common/swagger/build-swagger-config';
 import { WARNING_CODES } from '../../src/common/warnings/response-warning';
-import { CONVERSION_STRATEGY_NAMES } from '../../src/modules/conversion/strategies/conversion-strategy-name';
+import { CONVERSION_STRATEGY_NAMES } from '../../src/common/conversion/conversion-strategy-name';
 import { RATES_SOURCES } from '../../src/modules/rates/domain/rates-source';
 import { createE2eApp } from './create-e2e-app';
 
@@ -221,31 +221,36 @@ describe('OpenAPI document (e2e)', () => {
         strategy: { type: 'string', enum: [...CONVERSION_STRATEGY_NAMES] },
         source: { type: 'string', enum: [...RATES_SOURCES] },
       },
-      required: expect.arrayContaining([
-        'id',
-        'from',
-        'to',
-        'amount',
-        'result',
-        'rate',
-        'strategy',
-        'source',
-        'ratesTimestamp',
-        'createdAt',
-      ]) as string[],
     });
   });
 
-  // The record is the conversion that was answered, not the request that
-  // produced it: what degraded while it ran is not part of what was converted,
-  // and the store has never had a column for it.
-  it('describes a record without the warnings of the response it mirrors', () => {
+  // The exact set, not a subset: the record is the conversion that was answered
+  // plus the two fields the store owns, and it declares those ten properties
+  // itself rather than inheriting them. A field that stops being published, or
+  // one that arrives from somewhere, fails here either way — `warnings` in
+  // particular, which is a fact about a request rather than about what was
+  // converted and which the store has never had a column for.
+  it('publishes exactly the ten fields of a stored conversion', () => {
     const record = document.components?.schemas?.ConversionRecordDto as {
       properties: Record<string, unknown>;
+      required: string[];
     };
 
-    expect(record.properties).not.toHaveProperty('warnings');
-    expect(record.properties).toHaveProperty('ratesTimestamp');
+    expect([...record.required].sort()).toStrictEqual([
+      'amount',
+      'createdAt',
+      'from',
+      'id',
+      'rate',
+      'ratesTimestamp',
+      'result',
+      'source',
+      'strategy',
+      'to',
+    ]);
+    expect(Object.keys(record.properties).sort()).toStrictEqual(
+      [...record.required].sort(),
+    );
   });
 
   it('puts the cache invalidation behind the admin key scheme', () => {

@@ -3,7 +3,7 @@ import type Big from 'big.js';
 import { CurrencyCode } from '../../../common/currency/currency-code';
 import { ExchangeRate } from '../../rates/domain/exchange-rate';
 import { ConversionStrategy } from './conversion-strategy';
-import { ConversionStrategyName } from './conversion-strategy-name';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
 import { directionalRate } from './directional-rate';
 
 // One pair, either way round: USD/UAH prices both USD → UAH and UAH → USD, and
