@@ -57,3 +57,38 @@ jobs:
       # longer builds has to fail here rather than at deploy time.
       - name: Docker image
         run: docker build -t currency-api:ci .
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # The image is a deliverable of this package, so a Dockerfile that no
+      # longer builds has to fail here rather than at deploy time.
+      - name: Docker image
+        run: docker build -t currency-web:ci .
