@@ -25,12 +25,13 @@ npm run test:coverage  # vitest with coverage thresholds (90%)
 src/
 ├── api/
 │   ├── http/           fetch client, ApiError and envelope mapping
-│   ├── repositories/   one interface per resource + HTTP implementations, React context
+│   ├── repositories/   repositories.ts (one interface per resource + the aggregate),
+│   │                   createHttpRepositories.ts, React context, provider and hook
 │   └── hooks/          useConvert, useCurrencies, useHistory, useHealth
 ├── components/         shell and cross-feature presentation
 ├── features/
 │   ├── about/          components/, __tests__/
-│   └── converter/      components/, hooks/, lib/, __tests__/
+│   └── converter/      components/, hooks/, lib/ (with lib/amount/), __tests__/
 ├── i18n/               en.json, i18next setup, key typings
 ├── lib/                formatters and external links
 └── test/               setup, render helper, in-memory repository fakes
@@ -43,8 +44,8 @@ network.
 
 ## The amount field
 
-`features/converter/lib/formatAmountInput.ts` is the one rule for what the
-field may hold. Every edit — a keystroke, a paste, a drop — goes through it:
+`features/converter/lib/amount/formatAmountInput.ts` is the one rule for what
+the field may hold. Every edit — a keystroke, a paste, a drop — goes through it:
 anything that is not a digit or the active locale's decimal separator is
 dropped, the integer part is capped at the width of the API's maximum, at most
 two decimals survive, thousands are grouped with the separator `Intl` reports
@@ -57,8 +58,8 @@ It decides what may be _typed_, not what an amount _means_: `parseAmount` is
 still the single rule for that, and it is what answers `Amount must be
 1,000,000,000,000 or less.`
 
-The two do not read the same string, so `lib/canonicalAmount.ts` stands between
-them: it drops the group mark, normalises the decimal mark to `.` and drops a
+The two do not read the same string, so `canonicalAmount` — in the same file,
+because it exists to read that file's own output back — stands between them: it drops the group mark, normalises the decimal mark to `.` and drops a
 decimal mark with nothing behind it, and the form parses that. It is what keeps
 `12.` submitted with Enter — which never blurs — from being read as no number
 at all, and what stops the `1.234` the field writes for 1234 in a

@@ -183,9 +183,30 @@ log that names the load balancer.
 | `npm test` | Unit tests |
 | `npm run test:cov` | Unit tests with the 85% line and branch gate |
 | `npm run test:e2e` | End-to-end tests over the real HTTP surface |
+| `npm run test:integration` | The Redis and Mongo adapters against real servers; skipped unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set |
+| `npm run openapi:write` | Regenerates `docs/openapi.json` from the decorators |
 
 Unit tests live in a `__tests__` folder beside the code they cover; the
 end-to-end suites live in `test/e2e` and boot the app the way `main.ts` does.
+
+`test/integration` is the only place anything reaches a real Redis or MongoDB.
+Every other test of those two adapters runs against a hand-written fake, which
+can only confirm the assumption its author had about the driver; these check the
+TTLs both cache keys are actually written with, the index Mongo actually holds
+and the order a page actually comes back in. Point them at a running pair:
+
+```bash
+npm run infra:up   # from the repository root
+INTEGRATION_REDIS_URL=redis://127.0.0.1:6379 \
+INTEGRATION_MONGO_URL=mongodb://127.0.0.1:27017/currency_converter_integration \
+  npm run test:integration
+```
+
+`docs/openapi.json` at the repository root is the published contract, committed
+so a change to it shows up in a diff. `test/e2e/openapi-contract.e2e-spec.ts`
+regenerates it from the application's own decorators and fails when the two
+differ, naming `openapi:write` as the fix; the web app validates its own
+response fixtures against those schemas.
 
 The coverage report is the **unit** suites only, and the 85% gate is on those
 numbers. `npm run test:e2e` runs without instrumentation, so what only it
