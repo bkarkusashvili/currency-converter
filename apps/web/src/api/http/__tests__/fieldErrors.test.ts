@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError, extractFieldErrors } from './errors';
+import { ApiError } from '../ApiError';
+import { extractFieldErrors } from '../fieldErrors';
 
 function validationError(details: Record<string, unknown>): ApiError {
   return new ApiError({
@@ -47,5 +48,6 @@ describe('extractFieldErrors', () => {
     expect(extractFieldErrors(otherCode)).toEqual([]);
     expect(extractFieldErrors(validationError({ errors: 'nope' }))).toEqual([]);
     expect(extractFieldErrors(validationError({ errors: [{ field: 'amount' }] }))).toEqual([]);
+    expect(extractFieldErrors(validationError({ errors: [null, 42] }))).toEqual([]);
   });
 });

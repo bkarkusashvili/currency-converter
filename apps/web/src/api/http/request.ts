@@ -1,7 +1,9 @@
-import { getApiUrl } from '../config';
-import { ApiError, parseErrorEnvelope } from './errors';
+import { ApiError } from './ApiError';
+import { apiUrl } from './apiUrl';
+import { parseErrorEnvelope } from './errorEnvelope';
+import { readJson } from './readJson';
 
-interface RequestOptions {
+export interface RequestOptions {
   method?: 'GET' | 'POST';
   body?: unknown;
   signal?: AbortSignal;
@@ -9,9 +11,10 @@ interface RequestOptions {
 
 const JSON_HEADERS = { Accept: 'application/json' };
 
+/** Every non-2xx answer carries the error envelope, so it becomes an ApiError. */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, signal } = options;
-  const url = `${getApiUrl()}${path}`;
+  const url = apiUrl(path);
 
   let response: Response;
   try {
@@ -29,17 +32,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const payload = await readJson(response);
 
   if (!response.ok) {
-    throw new ApiError(parseErrorEnvelope(payload, response.status));
+    throw new ApiError(parseErrorEnvelope(payload.ok ? payload.body : undefined, response.status));
   }
 
   // The API contract in docs/architecture.md §3 is the schema; successful payloads are not re-validated here.
-  return payload as T;
-}
-
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return undefined;
-  }
+  return (payload.ok ? payload.body : undefined) as T;
 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from './errors';
-import { request } from './http';
+import { ApiError } from '../ApiError';
+import { request } from '../request';
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -81,14 +81,17 @@ describe('request', () => {
     });
   });
 
-  it('reports a network failure as NETWORK_ERROR', async () => {
+  it('reports a network failure as NETWORK_ERROR carrying the URL', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
     const error = await request('/api/v1/currencies').catch((thrown: unknown) => thrown);
 
     expect(error).toBeInstanceOf(ApiError);
-    expect(error).toMatchObject({ statusCode: 0, code: 'NETWORK_ERROR' });
-    expect((error as ApiError).message).toContain('https://api.test');
+    expect(error).toMatchObject({
+      statusCode: 0,
+      code: 'NETWORK_ERROR',
+      details: { url: 'https://api.test/api/v1/currencies' },
+    });
   });
 
   it('uses the fallback API URL when none is configured', async () => {
