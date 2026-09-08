@@ -19,7 +19,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "test:integration": "jest --config ./test/jest-integration.json"
+    "test:integration": "jest --config ./test/jest-integration.json",
+    "openapi:write": "ts-node --project tsconfig.json test/write-openapi.ts"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",

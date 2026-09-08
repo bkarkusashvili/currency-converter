@@ -1,0 +1,1134 @@
+{
+  "components": {
+    "schemas": {
+      "ConversionRecordDto": {
+        "properties": {
+          "amount": {
+            "description": "The amount that was converted, as it was sent.",
+            "example": 100,
+            "type": "number"
+          },
+          "createdAt": {
+            "description": "When the conversion was recorded, ISO 8601. Read with `ratesTimestamp` it is how old the quote was when it was used.",
+            "example": "2026-09-08T12:00:05.000Z",
+            "type": "string"
+          },
+          "from": {
+            "description": "The code that was converted from, upper-cased.",
+            "example": "EUR",
+            "type": "string"
+          },
+          "id": {
+            "description": "Identifier of the stored record.",
+            "example": "6f0000000000000000000001",
+            "type": "string"
+          },
+          "rate": {
+            "description": "The effective `to` per `from` rate the conversion used, rounded half-up to six decimals.",
+            "example": 0.847312,
+            "type": "number"
+          },
+          "ratesTimestamp": {
+            "description": "When the upstream fetch that produced these rates ran, ISO 8601. Read it with `source`: it is how old the quote behind this result is.",
+            "example": "2026-09-08T12:00:00.000Z",
+            "type": "string"
+          },
+          "result": {
+            "description": "The converted amount, rounded half-up to two decimals. Computed from the unrounded rate, so it is the amount the rate below explains rather than the one six decimals of it would reproduce. An amount worth less than half a minor unit of `to` rounds to `0` — 0.01 UAH is 0.000223 USD — which is an answer rather than an error, and `rate` is what explains it.",
+            "example": 84.73,
+            "type": "number"
+          },
+          "source": {
+            "description": "Where the rates came from. `stale-cache` means the upstream could not be reached and the fallback copy priced this conversion, so the rate is older than the cache TTL — which is what explains a stored rate that does not match the ones published around it.",
+            "enum": [
+              "cache",
+              "provider",
+              "stale-cache"
+            ],
+            "example": "cache",
+            "type": "string"
+          },
+          "strategy": {
+            "description": "How the rate was arrived at. `direct` is a pair the upstream publishes; `cross` composes two of them through the hryvnia and so pays a spread twice; `identity` is a currency converted to itself.",
+            "enum": [
+              "identity",
+              "direct",
+              "cross"
+            ],
+            "example": "cross",
+            "type": "string"
+          },
+          "to": {
+            "description": "The code that was converted to, upper-cased.",
+            "example": "GBP",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "from",
+          "to",
+          "amount",
+          "result",
+          "rate",
+          "strategy",
+          "source",
+          "ratesTimestamp",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "ConvertRequestDto": {
+        "properties": {
+          "amount": {
+            "description": "How much of `from` to convert. A JSON number, not a string: the API does not coerce, so \"100\" is a validation error rather than a silent reinterpretation of what was sent.",
+            "example": 100,
+            "exclusiveMinimum": true,
+            "maximum": 1000000000000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "from": {
+            "description": "ISO 4217 alpha-3 code to convert from. Case-insensitive; the response echoes it upper-cased.",
+            "example": "EUR",
+            "maxLength": 3,
+            "minLength": 3,
+            "pattern": "^[A-Za-z]{3}$",
+            "type": "string"
+          },
+          "to": {
+            "description": "ISO 4217 alpha-3 code to convert to, on the same terms.",
+            "example": "GBP",
+            "maxLength": 3,
+            "minLength": 3,
+            "pattern": "^[A-Za-z]{3}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "amount"
+        ],
+        "type": "object"
+      },
+      "ConvertResponseDto": {
+        "properties": {
+          "amount": {
+            "description": "The amount that was converted, as it was sent.",
+            "example": 100,
+            "type": "number"
+          },
+          "from": {
+            "description": "The code that was converted from, upper-cased.",
+            "example": "EUR",
+            "type": "string"
+          },
+          "rate": {
+            "description": "The effective `to` per `from` rate the conversion used, rounded half-up to six decimals.",
+            "example": 0.847312,
+            "type": "number"
+          },
+          "ratesTimestamp": {
+            "description": "When the upstream fetch that produced these rates ran, ISO 8601. Read it with `source`: it is how old the quote behind this result is.",
+            "example": "2026-09-08T12:00:00.000Z",
+            "type": "string"
+          },
+          "result": {
+            "description": "The converted amount, rounded half-up to two decimals. Computed from the unrounded rate, so it is the amount the rate below explains rather than the one six decimals of it would reproduce. An amount worth less than half a minor unit of `to` rounds to `0` — 0.01 UAH is 0.000223 USD — which is an answer rather than an error, and `rate` is what explains it.",
+            "example": 84.73,
+            "type": "number"
+          },
+          "source": {
+            "description": "Where the rates came from. `stale-cache` means the upstream could not be reached and the fallback copy priced this conversion, so the rate is older than the cache TTL.",
+            "enum": [
+              "cache",
+              "provider",
+              "stale-cache"
+            ],
+            "example": "cache",
+            "type": "string"
+          },
+          "strategy": {
+            "description": "How the rate was arrived at. `direct` is a pair the upstream publishes; `cross` composes two of them through the hryvnia and so pays a spread twice; `identity` is a currency converted to itself.",
+            "enum": [
+              "identity",
+              "direct",
+              "cross"
+            ],
+            "example": "cross",
+            "type": "string"
+          },
+          "to": {
+            "description": "The code that was converted to, upper-cased.",
+            "example": "GBP",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "What degraded while this request was answered. Absent when nothing did: the request succeeded either way, and this is what the client should know about how the answer was produced.",
+            "example": [
+              {
+                "code": "CACHE_UNAVAILABLE",
+                "message": "The rates cache could not be reached during this request, so it was not used; `source` says where the rates came from."
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ResponseWarningDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "amount",
+          "result",
+          "rate",
+          "strategy",
+          "source",
+          "ratesTimestamp"
+        ],
+        "type": "object"
+      },
+      "CurrenciesResponseDto": {
+        "properties": {
+          "currencies": {
+            "description": "Every currency the current snapshot can quote, sorted by code. The list follows the upstream: a pair it stops publishing leaves it.",
+            "example": [
+              {
+                "code": "EUR",
+                "name": "Euro",
+                "numericCode": 978
+              },
+              {
+                "code": "UAH",
+                "name": "Hryvnia",
+                "numericCode": 980
+              },
+              {
+                "code": "USD",
+                "name": "US Dollar",
+                "numericCode": 840
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CurrencyDto"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "description": "What degraded while this request was answered. Absent when nothing did. The list is a projection of the same snapshot /rates serves, so it is reached the same way and costs the same when the cache is down.",
+            "example": [
+              {
+                "code": "CACHE_UNAVAILABLE",
+                "message": "The rates cache could not be reached during this request, so it was not used; `source` says where the rates came from."
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ResponseWarningDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "currencies"
+        ],
+        "type": "object"
+      },
+      "CurrencyDto": {
+        "properties": {
+          "code": {
+            "description": "ISO 4217 alpha-3 code, the form every other endpoint takes.",
+            "example": "EUR",
+            "type": "string"
+          },
+          "name": {
+            "description": "English name from the ISO 4217 table.",
+            "example": "Euro",
+            "type": "string"
+          },
+          "numericCode": {
+            "description": "ISO 4217 numeric code, for a client that stores currencies numerically.",
+            "example": 978,
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "numericCode",
+          "name"
+        ],
+        "type": "object"
+      },
+      "ErrorResponseDto": {
+        "properties": {
+          "code": {
+            "description": "Stable machine readable cause. One of the documented ErrorCodes; an unmapped 4xx is named after the failure instead.",
+            "example": "UNSUPPORTED_CURRENCY",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "description": "Structured context for the failure. Validation failures carry details.errors, a list of field and messages pairs.",
+            "example": {
+              "currency": "XYZ"
+            },
+            "type": "object"
+          },
+          "message": {
+            "description": "Human readable summary. Generic for a 5xx, where the detail stays in the log.",
+            "example": "Currency 'XYZ' is not supported",
+            "type": "string"
+          },
+          "path": {
+            "description": "The path that was requested.",
+            "example": "/api/v1/convert",
+            "type": "string"
+          },
+          "requestId": {
+            "description": "Echoed in the x-request-id header and on every log line for the request, so a report can be traced to its logs.",
+            "example": "8b5a2f0e-1f2c-4a35-9f0c-2f4d8b6e7a91",
+            "type": "string"
+          },
+          "statusCode": {
+            "description": "The HTTP status of the response, repeated in the body.",
+            "example": 422,
+            "type": "number"
+          },
+          "timestamp": {
+            "description": "When the response was produced, ISO 8601.",
+            "example": "2026-09-08T12:00:00.000Z",
+            "type": "string"
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "timestamp",
+          "path"
+        ],
+        "type": "object"
+      },
+      "ExchangeRateDto": {
+        "properties": {
+          "base": {
+            "description": "ISO 4217 alpha-3 code of the currency being priced.",
+            "example": "USD",
+            "type": "string"
+          },
+          "buy": {
+            "description": "What the bank pays in `quote` for one unit of `base`.",
+            "example": 44.35,
+            "type": "number"
+          },
+          "cross": {
+            "description": "Mid rate, published instead of a buy and sell pair for the currencies the bank quotes without a spread.",
+            "example": 60.7562,
+            "type": "number"
+          },
+          "date": {
+            "description": "When the upstream quoted this rate, ISO 8601. Older than `fetchedAt`: it is the age of the price, not of the request that read it.",
+            "example": "2026-09-08T11:00:00.000Z",
+            "type": "string"
+          },
+          "quote": {
+            "description": "ISO 4217 alpha-3 code the price is expressed in.",
+            "example": "UAH",
+            "type": "string"
+          },
+          "sell": {
+            "description": "What the bank charges in `quote` for one unit of `base`.",
+            "example": 44.831,
+            "type": "number"
+          }
+        },
+        "required": [
+          "base",
+          "quote",
+          "date"
+        ],
+        "type": "object"
+      },
+      "HistoryResponseDto": {
+        "properties": {
+          "items": {
+            "description": "The most recent conversions, newest first. Empty when nothing has been converted yet — an unreachable store answers 503 instead, so an empty page always means what it says.",
+            "items": {
+              "$ref": "#/components/schemas/ConversionRecordDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "RatesSnapshotResponseDto": {
+        "properties": {
+          "fetchedAt": {
+            "description": "When the upstream fetch that produced these rates ran, ISO 8601.",
+            "example": "2026-09-08T12:00:00.000Z",
+            "type": "string"
+          },
+          "rates": {
+            "description": "Every pair the upstream published that this API can quote.",
+            "example": [
+              {
+                "base": "USD",
+                "buy": 44.35,
+                "date": "2026-09-08T11:00:00.000Z",
+                "quote": "UAH",
+                "sell": 44.831
+              },
+              {
+                "base": "BTC",
+                "cross": 60.7562,
+                "date": "2026-09-08T11:00:00.000Z",
+                "quote": "USD"
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ExchangeRateDto"
+            },
+            "type": "array"
+          },
+          "source": {
+            "description": "Where this snapshot came from. `stale-cache` means the upstream could not be reached and the fallback copy was served instead, so the rates are older than the cache TTL.",
+            "enum": [
+              "cache",
+              "provider",
+              "stale-cache"
+            ],
+            "example": "cache",
+            "type": "string"
+          },
+          "warnings": {
+            "description": "What degraded while this request was answered. Absent when nothing did: the request succeeded either way, and this is what the client should know about how the answer was produced.",
+            "example": [
+              {
+                "code": "CACHE_UNAVAILABLE",
+                "message": "The rates cache could not be reached during this request, so it was not used; `source` says where the rates came from."
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ResponseWarningDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "source",
+          "fetchedAt",
+          "rates"
+        ],
+        "type": "object"
+      },
+      "ResponseWarningDto": {
+        "properties": {
+          "code": {
+            "description": "What degraded. `CACHE_UNAVAILABLE` means the rates cache could not be reached while the request was answered, so it was neither read nor written — read `source` for where the rates came from; `HISTORY_NOT_RECORDED` means the conversion was answered but not stored, so it will not appear in `/history`.",
+            "enum": [
+              "CACHE_UNAVAILABLE",
+              "HISTORY_NOT_RECORDED"
+            ],
+            "example": "CACHE_UNAVAILABLE",
+            "type": "string"
+          },
+          "message": {
+            "description": "The degradation in a sentence, safe to show to a user.",
+            "example": "The rates cache could not be reached during this request, so it was not used; `source` says where the rates came from.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "admin": {
+        "in": "header",
+        "name": "x-api-key",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "contact": {},
+    "description": "Currency converter REST API built on the Monobank public exchange-rate API.",
+    "title": "currency-converter-api",
+    "version": "0.1.0"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/convert": {
+      "post": {
+        "description": "Prices the pair from the snapshot the API is currently serving, reporting which strategy priced it and how old the rates are. The body is not coerced: `amount` must be a JSON number.",
+        "operationId": "ConversionController_convert",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConvertRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvertResponseDto"
+                }
+              }
+            },
+            "description": "The converted amount, the effective rate, and the provenance of the rates it used. A `source` of `stale-cache` is a degraded answer priced from the fallback copy, not a fresh one; a `warnings` entry says what could not be reached while the conversion was answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The request failed validation."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The request is well formed but cannot be satisfied with the current rates."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The rate limit for this client is spent."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "An unexpected failure. The message is generic by design."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "A dependency the request needs is unavailable."
+          }
+        },
+        "summary": "Convert an amount between two currencies",
+        "tags": [
+          "conversion"
+        ]
+      }
+    },
+    "/api/v1/currencies": {
+      "get": {
+        "operationId": "CurrenciesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrenciesResponseDto"
+                }
+              }
+            },
+            "description": "The currencies of the current snapshot, sorted by code. Derived from the same snapshot a conversion uses, so a code listed here is a code the API can quote right now — and a `warnings` entry says what could not be reached while that snapshot was read."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The rate limit for this client is spent."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "An unexpected failure. The message is generic by design."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "A dependency the request needs is unavailable."
+          }
+        },
+        "summary": "List the currencies the current snapshot can convert between",
+        "tags": [
+          "currencies"
+        ]
+      }
+    },
+    "/api/v1/history": {
+      "get": {
+        "description": "Newest first. Each entry carries the rate and the provenance the conversion was answered with, so a result can be reconciled against rates that have moved since.",
+        "operationId": "HistoryController_list",
+        "parameters": [
+          {
+            "description": "How many of the most recent conversions to return. The upper bound is the page, not the retention: older records exist until they expire.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "example": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryResponseDto"
+                }
+              }
+            },
+            "description": "The most recent conversions, newest first."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The request failed validation."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The rate limit for this client is spent."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "An unexpected failure. The message is generic by design."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "A dependency the request needs is unavailable."
+          }
+        },
+        "summary": "List the most recent conversions the API answered",
+        "tags": [
+          "history"
+        ]
+      }
+    },
+    "/api/v1/rates": {
+      "get": {
+        "operationId": "RatesController_getRates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatesSnapshotResponseDto"
+                }
+              }
+            },
+            "description": "The current snapshot, with the source it was served from. A 200 with `stale-cache` is a degraded answer, not a fresh one, and a `warnings` entry says what could not be reached while it was produced."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The rate limit for this client is spent."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "An unexpected failure. The message is generic by design."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "A dependency the request needs is unavailable."
+          }
+        },
+        "summary": "Return the exchange rate snapshot the API converts with",
+        "tags": [
+          "rates"
+        ]
+      }
+    },
+    "/api/v1/rates/cache": {
+      "delete": {
+        "operationId": "RatesController_invalidate",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Both the fresh and the fallback key are gone. Answered even when they were already absent: the request states the wanted end state. A cache that could not be reached answers `503 CACHE_UNAVAILABLE` instead, because the keys are still there."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The admin API key is missing or wrong."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The rate limit for this client is spent."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "An unexpected failure. The message is generic by design."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "A dependency the request needs is unavailable."
+          }
+        },
+        "security": [
+          {
+            "admin": []
+          }
+        ],
+        "summary": "Drop both cache keys so the next read refetches from the upstream",
+        "tags": [
+          "rates"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "details": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "error": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {},
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "info": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "status": {
+                      "example": "ok",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Every registered indicator reports the service as up.\n\nThe Health Check is successful"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "details": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        },
+                        "redis": {
+                          "message": "Could not connect",
+                          "status": "down"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "error": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "redis": {
+                          "message": "Could not connect",
+                          "status": "down"
+                        }
+                      },
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "info": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "status": {
+                      "example": "error",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "At least one indicator is down. This route answers with the Terminus report rather than the error envelope, so which dependency failed stays visible.\n\nThe Health Check is not successful"
+          }
+        },
+        "summary": "Report whether the service and its dependencies are healthy",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "description": "The liveness probe: it runs no indicator, so it answers 200 whenever the process can serve a request. Deploy gates and container health checks use this one; `/health` is the dependency report for monitoring.",
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "details": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "error": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {},
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "info": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "status": {
+                      "example": "ok",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The process is up and serving.\n\nThe Health Check is successful"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "details": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        },
+                        "redis": {
+                          "message": "Could not connect",
+                          "status": "down"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "error": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "redis": {
+                          "message": "Could not connect",
+                          "status": "down"
+                        }
+                      },
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "info": {
+                      "additionalProperties": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ],
+                        "type": "object"
+                      },
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "nullable": true,
+                      "type": "object"
+                    },
+                    "status": {
+                      "example": "error",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The Health Check is not successful"
+          }
+        },
+        "summary": "Report whether the process is up, regardless of its dependencies",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "servers": [],
+  "tags": []
+}
