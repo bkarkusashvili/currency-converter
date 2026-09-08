@@ -108,7 +108,7 @@
     "status": {
       "title": "Where it stands",
       "items": [
-        "The API foundation — typed configuration, pino request logging, the shared error envelope, the health endpoint, its Docker image and CI — is merging now.",
+        "The API foundation — typed configuration, pino request logging, the shared error envelope, the health endpoint, its Docker image and CI — has merged.",
         "The rates, conversion and history modules follow in subsequent pull requests, and the Docker Compose file that runs api, web, Redis and Mongo together lands with them.",
         "This client is complete and is built against the API contract in docs/architecture.md, not against a running service. Until the conversion module merges, converting against a local API returns a 404 through the same error envelope.",
         "Everything below describes the design the code implements as those modules land."
@@ -119,7 +119,7 @@
       "points": [
         {
           "term": "A NestJS API",
-          "description": "REST endpoints under /api/v1 for convert, rates, currencies and history, documented with Swagger at /docs, plus a terminus health endpoint reporting Redis, MongoDB and the Monobank circuit breaker."
+          "description": "REST endpoints under /api/v1 for convert, rates, currencies and history, documented with Swagger at /docs, plus a terminus health endpoint that reports the Redis, MongoDB and Monobank indicators as those modules land — today it answers with an empty report, and this page renders whatever indicators it carries."
         },
         {
           "term": "Ports and adapters",
@@ -147,7 +147,7 @@
         },
         {
           "term": "Operations",
-          "description": "pino request logging with a request id, environment validated by a zod schema at boot, a multi-stage Docker image per app, and GitHub Actions running lint, typecheck, formatting, tests with coverage thresholds, and build."
+          "description": "pino request logging with a request id, environment validated by a zod schema at boot, a multi-stage Docker image per app, and GitHub Actions running lint, formatting, typecheck, tests with coverage thresholds, build and the image build — one job per app, both gated the same way."
         },
         {
           "term": "This client",
