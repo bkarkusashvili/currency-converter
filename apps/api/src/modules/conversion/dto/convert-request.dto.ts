@@ -1,16 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import {
-  IsNumber,
-  IsPositive,
-  IsString,
-  Length,
-  Matches,
-  Max,
-} from 'class-validator';
+import { IsNumber, IsPositive, IsString, Matches, Max } from 'class-validator';
 import { toUpperCase } from '../../../common/validation/to-upper-case';
 import { ConversionRequest } from '../domain/conversion-request';
 
+// The whole rule for a code, and the only one: a length check beside it would
+// report one mistake twice in `details.errors[].messages`, since a code of the
+// wrong length is already a code that does not match. The `minLength` and
+// `maxLength` below are for OpenAPI, which cannot read a pattern's quantifier.
 const CURRENCY_CODE = /^[A-Za-z]{3}$/;
 
 // A trillion, the bound §3 states. Above roughly nine quadrillion a double
@@ -32,7 +29,6 @@ export class ConvertRequestDto implements ConversionRequest {
     pattern: CURRENCY_CODE.source,
   })
   @IsString()
-  @Length(3, 3)
   @Matches(CURRENCY_CODE)
   @Transform(toUpperCase)
   from!: string;
@@ -45,7 +41,6 @@ export class ConvertRequestDto implements ConversionRequest {
     pattern: CURRENCY_CODE.source,
   })
   @IsString()
-  @Length(3, 3)
   @Matches(CURRENCY_CODE)
   @Transform(toUpperCase)
   to!: string;

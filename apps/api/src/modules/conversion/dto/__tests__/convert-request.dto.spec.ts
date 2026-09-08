@@ -88,6 +88,16 @@ describe('ConvertRequestDto', () => {
     },
   );
 
+  // The pattern is the only rule on a code, so a client that sends two letters
+  // is told once what a code has to look like rather than twice.
+  it('reports a code of the wrong length once', async () => {
+    const [error] = await reject({ ...VALID, from: 'US' });
+
+    expect(error.messages).toStrictEqual([
+      'from must match /^[A-Za-z]{3}$/ regular expression',
+    ]);
+  });
+
   it('reports every missing field at once', async () => {
     await expect(fields({})).resolves.toStrictEqual(['from', 'to', 'amount']);
   });
