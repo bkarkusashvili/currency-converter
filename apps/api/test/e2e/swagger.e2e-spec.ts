@@ -5,6 +5,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { API_KEY_HEADER } from '../../src/common/guards/api-key.constant';
 import { ADMIN_SECURITY_SCHEME } from '../../src/common/swagger/build-swagger-config';
+import { CONVERSION_STRATEGY_NAMES } from '../../src/modules/conversion/strategies/conversion-strategy-name';
 import { RATES_SOURCES } from '../../src/modules/rates/domain/rates-source';
 import { createE2eApp } from './create-e2e-app';
 import { overrideRedis } from './override-redis';
@@ -15,6 +16,7 @@ import { overrideRedis } from './override-redis';
 const EXPECTED_PATHS: ReadonlyArray<readonly [string, string]> = [
   ['/health', 'get'],
   ['/api/v1/rates', 'get'],
+  ['/api/v1/convert', 'post'],
   ['/api/v1/rates/cache', 'delete'],
   ['/api/v1/currencies', 'get'],
 ];
@@ -26,6 +28,8 @@ const EXPECTED_SCHEMAS: readonly string[] = [
   'RatesSnapshotResponseDto',
   'CurrencyDto',
   'CurrenciesResponseDto',
+  'ConvertRequestDto',
+  'ConvertResponseDto',
 ];
 
 describe('OpenAPI document (e2e)', () => {
@@ -133,6 +137,33 @@ describe('OpenAPI document (e2e)', () => {
     expect(
       Object.keys(document.paths['/api/v1/rates']?.get?.responses ?? {}).sort(),
     ).toStrictEqual(['200', '429', '500', '503']);
+  });
+
+  it('enumerates the strategies a conversion can be priced with', () => {
+    expect(document.components?.schemas?.ConvertResponseDto).toMatchObject({
+      properties: {
+        strategy: { type: 'string', enum: [...CONVERSION_STRATEGY_NAMES] },
+        source: { type: 'string', enum: [...RATES_SOURCES] },
+      },
+    });
+  });
+
+  it('declares every failure a conversion can answer with', () => {
+    expect(
+      Object.keys(
+        document.paths['/api/v1/convert']?.post?.responses ?? {},
+      ).sort(),
+    ).toStrictEqual(['200', '400', '422', '429', '500', '503']);
+  });
+
+  it('constrains the convert request body in the document', () => {
+    expect(document.components?.schemas?.ConvertRequestDto).toMatchObject({
+      properties: {
+        from: { minLength: 3, maxLength: 3, pattern: '^[A-Za-z]{3}$' },
+        amount: { minimum: 0, exclusiveMinimum: true, maximum: 1000000000000 },
+      },
+      required: ['from', 'to', 'amount'],
+    });
   });
 
   it('puts the cache invalidation behind the admin key scheme', () => {
