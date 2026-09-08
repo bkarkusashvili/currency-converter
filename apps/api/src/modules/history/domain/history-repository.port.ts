@@ -7,6 +7,7 @@ import { ConversionRecord, NewConversionRecord } from './conversion-record';
 export interface HistoryRepository {
   // Never rejects. A store that cannot take the record drops it, logged.
   record(entry: NewConversionRecord): Promise<void>;
-  // Newest first, at most `limit`. Rejects when the store cannot be read.
+  // Newest first, at most `limit`, and never more than MAX_HISTORY_LIMIT
+  // whatever the caller asks for. Rejects when the store cannot be read.
   findRecent(limit: number): Promise<ConversionRecord[]>;
 }

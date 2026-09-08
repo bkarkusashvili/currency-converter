@@ -118,7 +118,9 @@ Currencies present in the current snapshot plus `UAH`, sorted by code:
 
 Most recent conversions, newest first. `limit` is `1..50`, default `10`, and it
 is validated rather than clamped: `?limit=0`, `?limit=51` and `?limit=abc` each
-answer `400` naming the field.
+answer `400` naming the field. The `50` is `MAX_HISTORY_LIMIT`, shared by the
+DTO that validates the query and the adapter, which clamps to it as well —
+nothing that reaches the repository port can ask it for the whole collection.
 
 ```json
 {

@@ -1,9 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, Max, Min } from 'class-validator';
-
-export const DEFAULT_HISTORY_LIMIT = 10;
-export const MAX_HISTORY_LIMIT = 50;
+import {
+  DEFAULT_HISTORY_LIMIT,
+  MAX_HISTORY_LIMIT,
+} from '../domain/history-limits';
 
 export class HistoryQueryDto {
   @ApiPropertyOptional({

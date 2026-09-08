@@ -7,6 +7,7 @@ import {
 import { fakeConfig } from '../../../../config/__tests__/fake-config';
 import { FakeMongoConnection } from '../../../../infrastructure/mongo/__tests__/fake-mongo-connection';
 import { NewConversionRecord } from '../../domain/conversion-record';
+import { MAX_HISTORY_LIMIT } from '../../domain/history-limits';
 import { ConversionRecordDocument } from '../../schemas/conversion-record.schema';
 import { MongoHistoryRepository } from '../mongo-history.repository';
 
@@ -116,6 +117,15 @@ describe('MongoHistoryRepository', () => {
       expect(query.sort).toHaveBeenCalledWith({ createdAt: -1 });
       expect(query.limit).toHaveBeenCalledWith(5);
       expect(query.lean).toHaveBeenCalled();
+    });
+
+    // The DTO bounds what a request can ask for; the port is reachable without
+    // one, and an unbounded limit is a full collection scan behind a route that
+    // answers a page.
+    it('never reads past the page ceiling, whatever it is asked for', async () => {
+      await repository.findRecent(MAX_HISTORY_LIMIT * 100);
+
+      expect(query.limit).toHaveBeenCalledWith(MAX_HISTORY_LIMIT);
     });
 
     it('publishes the document as the domain record', async () => {

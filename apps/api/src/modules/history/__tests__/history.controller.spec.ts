@@ -1,6 +1,6 @@
 import { HistoryUnavailableError } from '../../../common/errors/history-unavailable.error';
 import { ConversionRecord } from '../domain/conversion-record';
-import { DEFAULT_HISTORY_LIMIT } from '../dto/history-query.dto';
+import { DEFAULT_HISTORY_LIMIT } from '../domain/history-limits';
 import { HistoryController } from '../history.controller';
 import { HistoryService } from '../history.service';
 

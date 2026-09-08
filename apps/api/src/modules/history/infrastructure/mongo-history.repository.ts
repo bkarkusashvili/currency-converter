@@ -9,6 +9,7 @@ import { withTimeout } from '../../../common/utils/with-timeout';
 import type { TypedConfigService } from '../../../config/typed-config.service';
 import { ConversionRecord } from '../domain/conversion-record';
 import type { NewConversionRecord } from '../domain/conversion-record';
+import { MAX_HISTORY_LIMIT } from '../domain/history-limits';
 import { HistoryRepository } from '../domain/history-repository.port';
 import {
   CONVERSION_RECORD_MODEL,
@@ -77,7 +78,11 @@ export class MongoHistoryRepository implements HistoryRepository {
       throw new HistoryUnavailableError({ reason: 'connection not ready' });
     }
 
-    const documents = await this.read(limit);
+    // The DTO already rejects anything outside the range, so this is not
+    // validation: it is the adapter refusing to build a query it cannot bound.
+    // Everything else that reaches the port — a future caller, a job, a test —
+    // gets the same page ceiling rather than a full collection scan.
+    const documents = await this.read(Math.min(limit, MAX_HISTORY_LIMIT));
 
     return documents.map((document) => this.toRecord(document));
   }

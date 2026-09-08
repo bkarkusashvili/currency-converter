@@ -3,9 +3,9 @@ import { FieldValidationError } from '../../../../common/validation/field-valida
 import { validationPipeOptions } from '../../../../common/validation/validation-pipe.options';
 import {
   DEFAULT_HISTORY_LIMIT,
-  HistoryQueryDto,
   MAX_HISTORY_LIMIT,
-} from '../history-query.dto';
+} from '../../domain/history-limits';
+import { HistoryQueryDto } from '../history-query.dto';
 
 const metadata: ArgumentMetadata = {
   type: 'query',
