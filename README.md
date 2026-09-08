@@ -43,10 +43,30 @@ until the API side lands.
 
 ## Quick start
 
-Requires Docker with Compose v2. Nothing else — no Node install, no local Redis.
+Node 24 (see [`.nvmrc`](.nvmrc)) and Docker with Compose v2.
 
 ```bash
-docker compose up --build
+npm ci && npm run setup   # root scripts, then apps/api and apps/web
+npm run dev               # Redis and MongoDB in Docker, both apps from npm
+```
+
+`npm run dev` waits for Redis and MongoDB to report healthy, then runs the API
+and the Vite dev server side by side with prefixed output. Ctrl-C stops both.
+`npm run infra:down` stops the two containers afterwards.
+
+| What          | URL                          |
+| ------------- | ---------------------------- |
+| Web           | http://localhost:5173        |
+| API base path | http://localhost:3000/api/v1 |
+| Swagger       | http://localhost:3000/docs   |
+| Health        | http://localhost:3000/health |
+
+### Or the whole stack in Docker
+
+Nothing but Docker — no Node install, no local Redis:
+
+```bash
+docker compose up --build   # or: npm run up, detached and waiting for health
 ```
 
 | What          | URL                          |
@@ -56,42 +76,51 @@ docker compose up --build
 | Swagger       | http://localhost:3000/docs   |
 | Health        | http://localhost:3000/health |
 
-Redis and MongoDB run inside the network and are not published. The API waits
-for both to report healthy before it starts.
+Here Redis and MongoDB stay inside the network and are not published, and the
+API waits for both to report healthy before it starts.
 
 ```bash
-docker compose down      # stop, keep the Redis and Mongo volumes
-docker compose down -v   # stop and wipe the volumes
+docker compose logs -f   # npm run logs
+docker compose down      # npm run down — stop, keep the Redis and Mongo volumes
+docker compose down -v   # npm run down:clean — stop and wipe them
 ```
 
-If port 3000 or 8080 is taken on your machine, copy [`.env.example`](.env.example)
-to `.env` and set `API_PORT` / `WEB_PORT`. Everything that depends on them —
-the web app's `API_URL` and the API's `CORS_ORIGINS` — follows automatically.
-
-A `Makefile` wraps the four commands worth aliasing: `make up`, `make down`,
-`make dev`, `make logs`.
+If a port is taken on your machine, copy [`.env.example`](.env.example) to
+`.env` and set `API_PORT`, `WEB_PORT`, `REDIS_PORT` or `MONGO_PORT`; everything
+that depends on them — the web app's `API_URL`, the API's `CORS_ORIGINS` —
+follows automatically. Those apply to Compose; the port `npm run dev` gives the
+API is `PORT` in `apps/api/.env`, and Vite picks the next free port after 5173
+on its own.
 
 ## Local development
 
-Run Redis and MongoDB in Docker and the two apps from npm, so both reload on
-save:
+Every root script is a thin wrapper around the two apps and Compose:
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d   # or: make dev
-```
+| Script                                                           | What it runs                                                  |
+| ---------------------------------------------------------------- | ------------------------------------------------------------- |
+| `npm run setup`                                                  | `npm ci` in both apps, in parallel                            |
+| `npm run dev`                                                    | `infra:up`, then both apps under `concurrently --kill-others` |
+| `npm run dev:api` / `npm run dev:web`                            | one app on its own                                            |
+| `npm run infra:up` / `npm run infra:down`                        | Redis and MongoDB only                                        |
+| `npm run lint` / `typecheck` / `format:check` / `test` / `build` | fan out to both apps; both always report                      |
+| `npm run up` / `down` / `down:clean` / `logs`                    | the full Docker stack                                         |
 
-The overlay publishes Redis on `6379` and MongoDB on `27017` — the addresses
+`infra:up` applies [`docker-compose.dev.yml`](docker-compose.dev.yml), which
+publishes Redis on `6379` and MongoDB on `27017` — the addresses
 `apps/api/.env.example` already defaults to — and moves the `api` and `web`
 containers behind a `containers` profile so they stay out of `up`. Add
-`--profile containers` to that command to bring them back.
+`--profile containers` to the compose command to bring them back.
+
+The apps still run standalone, which is all the root scripts do:
 
 ```bash
 cd apps/api && npm ci && npm run start:dev   # http://localhost:3000
 cd apps/web && npm ci && npm run dev         # http://localhost:5173
 ```
 
-Node 24 (see [`.nvmrc`](.nvmrc)). Each app is an independent npm package with
-its own lockfile; there is no root workspace. Per-app scripts and layout are in
+Each app is an independent npm package with its own lockfile; the root
+`package.json` is not a workspace, just those scripts and one dev dependency
+(`concurrently`). Per-app scripts and layout are in
 [`apps/api/README.md`](apps/api/README.md) and
 [`apps/web/README.md`](apps/web/README.md).
 
@@ -160,6 +189,7 @@ apps/
     ├── Dockerfile      node build stage, nginx runtime
     └── railway.json
 docs/architecture.md    the design contract
+package.json            root scripts + `concurrently`; not a workspace
 docker-compose.yml      api, web, redis, mongo
 docker-compose.dev.yml  overlay: backing services only, ports published
 .github/workflows/ci.yml
@@ -170,6 +200,11 @@ docker-compose.dev.yml  overlay: backing services only, ports published
 CI runs both jobs on every pull request: lint, format check, typecheck, build,
 unit tests with coverage, and a `docker build` of each image. The API job also
 runs the e2e suite.
+
+`npm test`, `npm run lint`, `npm run typecheck`, `npm run format:check` and
+`npm run build` from the root run the same checks across both apps and let both
+report, so a failure in one does not hide the other. Coverage gates and the e2e
+suite stay per-app:
 
 ```bash
 cd apps/api
