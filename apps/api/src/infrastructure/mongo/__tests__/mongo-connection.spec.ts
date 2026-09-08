@@ -91,6 +91,48 @@ describe('MongoConnection', () => {
       }
     });
 
+    // The failure that leaves no event behind: the factory starts connecting
+    // before this module attaches its listeners, and a fast enough failure —
+    // DNS, TLS — is over by then. Mongoose drops the `error` nothing was
+    // listening for and emits no `disconnected` for a first attempt, so reading
+    // the state is the only way the outage is ever noticed.
+    it('reports an outage that finished before it started watching', () => {
+      const connection = new FakeMongoConnection();
+      connection.failsBeforeAnyoneWatches();
+
+      const { logger } = createConnection(connection);
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.anything(),
+        'MongoDB is unavailable, the conversion history is degraded',
+      );
+    });
+
+    // Reporting it is half the point; the report is what arms the retry, and
+    // without it the history would stay down until the next deploy.
+    it('retries an outage that finished before it started watching', () => {
+      jest.useFakeTimers();
+
+      try {
+        const connection = new FakeMongoConnection();
+        connection.failsBeforeAnyoneWatches();
+
+        const { logger } = createConnection(connection);
+
+        jest.advanceTimersByTime(PAST_ANY_RETRY_MS);
+        expect(connection.openCalls).toBeGreaterThan(0);
+
+        connection.comesBack();
+        jest.advanceTimersByTime(PAST_ANY_RETRY_MS);
+
+        expect(logger.info).toHaveBeenCalledWith(
+          'MongoDB connection established',
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     // Mongoose retries a connection it has opened before and not one that never
     // opened, so without this the history would stay down until the next deploy
     // because Mongo happened to be starting when the API was.

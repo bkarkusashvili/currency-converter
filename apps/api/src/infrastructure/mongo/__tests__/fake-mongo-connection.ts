@@ -83,6 +83,16 @@ export class FakeMongoConnection extends EventEmitter {
     return model;
   }
 
+  // The first attempt failing before anything was listening. Mongoose drops an
+  // `error` that has no listener and emits no `disconnected` for a first
+  // attempt at all, so nothing survives the failure but the state — which is
+  // exactly the case a module that attaches its listeners after the factory
+  // started connecting has to read rather than wait for.
+  failsBeforeAnyoneWatches(): void {
+    this.options = { ...this.options, unreachable: true };
+    this.readyState = ConnectionStates.disconnected;
+  }
+
   // The server the next attempt finds, so a suite can watch a connection
   // recover rather than only fail.
   comesBack(): void {

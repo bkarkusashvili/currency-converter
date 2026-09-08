@@ -46,8 +46,17 @@ export class MongoConnection implements OnModuleInit, OnModuleDestroy {
       this.reportDown(error);
     });
 
+    // Both fallbacks matter, because the factory started connecting before this
+    // hook ran. An attempt that succeeded in the meantime emitted its
+    // `connected` to nobody; one that failed emitted nothing at all — mongoose
+    // drops the `error` when no listener exists yet and never emits
+    // `disconnected` for a first attempt — so the state is all that is left of
+    // it, and without this branch a DNS or TLS failure would arm no retry and
+    // leave the history down until the next deploy.
     if (this.connection.readyState === ConnectionStates.connected) {
       this.reportUp();
+    } else if (this.connection.readyState === ConnectionStates.disconnected) {
+      this.reportDown();
     }
   }
 
