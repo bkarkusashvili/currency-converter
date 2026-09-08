@@ -8,9 +8,9 @@
   --surface-sunken: #e8ece9;
   --ink: #14191b;
   --ink-muted: #576265;
-  --ink-faint: #838e91;
+  --ink-faint: #5f6b6e;
   --line: #dbe1dd;
-  --line-strong: #bcc6c1;
+  --line-strong: #86938d;
   --accent: #0b7a6b;
   --accent-hover: #096659;
   --accent-contrast: #ffffff;
@@ -30,9 +30,9 @@
     --surface-sunken: #0a0e0f;
     --ink: #e8edeb;
     --ink-muted: #9aa5a4;
-    --ink-faint: #6e7a79;
+    --ink-faint: #8b9897;
     --line: #242b2d;
-    --line-strong: #38443f;
+    --line-strong: #5a6b64;
     --accent: #2ecfb2;
     --accent-hover: #52e0c6;
     --accent-contrast: #06211c;
@@ -203,17 +203,6 @@
 
   .button-primary:hover:not(:disabled) {
     background-color: var(--accent-hover);
-  }
-
-  .button-quiet {
-    background-color: transparent;
-    border-color: var(--line-strong);
-    color: var(--ink);
-  }
-
-  .button-quiet:hover:not(:disabled) {
-    border-color: var(--ink-faint);
-    background-color: var(--surface-sunken);
   }
 
   .badge {
