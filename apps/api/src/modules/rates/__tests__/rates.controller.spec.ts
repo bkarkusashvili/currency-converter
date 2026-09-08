@@ -73,6 +73,26 @@ describe('RatesController', () => {
       });
     });
 
+    // The flag is raised by a failed read as well as a failed write, so the
+    // warning rides on an answer that came out of the stale key rather than out
+    // of the upstream. A message that named a provenance would be wrong here,
+    // and `source` is the field that has one.
+    it('warns without claiming a provenance when a stale answer degraded', async () => {
+      service.getSnapshot.mockResolvedValue({
+        ...LOOKUP,
+        source: 'stale-cache',
+        cacheDegraded: true,
+      });
+
+      const response = await controller.getRates();
+      const [warning] = response.warnings ?? [];
+
+      expect(response.source).toBe('stale-cache');
+      expect(warning?.code).toBe('CACHE_UNAVAILABLE');
+      expect(warning?.message).not.toMatch(/upstream|fetch|provider/i);
+      expect(warning?.message).toContain('source');
+    });
+
     // Absent rather than empty, so a healthy answer is exactly what it was.
     it('carries no warnings field at all when nothing degraded', async () => {
       const response = await controller.getRates();

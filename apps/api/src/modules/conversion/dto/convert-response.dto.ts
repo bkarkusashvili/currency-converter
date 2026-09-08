@@ -52,8 +52,8 @@ export class ConvertResponseDto implements ConversionResult {
       {
         code: 'CACHE_UNAVAILABLE',
         message:
-          'The rates cache could not be reached, so these rates were fetched ' +
-          'from the upstream and could not be cached for the next request.',
+          'The rates cache could not be reached during this request, so it ' +
+          'was not used; `source` says where the rates came from.',
       },
     ],
   })

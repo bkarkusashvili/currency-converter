@@ -43,7 +43,7 @@ because the upstream could not be reached, so the rates are older than the cache
 TTL. When the upstream fails and no fallback exists, `/rates` and `/currencies`
 answer `503 RATES_UNAVAILABLE`. Redis being down is not a failure at all: the
 rates come from the upstream and the answer carries a `CACHE_UNAVAILABLE`
-warning saying what that cost (see **Warnings** below).
+warning saying the cache was not part of it (see **Warnings** below).
 
 Monobank allows one request per minute. A cache miss is de-duplicated, so a
 burst of concurrent callers produces one upstream call rather than one each, and
@@ -102,7 +102,7 @@ response is exactly the one above:
   "warnings": [
     {
       "code": "CACHE_UNAVAILABLE",
-      "message": "The rates cache could not be reached, so these rates were fetched from the upstream and could not be cached for the next request."
+      "message": "The rates cache could not be reached during this request, so it was not used; `source` says where the rates came from."
     }
   ]
 }
@@ -110,7 +110,7 @@ response is exactly the one above:
 
 | `code` | What it means |
 | ------ | ------------- |
-| `CACHE_UNAVAILABLE` | Redis could not be read or written, so these rates came from the upstream and were not cached; the next request pays again |
+| `CACHE_UNAVAILABLE` | Redis could not be read or written while the request was answered, so the cache neither served this response nor kept it for the next one. `source` says where the rates did come from |
 | `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but not stored, so it will not appear in `/history` |
 
 The request succeeded either way — a warning is not an error, and the answer is

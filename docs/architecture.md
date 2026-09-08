@@ -236,7 +236,7 @@ beside their answer:
   "warnings": [
     {
       "code": "CACHE_UNAVAILABLE",
-      "message": "The rates cache could not be reached, so these rates were fetched from the upstream and could not be cached for the next request."
+      "message": "The rates cache could not be reached during this request, so it was not used; `source` says where the rates came from."
     }
   ]
 }
@@ -249,10 +249,16 @@ and a healthy response is byte for byte the one it has always been.
 
 | `code`                 | When                                                                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CACHE_UNAVAILABLE`    | Redis could not be read from or written to while the request was answered, so the snapshot came from the upstream and was not cached — the next request pays again |
+| `CACHE_UNAVAILABLE`    | Redis could not be read from or written to while the request was answered, so the cache neither served this response nor kept it for the next one |
 | `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but its record was dropped or timed out, so it will not appear in `/history`                                      |
 
 `message` is a sentence safe to show to a user; a client switches on `code`.
+`CACHE_UNAVAILABLE` says nothing about where the rates came from, because the
+flag behind it is raised by a failed read, a failed write, or both: a read that
+timed out and a write that then succeeded is one of them, a degraded read
+answered from the stale key is another, and neither is "fetched from the
+upstream and not cached". `source` is the field that answers that, and it is on
+the same response.
 `CACHE_UNAVAILABLE` is deliberately also an error `code` in the table below: it
 is the same condition, reported beside a successful answer when the request
 could still be served and in the envelope when it could not — which on

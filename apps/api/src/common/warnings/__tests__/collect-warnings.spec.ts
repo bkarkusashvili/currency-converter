@@ -34,6 +34,18 @@ describe('collectWarnings', () => {
     ]);
   });
 
+  // The flag behind this code is raised by a failed read, a failed write, or
+  // both, so any sentence about where the rates came from is one the warning
+  // cannot know: a read that timed out and a write that then succeeded was
+  // cached after all, and a degraded read answered from the stale key never
+  // reached the upstream. `source` is on the same response and answers it.
+  it('says the cache was not reached without saying what answered instead', () => {
+    const [warning] = collectWarnings({ CACHE_UNAVAILABLE: true }) ?? [];
+
+    expect(warning?.message).not.toMatch(/upstream|fetch|provider|stale/i);
+    expect(warning?.message).toContain('source');
+  });
+
   // The message is the contract a client renders, so the same code cannot
   // arrive worded two ways.
   it('gives a code the same message wherever it is reported', () => {
