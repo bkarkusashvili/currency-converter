@@ -302,9 +302,11 @@ interface ConversionStrategy {
   `resetTimeoutMs`, closes on success / reopens on failure. Exposes `state` for
   the health indicator. Implemented in-house (~80 lines) so it is fully unit
   tested and dependency-free. The instance is bound to the
-  `MONOBANK_CIRCUIT_BREAKER` token and exported by `MonobankModule`, so the
+  `MONOBANK_CIRCUIT_BREAKER` token (declared beside the other rates tokens in
+  `rates/domain`) by `MonobankModule`, which `RatesModule` re-exports, so the
   health indicator reports the breaker the provider actually trips rather than
-  one of its own that nothing ever opens.
+  one of its own that nothing ever opens — and reaches it through the rates
+  module's exports instead of importing its infrastructure folder.
 - **Timeout** on every upstream request (`MONOBANK_TIMEOUT_MS`), and an overall
   budget on the whole call (`MONOBANK_TOTAL_BUDGET_MS`, 8 s):
   `withTimeout(retry(...), budget)` inside the breaker. The per-request timeout
@@ -442,7 +444,7 @@ apps/api
 │       │   ├── domain/          ExchangeRate, RatesSnapshot, RatesSource, ports + tokens
 │       │   ├── dto/             ExchangeRateDto, RatesSnapshotResponseDto
 │       │   ├── infrastructure/
-│       │   │   ├── monobank/    provider, zod payload schema, mapper, retry predicate, breaker token
+│       │   │   ├── monobank/    provider, zod payload schema, mapper, retry predicate
 │       │   │   ├── cached-rates-snapshot.schema.ts  zod schema for a cached value
 │       │   │   ├── rates-cache-keys.ts
 │       │   │   └── redis-rates.repository.ts

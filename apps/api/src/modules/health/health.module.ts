@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { RedisModule } from '../../infrastructure/redis/redis.module';
-import { MonobankModule } from '../rates/infrastructure/monobank/monobank.module';
+import { RatesModule } from '../rates/rates.module';
 import { HealthController } from './health.controller';
 import type { HealthIndicatorPort } from './health-indicator.port';
 import { HEALTH_INDICATORS } from './health-indicators.token';
@@ -18,9 +18,12 @@ function collectIndicators(
 }
 
 @Module({
-  // MonobankModule for the breaker the provider trips, not for the provider:
-  // the indicator reports that instance's state and never calls the upstream.
-  imports: [TerminusModule, RedisModule, MonobankModule],
+  // RatesModule for the breaker the provider trips, not for the provider: the
+  // indicator reports that instance's state and never calls the upstream. Which
+  // adapter binds the breaker is the rates module's business, so this module
+  // takes it from that module's exports rather than reaching into its
+  // infrastructure folder.
+  imports: [TerminusModule, RedisModule, RatesModule],
   controllers: [HealthController],
   providers: [
     RedisHealthIndicator,
