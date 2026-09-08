@@ -76,6 +76,10 @@ to six decimals for display, while `result` is computed from the unrounded
 rate, so on a large amount it will not always match `amount × rate` to the
 last cent.
 
+An amount worth less than half a cent of the target answers `200` with
+`result: 0` — `0.01 UAH → USD` is 0.000223 dollars — and `rate` is what explains
+the zero.
+
 A pair the current snapshot cannot price answers `422`: `UNSUPPORTED_CURRENCY`
 when a code is not in the snapshot at all, `RATE_NOT_AVAILABLE` when both codes
 are quoted and there is no path between them.

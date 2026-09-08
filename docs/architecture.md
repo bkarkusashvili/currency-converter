@@ -78,9 +78,11 @@ Response `200`:
 }
 ```
 
-- `rate` is the effective `to`-per-`from` rate, rounded to 6 decimals.
-- `result` is `amount × rate`, rounded half-up to 2 decimals. Arithmetic uses
-  `big.js`; floating point is never used for money.
+- `rate` is the effective `to`-per-`from` rate, rounded half-up to 6 decimals.
+- `result` is `amount` times the **unrounded** effective rate, rounded half-up
+  to 2 decimals — not `amount × rate` as published, so on a large amount the two
+  differ in the last cent. §5 has the rule and the arithmetic behind it.
+  Arithmetic uses `big.js`; floating point is never used for money.
 - `strategy`: `identity` | `direct` | `cross`.
 - `source`: `cache` | `provider` | `stale-cache`.
 
@@ -274,7 +276,16 @@ a mid rate for pairs without a spread. From the client's point of view:
 | `base → quote`       | `buy ?? cross`                         |
 | `quote → base`       | `1 / (sell ?? cross)`                  |
 
-Strategies, tried in order by `ConversionStrategyResolver`:
+`ConversionStrategyResolver` settles membership before it prices anything: the
+snapshot has to quote `from`, then `to`, or the answer is `UNSUPPORTED_CURRENCY`
+naming the code. It cannot be left to the chain below failing, because
+`IdentityStrategy` prices any code against itself and `XYZ → XYZ` would answer
+`200` at rate `1` for a code `/currencies` never lists. Checking first also
+keeps every strategy ignorant of what the API supports, and leaves one meaning
+for a chain that finds nothing: both codes are quoted and there is no path
+between them, which is `RATE_NOT_AVAILABLE`.
+
+Strategies, tried in order once both codes are known to be quoted:
 
 1. **`IdentityStrategy`** — `from === to` → rate `1`.
 2. **`DirectPairStrategy`** — a rate exists for `(from, to)` or `(to, from)`
@@ -292,8 +303,30 @@ chain rather than an early return because the snapshot does hold a path from a
 currency back to itself, out through the base currency and back, losing both
 spreads.
 
-If no strategy applies: `UNSUPPORTED_CURRENCY` when a code is absent from the
-snapshot entirely, otherwise `RATE_NOT_AVAILABLE`.
+### Rounding, and what the two numbers are for
+
+`rate` is rounded half-up to 6 decimals and `result` to 2, and each is rounded
+once, at the edge that publishes it. Nothing in between is: a strategy returns
+its rate at full precision, and `result` is `amount` times *that* rather than
+times the six decimals of it that go out. The two answers part on a large
+amount — 1,000,000 GBP → PLN is 4,986,801.71 from the unrounded rate and
+4,986,802.00 from the published one, 29 groszy apart — and the reconcilable one
+is full precision's. `rate` is a report of what was used, not the input the
+result came from.
+
+The same rule at the other end of the scale: an amount worth less than half a
+minor unit of `to` rounds to `result: 0`. `0.01 UAH → USD` is 0.000223 dollars,
+so it answers `200` with `result` `0` and `rate` `0.022306`. It is not an error
+— the pair was priced, and that is what the amount is worth — and `rate` is what
+makes the zero readable.
+
+Every value on that path is built with `Money`, the configured `big.js`
+constructor in `common/money`, rather than the global `Big`. `Big.DP` and
+`Big.RM` are process-wide and writable by anything that imports big.js, and the
+reciprocal in `directionalRate` is a division: at `Big.DP = 2` it would answer
+`0.02` for the hryvnia. `Money` carries 30 decimal places of its own, far more
+than the six a rate is published to, so composing the two legs of a cross rate
+cannot move the answer either.
 
 ```ts
 interface ConversionStrategy {
@@ -436,6 +469,7 @@ leaving it `false` collapses every client into the proxy's address.
 apps/api
 ├── src
 │   ├── main.ts                  bootstrap: pino logger, swagger, shutdown hooks
+│   ├── listen-or-exit.ts        listen, or flush the buffered logs, name the port and exit 1
 │   ├── configure-http.ts        trust proxy, request id, helmet, CORS and the api/v1 prefix, shared with the e2e suite
 │   ├── app.module.ts
 │   ├── config/                  zod schema, typed AppConfig, ConfigModule setup
@@ -448,7 +482,7 @@ apps/api
 │   │   ├── throttling/          buildThrottlerOptions and the global guard
 │   │   ├── swagger/             OpenAPI document, ApiErrorResponses decorator
 │   │   ├── resilience/          retry, CircuitBreaker, CircuitOpenError
-│   │   ├── money/               roundHalfUp and the decimal scales §3 publishes (big.js)
+│   │   ├── money/               the Money constructor, roundHalfUp and the decimal scales §3 publishes (big.js)
 │   │   └── utils/               constant-time compare, withTimeout
 │   ├── infrastructure/
 │   │   ├── redis/               REDIS_CLIENT (ioredis) and the RedisConnection lifecycle
@@ -476,7 +510,8 @@ apps/api
 │       │   ├── domain/          ConversionRequest, ConversionResult
 │       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
 │       │   ├── strategies/      interface, identity, direct, cross, resolver + token,
-│       │   │                    findRate and directionalRate, the §5 table in one function
+│       │   │                    findRate, requireRate and directionalRate, which is the
+│       │   │                    §5 table in one function
 │       │   ├── conversion.service.ts
 │       │   ├── conversion.controller.ts  POST /convert
 │       │   └── conversion.module.ts

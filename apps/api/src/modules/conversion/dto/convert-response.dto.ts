@@ -28,7 +28,10 @@ export class ConvertResponseDto implements ConversionResult {
     description:
       'The converted amount, rounded half-up to two decimals. Computed from ' +
       'the unrounded rate, so it is the amount the rate below explains rather ' +
-      'than the one six decimals of it would reproduce.',
+      'than the one six decimals of it would reproduce. An amount worth less ' +
+      'than half a minor unit of `to` rounds to `0` — 0.01 UAH is 0.000223 ' +
+      'USD — which is an answer rather than an error, and `rate` is what ' +
+      'explains it.',
     example: 84.73,
   })
   result!: number;
