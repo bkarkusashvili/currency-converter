@@ -11,7 +11,9 @@
   --ink-faint: #5f6b6e;
   --line: #dbe1dd;
   --line-strong: #86938d;
-  --accent: #0b7a6b;
+  /* On --accent-soft this reaches 4.88:1, so the 11px badge-accent chip and the
+     12px terminal path node clear 4.5:1; #0b7a6b measured 4.38:1. */
+  --accent: #0a7264;
   --accent-hover: #096659;
   --accent-contrast: #ffffff;
   --accent-soft: #dcefea;
