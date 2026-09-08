@@ -1,6 +1,6 @@
 import { ArgumentMetadata, ValidationPipe } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsInt, IsString } from 'class-validator';
+import { IsInt, IsString, Max } from 'class-validator';
 import { FieldValidationError } from '../field-validation-error';
 import { validationPipeOptions } from '../validation-pipe.options';
 
@@ -13,6 +13,9 @@ class SampleDto {
   @IsInt()
   amount!: number;
 
+  // Two rules one bad value breaks at once, declared the way the real DTOs
+  // declare theirs: the type check last, so it is the first one evaluated.
+  @Max(10)
   @IsInt()
   @Type(() => Number)
   precision!: number;
@@ -83,6 +86,19 @@ describe('validationPipeOptions', () => {
       'from',
       'precision',
     ]);
+  });
+
+  // Every rule a wrong value breaks is a consequence of the same mistake: a
+  // precision of "abc" is NaN, and that NaN is also "not at most 10" is noise
+  // the client would render under the field beside the message that means
+  // something.
+  it('reports one message per field rather than every rule the value broke', async () => {
+    const [error] = await reject({ from: 'EUR', amount: 1, precision: 'abc' });
+
+    expect(error).toStrictEqual({
+      field: 'precision',
+      messages: ['precision must be an integer number'],
+    });
   });
 
   it('reports the failures as the field and message pairs the envelope carries', async () => {

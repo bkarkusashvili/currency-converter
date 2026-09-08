@@ -23,7 +23,7 @@ describe('HistoryQueryDto', () => {
     return (await pipe.transform(query, metadata)) as HistoryQueryDto;
   }
 
-  async function fields(query: unknown): Promise<string[]> {
+  async function reject(query: unknown): Promise<FieldValidationError[]> {
     try {
       await pipe.transform(query, metadata);
     } catch (error) {
@@ -31,10 +31,14 @@ describe('HistoryQueryDto', () => {
         error as { getResponse(): { errors: FieldValidationError[] } }
       ).getResponse();
 
-      return payload.errors.map((failure) => failure.field);
+      return payload.errors;
     }
 
     throw new Error('the pipe accepted a query it should have rejected');
+  }
+
+  async function fields(query: unknown): Promise<string[]> {
+    return (await reject(query)).map((failure) => failure.field);
   }
 
   it('defaults to the documented page size', async () => {
@@ -64,6 +68,19 @@ describe('HistoryQueryDto', () => {
       await expect(fields({ limit })).resolves.toStrictEqual(['limit']);
     },
   );
+
+  // The bound that was broken, rather than every bound the value is outside:
+  // `?limit=abc` is NaN, which is neither an integer nor within 1..50, and only
+  // the first of those tells the caller what to send.
+  it.each([
+    ['abc', 'limit must be an integer number'],
+    ['0', 'limit must not be less than 1'],
+    ['51', 'limit must not be greater than 50'],
+  ])('reports %p as exactly one message', async (limit, message) => {
+    const [error] = await reject({ limit });
+
+    expect(error!.messages).toStrictEqual([message]);
+  });
 
   it('rejects a parameter it does not document', async () => {
     await expect(fields({ offset: '10' })).resolves.toStrictEqual(['offset']);

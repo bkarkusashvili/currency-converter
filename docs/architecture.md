@@ -240,6 +240,12 @@ Every non-2xx response has this shape:
 | 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read          |
 | 500  | `INTERNAL_ERROR`       | Anything unexpected; message is generic              |
 
+`details.errors` carries one entry per field that failed and exactly one message
+per entry. The DTOs declare each field's type check last and the pipe stops at
+the first failure a field records, so `amount: "100"` is reported as the number
+it is not rather than as every bound `NaN` is also outside — a multi-field body
+still reports every field.
+
 Any other 4xx keeps its status and takes its `code` from the name the exception
 reports, upper-snake-cased, falling back to the status's own name: a 406 answers
 `NOT_ACCEPTABLE` and a 409 `CONFLICT`. A 4xx never answers `INTERNAL_ERROR`,

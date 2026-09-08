@@ -98,6 +98,36 @@ describe('ConvertRequestDto', () => {
     ]);
   });
 
+  // One mistake, one message, and the one that names what is wrong: before the
+  // pipe stopped at the first failure a string amount was reported as three,
+  // led by a complaint about a trillion.
+  it.each([
+    [
+      { amount: '100' },
+      'amount must be a number conforming to the specified constraints',
+    ],
+    [
+      { amount: Number.NaN },
+      'amount must be a number conforming to the specified constraints',
+    ],
+    [
+      { amount: Number.POSITIVE_INFINITY },
+      'amount must be a number conforming to the specified constraints',
+    ],
+    [{ amount: -5 }, 'amount must be a positive number'],
+    [{ amount: 0 }, 'amount must be a positive number'],
+    [
+      { amount: 2_000_000_000_000 },
+      'amount must not be greater than 1000000000000',
+    ],
+    [{ from: 1 }, 'from must be a string'],
+    [{ from: 'US' }, 'from must match /^[A-Za-z]{3}$/ regular expression'],
+  ])('reports %p as exactly one message', async (patch, message) => {
+    const [error] = await reject({ ...VALID, ...patch });
+
+    expect(error!.messages).toStrictEqual([message]);
+  });
+
   it('reports every missing field at once', async () => {
     await expect(fields({})).resolves.toStrictEqual(['from', 'to', 'amount']);
   });
