@@ -10,16 +10,26 @@ import { createFakeRepositories } from './fakes/createFakeRepositories';
 
 interface RenderOptions {
   repositories?: Repositories;
+  /**
+   * A client seeded with query data, which is what the persisted cache
+   * hydrates into: a test that needs data a failing request cannot produce
+   * puts it here rather than reaching for localStorage.
+   */
+  queryClient?: QueryClient;
 }
 
-export function renderWithProviders(ui: ReactElement, options: RenderOptions = {}): RenderResult {
-  const repositories = options.repositories ?? createFakeRepositories().repositories;
-  const queryClient = new QueryClient({
+export function createTestQueryClient(): QueryClient {
+  return new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
     },
   });
+}
+
+export function renderWithProviders(ui: ReactElement, options: RenderOptions = {}): RenderResult {
+  const repositories = options.repositories ?? createFakeRepositories().repositories;
+  const queryClient = options.queryClient ?? createTestQueryClient();
 
   return render(
     <I18nextProvider i18n={i18nInstance}>

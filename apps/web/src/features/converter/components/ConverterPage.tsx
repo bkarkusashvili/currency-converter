@@ -22,7 +22,7 @@ export function ConverterPage() {
 
       <div className="mt-9 grid gap-4">
         <ConverterForm
-          currencies={currencies.data?.currencies ?? []}
+          currencies={currencies.data?.currencies}
           currenciesError={currencies.error}
           serverErrors={serverErrors.fields}
           isSubmitting={conversion.isPending}

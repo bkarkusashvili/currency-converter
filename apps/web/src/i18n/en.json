@@ -27,7 +27,8 @@
       "submit": "Convert",
       "submitting": "Converting…",
       "currencyOption": "{{code}} — {{name}}",
-      "currenciesUnavailable": "The currency list did not load ({{message}}) — the two defaults are still available."
+      "currenciesUnavailable": "The currency list did not load ({{message}}) — the two defaults are still available.",
+      "currenciesFromCache": "The currency list did not load ({{message}}) — the copy saved in this browser is being used."
     },
     "amountErrors": {
       "empty": "Enter an amount to convert.",
