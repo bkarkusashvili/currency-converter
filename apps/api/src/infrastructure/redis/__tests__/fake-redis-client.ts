@@ -13,6 +13,37 @@ interface FakeRedisOptions {
   quitFails?: boolean;
 }
 
+// A pipeline queues commands and runs them on exec. ioredis reports a command
+// that failed on a live connection as an entry error rather than a rejection,
+// and rejects the whole exec only when the socket is unusable, which is what
+// the queued command's own rejection reproduces here.
+class FakeRedisPipeline {
+  private readonly queued: (() => Promise<unknown>)[] = [];
+
+  constructor(private readonly client: FakeRedisClient) {}
+
+  set(
+    key: string,
+    value: string,
+    mode?: 'EX',
+    ttlSeconds?: number,
+  ): FakeRedisPipeline {
+    this.queued.push(() => this.client.set(key, value, mode, ttlSeconds));
+
+    return this;
+  }
+
+  async exec(): Promise<[Error | null, unknown][]> {
+    const results: [Error | null, unknown][] = [];
+
+    for (const command of this.queued) {
+      results.push([null, await command()]);
+    }
+
+    return results;
+  }
+}
+
 // Models the two ioredis behaviours this module is built around: a lazyConnect
 // client starts in 'wait' without opening a socket, and with the offline queue
 // disabled every command issued before connect() has resolved is rejected
@@ -24,6 +55,7 @@ export class FakeRedisClient extends EventEmitter {
   disconnectCalls = 0;
 
   private readonly store = new Map<string, string>();
+  private readonly ttls = new Map<string, number>();
 
   constructor(private readonly options: FakeRedisOptions = {}) {
     super();
@@ -45,14 +77,47 @@ export class FakeRedisClient extends EventEmitter {
       : Promise.reject(new Error(OFFLINE_QUEUE_REJECTION));
   }
 
-  set(key: string, value: string): Promise<'OK'> {
+  set(
+    key: string,
+    value: string,
+    mode?: 'EX',
+    ttlSeconds?: number,
+  ): Promise<'OK'> {
     if (this.status !== 'ready') {
       return Promise.reject(new Error(OFFLINE_QUEUE_REJECTION));
     }
 
     this.store.set(key, value);
 
+    if (mode === 'EX' && ttlSeconds !== undefined) {
+      this.ttls.set(key, ttlSeconds);
+    }
+
     return Promise.resolve('OK');
+  }
+
+  del(...keys: string[]): Promise<number> {
+    if (this.status !== 'ready') {
+      return Promise.reject(new Error(OFFLINE_QUEUE_REJECTION));
+    }
+
+    const removed = keys.filter((key) => this.store.delete(key)).length;
+
+    for (const key of keys) {
+      this.ttls.delete(key);
+    }
+
+    return Promise.resolve(removed);
+  }
+
+  ping(): Promise<'PONG'> {
+    return this.status === 'ready'
+      ? Promise.resolve('PONG')
+      : Promise.reject(new Error(OFFLINE_QUEUE_REJECTION));
+  }
+
+  pipeline(): FakeRedisPipeline {
+    return new FakeRedisPipeline(this);
   }
 
   quit(): Promise<'OK'> {
@@ -70,6 +135,20 @@ export class FakeRedisClient extends EventEmitter {
   disconnect(): void {
     this.disconnectCalls += 1;
     this.status = 'end';
+  }
+
+  // What a test asserts on: the TTL a write asked for, and the raw value, so a
+  // suite can seed a corrupt entry or check what expiry the cache set.
+  ttlOf(key: string): number | undefined {
+    return this.ttls.get(key);
+  }
+
+  stored(key: string): string | undefined {
+    return this.store.get(key);
+  }
+
+  seed(key: string, value: string): void {
+    this.store.set(key, value);
   }
 
   // The production code takes an ioredis client; the fake only implements the
