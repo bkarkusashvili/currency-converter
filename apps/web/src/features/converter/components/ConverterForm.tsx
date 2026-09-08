@@ -1,8 +1,9 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ApiError } from '../../../api/http/ApiError';
-import type { ConvertRequest, Currency } from '../../../api/types';
+import type { ConvertRequest, Currency, ResponseWarning } from '../../../api/types';
 import { Spinner } from '../../../components/Spinner';
+import { WarningNotes } from '../../../components/WarningNotes';
 import { useApiErrorMessage } from '../../../lib/useApiErrorMessage';
 import { useFormatters } from '../../../lib/useFormatters';
 import { useConverterForm } from '../hooks/useConverterForm';
@@ -19,6 +20,8 @@ interface ConverterFormProps {
   currenciesError: ApiError | null;
   /** No list has arrived and none was stored, so the selects have nothing to offer yet. */
   currenciesLoading: boolean;
+  /** What degraded while the lists behind this form were fetched (§3); usually nothing. */
+  warnings: ResponseWarning[];
   serverErrors: FormFieldErrors;
   isSubmitting: boolean;
   onSubmit: (request: ConvertRequest) => void;
@@ -28,6 +31,7 @@ export function ConverterForm({
   currencies,
   currenciesError,
   currenciesLoading,
+  warnings,
   serverErrors,
   isSubmitting,
   onSubmit,
@@ -98,6 +102,10 @@ export function ConverterForm({
           {t(hintKey, { message: messageOf(currenciesError) })}
         </p>
       )}
+
+      {/* The lists arrived; something about how they arrived is worth saying.
+          Same place and same weight as the hint above, one tone up. */}
+      <WarningNotes warnings={warnings} className="mt-3" />
 
       <button
         type="submit"

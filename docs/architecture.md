@@ -708,6 +708,14 @@ newest-first page and the retention ride on the same key rather than on two.
   the same `big.js` constructor, rounded half-up to the six places §3 uses — and
   draws the hops the strategy took. The history panel shows each entry's
   `source` for the same reason §3 stores it.
+- **Warnings.** §3's `warnings` array is a successful answer saying what
+  degraded while it was produced, so it is rendered as a footnote and never as
+  a failure: warn-tone notes at the foot of the result card for a conversion's,
+  and one line under the form — beside the currency-list hint — for the ones
+  `/currencies` and `/rates` carry, deduplicated by code because a cache that is
+  down is down for both. The sentence shown is the translated one for a code
+  this client knows (`warnings.*` in `en.json`) and the server's own for a code
+  it does not, the same bargain the error envelope makes.
 - **Internationalisation.** Every user-facing string lives in
   `src/i18n/en.json`, loaded through `react-i18next`; the `CustomTypeOptions`
   augmentation type-checks keys against the JSON. Numbers and dates are

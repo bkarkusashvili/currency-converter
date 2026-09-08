@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useCurrencies } from '../../../api/hooks/useCurrencies';
+import { useRatesSnapshot } from '../../../api/hooks/useRatesSnapshot';
+import type { ResponseWarning } from '../../../api/types';
 import { ApiErrorNotice } from '../../../components/ApiErrorNotice';
 import { useFormatters } from '../../../lib/useFormatters';
 import { useConvertWithFallback } from '../hooks/useConvertWithFallback';
@@ -13,9 +15,13 @@ export function ConverterPage() {
   const { t } = useTranslation();
   const formatters = useFormatters();
   const currencies = useCurrencies();
+  // The same query `useConvertWithFallback` reads for the offline estimate;
+  // here it is read for what it says about itself.
+  const snapshot = useRatesSnapshot();
   const conversion = useConvertWithFallback();
 
   const serverErrors = splitServerFieldErrors(conversion.error);
+  const formWarnings = distinctWarnings(currencies.data?.warnings, snapshot.data?.warnings);
 
   return (
     <div className="shell pt-10 sm:pt-16">
@@ -30,6 +36,7 @@ export function ConverterPage() {
           currencies={currencies.data?.currencies}
           currenciesError={currencies.error}
           currenciesLoading={currencies.isPending}
+          warnings={formWarnings}
           serverErrors={serverErrors.fields}
           isSubmitting={conversion.isPending}
           onSubmit={(request) => {
@@ -69,6 +76,22 @@ export function ConverterPage() {
       <HistoryPanel />
     </div>
   );
+}
+
+/**
+ * Two queries can report the same degradation — a cache that is down is down
+ * for both — and the form has one line to say it on.
+ */
+function distinctWarnings(...lists: (ResponseWarning[] | undefined)[]): ResponseWarning[] {
+  const byCode = new Map<string, ResponseWarning>();
+
+  for (const warning of lists.flatMap((list) => list ?? [])) {
+    if (!byCode.has(warning.code)) {
+      byCode.set(warning.code, warning);
+    }
+  }
+
+  return [...byCode.values()];
 }
 
 function outcomeKey(outcome: ConversionOutcome): string {

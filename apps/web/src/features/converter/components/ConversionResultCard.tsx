@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { InfoBadge } from '../../../components/InfoBadge';
 import { Timestamp } from '../../../components/Timestamp';
+import { WarningNotes } from '../../../components/WarningNotes';
 import { useFormatters } from '../../../lib/useFormatters';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
 import { inverseRate } from '../lib/inverseRate';
@@ -113,6 +114,10 @@ export function ConversionResultCard({ result }: { result: ConversionOutcome }) 
             <Timestamp value={result.ratesTimestamp} withPreposition />
           </p>
         )}
+
+        {/* What degraded while this answer was produced (§3). The answer above
+            still stands; this is what it cost. */}
+        <WarningNotes warnings={result.warnings} className="mt-4" />
       </div>
     </section>
   );

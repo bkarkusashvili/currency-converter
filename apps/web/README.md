@@ -80,6 +80,17 @@ falling back to the server `message` for a code this client does not know.
 Field messages from `details.errors` are shown exactly as the server returned
 them; the ones naming `amount`, `from` or `to` are routed onto that input.
 
+## Warnings
+
+A `warnings` array on a `200` is the API saying what degraded while it answered
+(`docs/architecture.md` §3) — the cache it could not reach, the history record
+it could not write. It is a footnote on an answer, not a failure, so it renders
+as warn-tone notes at the foot of the result card, and as one line under the
+form for the ones `/currencies` and `/rates` carry, deduplicated by code.
+`src/i18n/warningMessageKey.ts` maps a code to a translated sentence and falls
+back to the server's own for a code this client has not been taught, exactly as
+the error envelope does. Absent means nothing to say, which is the usual case.
+
 ## Offline fallback
 
 The API answers from a stale Redis copy when Monobank is down. This client does

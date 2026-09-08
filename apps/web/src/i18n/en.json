@@ -248,6 +248,10 @@
     "statusUp": "up",
     "statusDown": "down"
   },
+  "warnings": {
+    "CACHE_UNAVAILABLE": "The rates cache could not be reached, so these rates came straight from Monobank and were not cached for the next request.",
+    "HISTORY_NOT_RECORDED": "This conversion was answered but could not be saved, so it will not appear under recent conversions."
+  },
   "errors": {
     "requestId": "request {{id}}",
     "fieldErrorsLead": "Fix the following and try again.",

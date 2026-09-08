@@ -2,7 +2,12 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../../api/http/ApiError';
-import type { ConvertResponse, CurrenciesResponse } from '../../../api/types';
+import type {
+  ConvertResponse,
+  CurrenciesResponse,
+  RatesSnapshotResponse,
+  ResponseWarningCode,
+} from '../../../api/types';
 import {
   createFakeRepositories,
   type FakeRepositoriesOptions,
@@ -397,6 +402,83 @@ describe('while the currency list is loading', () => {
     // No control to name yet, so nothing claims to name one.
     expect(document.querySelectorAll('label[for="from"], label[for="to"]')).toHaveLength(0);
     expect(screen.queryByLabelText('From')).not.toBeInTheDocument();
+  });
+});
+
+describe('warnings on a successful answer', () => {
+  it('says what degraded while the conversion was answered', async () => {
+    const user = userEvent.setup();
+    renderPage({
+      convert: {
+        ...conversion,
+        warnings: [
+          { code: 'HISTORY_NOT_RECORDED', message: 'Raw server sentence, not for a reader.' },
+        ],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const card = await screen.findByRole('region', { name: 'Result' });
+    // The answer still stands; the note is what it cost.
+    expect(card).toHaveTextContent('425.71 PLN');
+    expect(
+      within(card).getByText(/could not be saved, so it will not appear under recent conversions/i),
+    ).toBeInTheDocument();
+    expect(within(card).queryByText('Raw server sentence, not for a reader.')).toBeNull();
+  });
+
+  it('shows the server sentence for a warning code it does not know', async () => {
+    const user = userEvent.setup();
+    renderPage({
+      convert: {
+        ...conversion,
+        warnings: [
+          {
+            // A code the API grew after this client shipped.
+            code: 'CLOCK_SKEW' as ResponseWarningCode,
+            message: 'The rate clock drifted while this was answered.',
+          },
+        ],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    expect(
+      await screen.findByText('The rate clock drifted while this was answered.'),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing at all when nothing degraded', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const card = await screen.findByRole('region', { name: 'Result' });
+    expect(within(card).queryByText(/could not be reached/i)).toBeNull();
+  });
+
+  it('carries a list warning under the form, once, however many lists report it', async () => {
+    const snapshot: RatesSnapshotResponse = {
+      source: 'provider',
+      fetchedAt: '2024-03-05T12:00:00.000Z',
+      rates: [],
+      warnings: [{ code: 'CACHE_UNAVAILABLE', message: 'Server sentence.' }],
+    };
+    renderPage({
+      currencies: {
+        ...currencies,
+        warnings: [{ code: 'CACHE_UNAVAILABLE', message: 'Server sentence.' }],
+      },
+      rates: snapshot,
+    });
+
+    // One line, not one per query that noticed the same cache was down.
+    const notes = await screen.findAllByText(/The rates cache could not be reached/i);
+    expect(notes).toHaveLength(1);
+    expect(screen.queryByText('Server sentence.')).toBeNull();
   });
 });
 
