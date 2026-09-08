@@ -1,0 +1,88 @@
+name: currency-converter
+
+services:
+  api:
+    build: ./apps/api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      REDIS_URL: redis://redis:6379
+      MONGO_URL: mongodb://mongo:27017/currency_converter
+      # The browser talks to the API from the host, so the allowed origins are
+      # the published web port and the Vite dev server, not the compose network.
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-8080},http://localhost:5173
+      RATES_CACHE_TTL_SECONDS: ${RATES_CACHE_TTL_SECONDS:-300}
+      RATES_STALE_TTL_SECONDS: ${RATES_STALE_TTL_SECONDS:-86400}
+    ports:
+      - '${API_PORT:-3000}:3000'
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      # The runtime image is node:alpine with production dependencies only, so
+      # there is no curl or wget to probe with; node's own fetch is the probe.
+      # Tighter than the Dockerfile's own HEALTHCHECK so `up --wait` and the
+      # `service_healthy` conditions below settle in seconds, not minutes.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  web:
+    build: ./apps/web
+    environment:
+      PORT: 8080
+      # Baked into config.js at container start and fetched by the browser, so
+      # it has to be an address the host can reach — not http://api:3000.
+      API_URL: http://localhost:${API_PORT:-3000}
+    ports:
+      - '${WEB_PORT:-8080}:8080'
+    depends_on:
+      - api
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1:8080/']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Explicit RDB snapshotting: the rates cache survives a restart, so a
+    # restarted stack does not stampede the once-a-minute Monobank endpoint.
+    command: ['redis-server', '--save', '60', '1', '--loglevel', 'warning']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  mongo-data:
