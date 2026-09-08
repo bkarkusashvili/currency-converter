@@ -16,7 +16,10 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@tanstack/query-sync-storage-persister": "^5.102.8",
     "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-query-persist-client": "^5.102.8",
+    "big.js": "^7.0.1",
     "i18next": "^26.4.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -29,6 +32,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
+    "@types/big.js": "^7.0.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

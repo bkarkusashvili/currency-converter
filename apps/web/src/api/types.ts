@@ -62,3 +62,23 @@ export interface HealthResponse {
   error?: Record<string, HealthIndicator>;
   details: Record<string, HealthIndicator>;
 }
+
+/**
+ * One published pair, as `GET /rates` returns it: Monobank quotes one unit of
+ * `base` in `quote`, with a spread on the major pairs and a mid rate on the
+ * thinner ones (docs/architecture.md §4).
+ */
+export interface ExchangeRate {
+  base: string;
+  quote: string;
+  buy?: number;
+  sell?: number;
+  cross?: number;
+  date: string;
+}
+
+export interface RatesSnapshotResponse {
+  source: RateSource;
+  fetchedAt: string;
+  rates: ExchangeRate[];
+}

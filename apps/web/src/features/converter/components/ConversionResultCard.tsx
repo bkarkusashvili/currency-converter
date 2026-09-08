@@ -1,18 +1,22 @@
 import { useTranslation } from 'react-i18next';
-import type { ConvertResponse } from '../../../api/types';
 import { InfoBadge } from '../../../components/InfoBadge';
 import { Timestamp } from '../../../components/Timestamp';
 import { useFormatters } from '../../../lib/useFormatters';
-import { HUB_CURRENCY, sourceCopy, strategyCopy } from '../lib/provenance';
+import type { ConversionOutcome } from '../lib/conversionOutcome';
+import { HUB_CURRENCY, OFFLINE_ESTIMATE, sourceCopy, strategyCopy } from '../lib/provenance';
 import { ConversionPath } from './ConversionPath';
 
-export function ConversionResultCard({ result }: { result: ConvertResponse }) {
+export function ConversionResultCard({ result }: { result: ConversionOutcome }) {
   const { t } = useTranslation();
   const formatters = useFormatters();
 
   const strategy = strategyCopy(result.strategy);
   const source = sourceCopy(result.source);
   const rate = formatters.splitRate(result.rate);
+  // The estimate's note is the only one that has to say how old its rates are,
+  // and it is where a reader looks for it: the shared line below would be the
+  // same timestamp a second time, so the card carries one or the other.
+  const isEstimate = result.source === OFFLINE_ESTIMATE;
 
   return (
     <section className="card rise-in p-5 sm:p-7" aria-labelledby="result-heading">
@@ -69,17 +73,25 @@ export function ConversionResultCard({ result }: { result: ConvertResponse }) {
             <dd
               className={[
                 'mt-1 text-sm',
-                result.source === 'stale-cache' ? 'text-warn font-medium' : 'text-muted',
+                source.tone === 'warn' ? 'text-warn font-medium' : 'text-muted',
               ].join(' ')}
             >
               {t(source.noteKey)}
+              {isEstimate && (
+                <>
+                  {' '}
+                  <Timestamp value={result.ratesTimestamp} />
+                </>
+              )}
             </dd>
           </div>
         </dl>
 
-        <p className="eyebrow mt-4">
-          {t('converter.result.ratesFetched')} <Timestamp value={result.ratesTimestamp} />
-        </p>
+        {!isEstimate && (
+          <p className="eyebrow mt-4">
+            {t('converter.result.ratesFetched')} <Timestamp value={result.ratesTimestamp} />
+          </p>
+        )}
       </div>
     </section>
   );

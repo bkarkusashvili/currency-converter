@@ -107,8 +107,16 @@ describe('AboutPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Where it stands' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'What was built' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Two-layer fallback' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Why these decisions' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How to run it' })).toBeInTheDocument();
+  });
+
+  it('explains both fallbacks and how to see the client one', () => {
+    renderAbout();
+
+    expect(screen.getByText(/labels the response stale cache/)).toBeInTheDocument();
+    expect(screen.getByText(/set the Network tab in devtools to Offline/)).toBeInTheDocument();
   });
 
   it('describes how to run the app without promising a Compose file', () => {

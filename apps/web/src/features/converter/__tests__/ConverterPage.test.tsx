@@ -7,7 +7,8 @@ import {
   createFakeRepositories,
   type FakeRepositoriesOptions,
 } from '../../../test/fakes/createFakeRepositories';
-import { renderWithProviders } from '../../../test/renderWithProviders';
+import { createTestQueryClient, renderWithProviders } from '../../../test/renderWithProviders';
+import { queryKeys } from '../../../api/queryKeys';
 import { ConverterPage } from '../components/ConverterPage';
 
 const currencies: CurrenciesResponse = {
@@ -269,6 +270,74 @@ describe('ConverterPage', () => {
 
     await waitFor(() => {
       expect(fake.convertCalls).toEqual([{ from: 'USD', to: 'UAH', amount: 100 }]);
+    });
+  });
+});
+
+describe('the currency list', () => {
+  const STALE_AT = Date.now() - 10 * 60 * 1000;
+
+  const unreachable = new ApiError({
+    statusCode: 404,
+    code: 'NOT_FOUND',
+    message: 'Cannot GET /api/v1/currencies',
+  });
+
+  it('uses the copy saved in this browser before it falls back to the defaults', async () => {
+    const queryClient = createTestQueryClient();
+    // Hydrated from storage, so it is stale on arrival and the page refetches it.
+    queryClient.setQueryData(queryKeys.currencies, currencies, { updatedAt: STALE_AT });
+    const fake = createFakeRepositories({ currencies: unreachable });
+
+    renderWithProviders(<ConverterPage />, { repositories: fake.repositories, queryClient });
+
+    const from = await screen.findByLabelText('From');
+    expect(
+      within(from)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['EUR — Euro', 'PLN — Zloty', 'UAH — Hryvnia', 'USD — US Dollar']);
+    expect(
+      await screen.findByText(/the copy saved in this browser is being used/),
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to the two defaults when nothing has been saved', async () => {
+    renderPage({ currencies: unreachable });
+
+    const from = await screen.findByLabelText('From');
+    expect(
+      within(from)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['USD', 'UAH']);
+    expect(screen.getByLabelText('To')).toHaveValue('UAH');
+  });
+
+  it('translates why the list is missing instead of quoting the server', async () => {
+    renderPage({ currencies: unreachable });
+
+    expect(await screen.findByText(/The API does not have that endpoint\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Cannot GET/)).not.toBeInTheDocument();
+  });
+
+  it('shows a code on its own when the API has no name for it', async () => {
+    renderPage({
+      currencies: {
+        currencies: [
+          { code: 'USD', numericCode: 840, name: 'USD' },
+          { code: 'XDR', numericCode: 960, name: 'XDR' },
+        ],
+      },
+    });
+
+    const from = await screen.findByLabelText('From');
+    await waitFor(() => {
+      expect(
+        within(from)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual(['USD', 'XDR']);
     });
   });
 });
