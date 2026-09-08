@@ -686,8 +686,8 @@ apps/api
 │       │   ├── domain/          ConversionRequest, ConversionResult
 │       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
 │       │   ├── strategies/      interface, identity, direct, cross, resolver + token,
-│       │   │                    findRate and directionalRate, which is the
-│       │   │                    §5 table in one function
+│       │   │                    orderStrategies, findRate and directionalRate,
+│       │   │                    which is the §5 table in one function
 │       │   ├── conversion.service.ts
 │       │   ├── conversion.controller.ts  POST /convert
 │       │   └── conversion.module.ts
@@ -818,6 +818,13 @@ newest-first page and the retention ride on the same key rather than on two.
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
 | E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history` with a store that is up and one that is down, `/health`, `/health/live` while the dependencies report down |
 | Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
+
+A `*.module.ts` is wiring and is excluded from coverage, so anything a module
+decides lives in a file of its own beside it — `orderStrategies`,
+`collectIndicators`, `buildMonobankHttpOptions`,
+`buildMonobankCircuitBreaker`, `buildConfiguredConversionRecordSchema` — where
+the gate can see it. A factory inline in a module is logic the number does not
+cover.
 
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
 90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI

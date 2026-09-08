@@ -9,18 +9,7 @@ import { CONVERSION_STRATEGIES } from './strategies/conversion-strategies.token'
 import { CrossRateStrategy } from './strategies/cross-rate.strategy';
 import { DirectPairStrategy } from './strategies/direct-pair.strategy';
 import { IdentityStrategy } from './strategies/identity.strategy';
-import type { ConversionStrategy } from './strategies/conversion-strategy';
-
-// The chain, in the order §5 gives it: a currency to itself, then a published
-// pair, then two legs through the base currency. The order is the preference —
-// one spread beats two — and this list is the only place it is stated.
-function orderStrategies(
-  identity: IdentityStrategy,
-  direct: DirectPairStrategy,
-  cross: CrossRateStrategy,
-): ConversionStrategy[] {
-  return [identity, direct, cross];
-}
+import { orderStrategies } from './strategies/order-strategies';
 
 @Module({
   // Conversion reads the rates through RatesService, so it shares the cache and
