@@ -279,16 +279,33 @@ Strategies, tried in order by `ConversionStrategyResolver`:
 3. **`CrossRateStrategy`** — both `from` and `to` have a pair against the base
    currency `UAH`; rate = `rate(from→UAH) × rate(UAH→to)`.
 
+The direction rule above lives in one function, `directionalRate`, which both
+the direct and the cross strategy use — the cross one twice, once per leg — so
+"buy going out, sell coming back" has a single definition. A rate that is not
+positive is read as absent: the upstream payload is validated positive at its
+boundary, but a cached snapshot outlives a deploy and is only checked for
+shape, and a zero would otherwise divide. `IdentityStrategy` is first in the
+chain rather than an early return because the snapshot does hold a path from a
+currency back to itself, out through the base currency and back, losing both
+spreads.
+
 If no strategy applies: `UNSUPPORTED_CURRENCY` when a code is absent from the
 snapshot entirely, otherwise `RATE_NOT_AVAILABLE`.
 
 ```ts
 interface ConversionStrategy {
   readonly name: 'identity' | 'direct' | 'cross';
-  supports(from: CurrencyCode, to: CurrencyCode, rates: ExchangeRate[]): boolean;
-  rate(from: CurrencyCode, to: CurrencyCode, rates: ExchangeRate[]): Big;
+  supports(from: CurrencyCode, to: CurrencyCode, rates: readonly ExchangeRate[]): boolean;
+  rate(from: CurrencyCode, to: CurrencyCode, rates: readonly ExchangeRate[]): Big;
 }
 ```
+
+`result` is computed from the **unrounded** rate, and `rate` is rounded to six
+decimals separately: half a unit in the sixth decimal is 29 groszy on a million
+pounds crossed to zloty, so `rate` is a report of the rate that was used rather
+than the input the result was derived from. Both roundings are half-up, in
+`big.js`, at the edge that publishes the number — nothing in between is ever a
+float.
 
 ## 6. Resilience (`apps/api/src/common/resilience`)
 
@@ -396,11 +413,12 @@ apps/api
 │   │   ├── filters/             GlobalExceptionFilter, ErrorResponseDto, status → code mapping
 │   │   ├── guards/              ApiKeyGuard
 │   │   ├── logging/             nestjs-pino setup, request id middleware, log level, serializers
-│   │   ├── validation/          ValidationPipe options, validation error flattening
+│   │   ├── validation/          ValidationPipe options, error flattening, the upper-case transform
 │   │   ├── throttling/          buildThrottlerOptions and the global guard
 │   │   ├── swagger/             OpenAPI document, ApiErrorResponses decorator
 │   │   ├── resilience/          retry, CircuitBreaker, CircuitOpenError
-│   │   └── utils/               money rounding helpers (big.js), constant-time compare, withTimeout
+│   │   ├── money/               roundHalfUp and the decimal scales §3 publishes (big.js)
+│   │   └── utils/               constant-time compare, withTimeout
 │   ├── infrastructure/
 │   │   ├── redis/               REDIS_CLIENT (ioredis) and the RedisConnection lifecycle
 │   │   └── mongo/               MongoModule (MongooseModule.forRootAsync)
@@ -424,8 +442,10 @@ apps/api
 │       │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
 │       │   └── rates.module.ts
 │       ├── conversion/
+│       │   ├── domain/          ConversionRequest, ConversionResult
 │       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
-│       │   ├── strategies/      interface, identity, direct, cross, resolver
+│       │   ├── strategies/      interface, identity, direct, cross, resolver + token,
+│       │   │                    findRate and directionalRate, the §5 table in one function
 │       │   ├── conversion.service.ts
 │       │   ├── conversion.controller.ts  POST /convert
 │       │   └── conversion.module.ts

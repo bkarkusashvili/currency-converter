@@ -29,6 +29,7 @@ npm run start:dev
 
 | Method | Path | What it does |
 | ------ | ---- | ------------ |
+| `POST` | `/api/v1/convert` | Converts an amount between two currencies and reports the rate, the strategy that priced it and how old the rates were |
 | `GET` | `/api/v1/rates` | The current exchange rate snapshot, with the `source` it was served from: `cache`, `provider` or `stale-cache` |
 | `DELETE` | `/api/v1/rates/cache` | Drops both cache keys so the next read refetches. `204`; needs `x-api-key` when `ADMIN_API_KEY` is set |
 | `GET` | `/api/v1/currencies` | The currencies of the current snapshot, with ISO 4217 names and numeric codes, sorted by code |
@@ -42,6 +43,42 @@ answer `503 RATES_UNAVAILABLE`.
 Monobank allows one request per minute. A cache miss is de-duplicated, so a
 burst of concurrent callers produces one upstream call rather than one each, and
 `DELETE /rates/cache` is the only way to force a refetch before the TTL expires.
+
+## Converting
+
+```bash
+curl -sX POST http://localhost:3000/api/v1/convert \
+  -H 'content-type: application/json' \
+  -d '{"from":"EUR","to":"GBP","amount":100}'
+```
+
+```json
+{
+  "from": "EUR",
+  "to": "GBP",
+  "amount": 100,
+  "result": 85.09,
+  "rate": 0.850942,
+  "strategy": "cross",
+  "source": "cache",
+  "ratesTimestamp": "2026-09-08T12:00:00.000Z"
+}
+```
+
+Codes are case-insensitive and echoed upper-cased. `amount` has to be a JSON
+number: the API does not coerce, so `"100"` is a `400` naming the field rather
+than a value quietly reinterpreted.
+
+`strategy` says how the rate was arrived at — `direct` is a pair Monobank
+publishes, `cross` composes two of them through the hryvnia and so pays a
+spread twice, `identity` is a currency converted to itself. `rate` is rounded
+to six decimals for display, while `result` is computed from the unrounded
+rate, so on a large amount it will not always match `amount × rate` to the
+last cent.
+
+A pair the current snapshot cannot price answers `422`: `UNSUPPORTED_CURRENCY`
+when a code is not in the snapshot at all, `RATE_NOT_AVAILABLE` when both codes
+are quoted and there is no path between them.
 
 ## Configuration
 
