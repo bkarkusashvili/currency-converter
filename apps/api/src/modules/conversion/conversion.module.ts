@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LoggingModule } from '../../common/logging/logging.module';
+import { HistoryModule } from '../history/history.module';
 import { RatesModule } from '../rates/rates.module';
 import { ConversionController } from './conversion.controller';
 import { ConversionService } from './conversion.service';
@@ -25,7 +26,7 @@ function orderStrategies(
   // Conversion reads the rates through RatesService, so it shares the cache and
   // the single flight rather than spending the upstream's one-a-minute budget
   // on its own fetch.
-  imports: [RatesModule, LoggingModule],
+  imports: [RatesModule, HistoryModule, LoggingModule],
   controllers: [ConversionController],
   providers: [
     IdentityStrategy,
@@ -39,8 +40,6 @@ function orderStrategies(
     ConversionStrategyResolver,
     ConversionService,
   ],
-  // The history module records what a conversion produced, and the service
-  // returns the whole result for it to record.
   exports: [ConversionService],
 })
 export class ConversionModule {}
