@@ -43,6 +43,14 @@ export const envSchema = z
     // that never answers, and the cache is on the request path.
     REDIS_COMMAND_TIMEOUT_MS: positiveInt.default(300),
     MONGO_URL: z.url().default('mongodb://localhost:27017/currency_converter'),
+    // How long the driver looks for a reachable server before giving up. The
+    // default of 30s is a deadline for a conversion that only writes a history
+    // record; §2 keeps that request answering while Mongo is down.
+    MONGO_SERVER_SELECTION_TIMEOUT_MS: positiveInt.default(3000),
+    // How long a conversion record is kept. A demo collection nobody prunes
+    // grows without bound, and nothing in the product reads a month-old
+    // conversion; the TTL index is what enforces it.
+    HISTORY_TTL_DAYS: positiveInt.default(30),
     MONOBANK_API_URL: z.url().default('https://api.monobank.ua/bank/currency'),
     MONOBANK_TIMEOUT_MS: positiveInt.default(5000),
     MONOBANK_RETRY_ATTEMPTS: positiveInt.default(3),

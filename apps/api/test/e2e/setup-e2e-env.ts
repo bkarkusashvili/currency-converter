@@ -20,3 +20,8 @@ process.env.REDIS_URL = 'redis://127.0.0.1:1';
 // call Monobank for real from CI. Pointed at a port nothing listens on, it
 // fails instead.
 process.env.MONOBANK_API_URL = 'http://127.0.0.1:1';
+// Same reasoning for Mongo: every suite runs against an in-memory history
+// repository and a fake connection, and a dead host is what keeps that true.
+// A suite that forgot the override reports the history down rather than
+// writing into whatever database the developer happens to have running.
+process.env.MONGO_URL = 'mongodb://127.0.0.1:1/currency_converter';
