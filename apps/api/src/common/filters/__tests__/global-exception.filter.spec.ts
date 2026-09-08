@@ -12,6 +12,7 @@ import {
 import { ThrottlerException } from '@nestjs/throttler';
 import { PinoLogger } from 'nestjs-pino';
 import { ErrorCode } from '../../errors/error-code.enum';
+import { HistoryUnavailableError } from '../../errors/history-unavailable.error';
 import { RatesUnavailableError } from '../../errors/rates-unavailable.error';
 import { UnsupportedCurrencyError } from '../../errors/unsupported-currency.error';
 import { ErrorResponseDto } from '../error-response.dto';
@@ -120,8 +121,30 @@ describe('GlobalExceptionFilter', () => {
       expect(body.details).toBeUndefined();
     });
 
+    // Two dependencies fail with the same status and a client has to be able
+    // to tell them apart: rates down means no conversion, history down means
+    // one route of the API is degraded.
+    it('gives each unavailable dependency its own code under the same status', () => {
+      const rates = captureEnvelope(new RatesUnavailableError());
+      const history = captureEnvelope(
+        new HistoryUnavailableError({ reason: 'connection not ready' }),
+      );
+
+      expect(rates).toMatchObject({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        code: ErrorCode.RATES_UNAVAILABLE,
+      });
+      expect(history).toMatchObject({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        code: ErrorCode.HISTORY_UNAVAILABLE,
+        message: 'Conversion history is temporarily unavailable',
+        details: { reason: 'connection not ready' },
+      });
+    });
+
     it('is not logged as an unhandled failure', () => {
       captureEnvelope(new RatesUnavailableError());
+      captureEnvelope(new HistoryUnavailableError());
 
       expect(logger.error).not.toHaveBeenCalled();
     });
