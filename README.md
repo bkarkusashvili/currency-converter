@@ -24,8 +24,8 @@ comes up with one command locally and deploys from the same images.
 ## What is here
 
 Everything described in [`docs/architecture.md`](docs/architecture.md) is
-merged on `main` and deployed. Nine pull requests, each reviewed with CI green
-before merge, built:
+merged on `main` and deployed. Nine pull requests, each merged with CI green,
+built:
 
 - **API** (`apps/api`) — NestJS 11, TypeScript strict. `POST /api/v1/convert`
   through a strategy chain (identity, direct pair, cross via UAH),
