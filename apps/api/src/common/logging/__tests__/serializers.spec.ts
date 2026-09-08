@@ -1,5 +1,9 @@
-import { IncomingMessage } from 'node:http';
-import { serializeRequest } from '../serialize-request';
+import { IncomingMessage, ServerResponse } from 'node:http';
+import {
+  errorStack,
+  serializeRequest,
+  serializeResponse,
+} from '../serializers';
 
 interface RequestFields {
   id?: string;
@@ -79,5 +83,56 @@ describe('serializeRequest', () => {
     expect(
       serializeRequest(createRequest({ url: '/health' })).id,
     ).toBeUndefined();
+  });
+});
+
+function createResponse(
+  statusCode: number,
+  headers: Record<string, string> = {},
+): ServerResponse {
+  return {
+    statusCode,
+    getHeaders: () => headers,
+  } as unknown as ServerResponse;
+}
+
+describe('serializeResponse', () => {
+  it('reports the status code', () => {
+    expect(serializeResponse(createResponse(429))).toStrictEqual({
+      statusCode: 429,
+    });
+  });
+
+  it('never writes a response header, the echoed CSP included', () => {
+    const serialized = serializeResponse(
+      createResponse(200, {
+        'content-security-policy': "script-src 'self' 'unsafe-inline'",
+        'set-cookie': 'session=abc',
+      }),
+    );
+
+    expect(JSON.stringify(serialized)).not.toMatch(/script-src|session=abc/);
+    expect(serialized).not.toHaveProperty('headers');
+  });
+});
+
+describe('errorStack', () => {
+  it('reports the stack of an error, which is what carries the frames', () => {
+    const failure = new Error('EADDRINUSE');
+
+    expect(errorStack(failure)).toBe(failure.stack);
+  });
+
+  // A rejection is not always an Error, and the message is better than the
+  // "[object Object]" a bare cast would log.
+  it('falls back to the message when the error carries no stack', () => {
+    const failure = new Error('no frames');
+    failure.stack = undefined;
+
+    expect(errorStack(failure)).toBe('no frames');
+  });
+
+  it('describes something that was thrown and is not an error at all', () => {
+    expect(errorStack('just a string')).toBe('just a string');
   });
 });

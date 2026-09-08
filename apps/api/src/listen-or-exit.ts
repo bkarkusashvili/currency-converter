@@ -1,6 +1,5 @@
 import { INestApplication, Logger } from '@nestjs/common';
-import { errorStack } from './common/logging/error-stack';
-
+import { errorStack } from './common/logging/serializers';
 // Every interface, which is what makes the process reachable from outside its
 // container.
 const HOST = '0.0.0.0';

@@ -1,6 +1,25 @@
 import { HttpStatus } from '@nestjs/common';
 import { ErrorCode } from '../errors/error-code.enum';
-import { upperSnakeCase } from '../utils/upper-snake-case';
+
+// Everything that turns a Nest HttpException into the two envelope fields the
+// filter cannot read off it directly: the code a client switches on, and the
+// sentence it shows. Kept beside the filter rather than inside it because the
+// filter is about the response and these are about the exception.
+
+// Long enough for the longest HTTP reason phrase, short enough that a name the
+// caller had a hand in cannot grow the envelope.
+const MAX_NAME_LENGTH = 48;
+
+// Turns a reason phrase or an exception name into the shape of an error code:
+// 'Not Acceptable' and 'NotAcceptable' both come out as NOT_ACCEPTABLE.
+export function upperSnakeCase(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .toUpperCase()
+    .slice(0, MAX_NAME_LENGTH)
+    .replace(/^_+|_+$/g, '');
+}
 
 const CODES_BY_STATUS: ReadonlyMap<number, ErrorCode> = new Map([
   [HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR],
@@ -55,4 +74,35 @@ export function deriveErrorCode(
     upperSnakeCase(statusName(status)) ||
     ErrorCode.INTERNAL_ERROR
   );
+}
+
+// A Nest HttpException carries either a plain string or a
+// { statusCode, message, error } object, and `message` may itself be an array.
+export function extractHttpExceptionMessage(
+  payload: string | object,
+  fallback: string,
+): string {
+  if (typeof payload === 'string') {
+    return payload;
+  }
+
+  if ('message' in payload) {
+    const { message } = payload;
+
+    if (typeof message === 'string' && message.length > 0) {
+      return message;
+    }
+
+    if (Array.isArray(message)) {
+      const joined = message
+        .filter((entry: unknown): entry is string => typeof entry === 'string')
+        .join('; ');
+
+      if (joined.length > 0) {
+        return joined;
+      }
+    }
+  }
+
+  return fallback;
 }
