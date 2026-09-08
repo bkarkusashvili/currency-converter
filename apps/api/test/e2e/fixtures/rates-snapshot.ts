@@ -51,7 +51,7 @@ function readFixture(name: string): unknown {
 
 export const RATES_SNAPSHOT: RatesSnapshot = snapshotSchema.parse(
   readFixture('rates-snapshot.json'),
-) as RatesSnapshot;
+);
 
 export type GoldenConversion = z.infer<
   typeof goldenSchema
