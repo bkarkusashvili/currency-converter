@@ -1,4 +1,4 @@
-export const MAX_AMOUNT = 1_000_000_000_000;
+const MAX_AMOUNT = 1_000_000_000_000;
 
 export type ParsedAmount = { ok: true; value: number } | { ok: false; message: string };
 
