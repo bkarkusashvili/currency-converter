@@ -47,8 +47,8 @@ services:
       API_URL: http://localhost:${API_PORT:-3000}
     ports:
       - '${WEB_PORT:-8080}:8080'
-    depends_on:
-      - api
+    # No depends_on: nginx serves the SPA whether or not the API is up, and the
+    # browser calls the API from the host, not over the compose network.
     healthcheck:
       test: ['CMD', 'wget', '--quiet', '--spider', 'http://127.0.0.1:8080/']
       interval: 10s
@@ -58,7 +58,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     # Explicit RDB snapshotting: the rates cache survives a restart, so a
     # restarted stack does not stampede the once-a-minute Monobank endpoint.
     command: ['redis-server', '--save', '60', '1', '--loglevel', 'warning']
@@ -73,7 +73,7 @@ services:
     restart: unless-stopped
 
   mongo:
-    image: mongo:7
+    image: mongo:7.0
     volumes:
       - mongo-data:/data/db
     healthcheck:
