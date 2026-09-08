@@ -13,13 +13,15 @@ Browser ──▶ web (React SPA, nginx) ──▶ api (NestJS) ──▶ Redis 
 
 Monorepo layout:
 
-| Path              | What                                                     |
-| ----------------- | -------------------------------------------------------- |
-| `apps/api`        | NestJS 11, TypeScript strict, REST API                   |
-| `apps/web`        | React 19 + Vite + TypeScript SPA                         |
-| `docker-compose.yml` | api, web, redis, mongo for local orchestration        |
-| `docs/`           | This document and the API reference                      |
-| `.github/workflows` | CI: lint, typecheck, unit + e2e tests, build per app   |
+| Path                     | What                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| `apps/api`               | NestJS 11, TypeScript strict, REST API                                                 |
+| `apps/web`               | React 19 + Vite + TypeScript SPA                                                        |
+| `docker-compose.yml`     | api, web, redis, mongo for local orchestration                                          |
+| `docker-compose.dev.yml` | overlay: the backing services alone, published on loopback                              |
+| `docs/architecture.md`   | this document; §3 is the written API contract, and the generated one is Swagger `/docs` |
+| `README.md`              | how to run it, the configuration surface, the API reference, requirements traceability  |
+| `.github/workflows`      | CI: per app lint, format, typecheck, build, unit tests with coverage, audit and image build (plus e2e for the api); one more job that boots the Compose stack and probes it |
 
 Each app is an independent npm package with its own lockfile so it can be built
 and deployed in isolation (Docker, Railway).
@@ -36,9 +38,11 @@ and deployed in isolation (Docker, Railway).
   invalidation, and single-flight de-duplication of concurrent misses.
 - **Resilience** around the upstream: timeout, retry with exponential backoff
   and jitter, circuit breaker (CLOSED → OPEN → HALF_OPEN).
-- **Graceful degradation.** Redis or Mongo being down never breaks a
-  conversion; it is logged, surfaced on `/health`, and the request still
-  succeeds when the upstream (or a stale copy) is reachable.
+- **Graceful degradation, said out loud.** Redis or Mongo being down never
+  breaks a conversion; it is logged, surfaced on `/health`, and the request
+  still succeeds when the upstream (or a stale copy) is reachable — and the
+  answer carries a `warnings` entry saying what it cost, so the degradation is
+  visible to the client and not only to whoever reads the logs.
 - **One error envelope** for every failure, produced by a global exception
   filter from a small hierarchy of typed domain errors.
 - **Strict typing, small files, no comments that restate the code.** Comments
@@ -47,7 +51,14 @@ and deployed in isolation (Docker, Railway).
 ## 3. API contract
 
 Base path: `/api/v1`. All responses are JSON. Swagger UI at `/docs`,
-OpenAPI JSON at `/docs-json`.
+OpenAPI JSON at `/docs-json` — 7 operations, 10 schemas and one `admin` security
+scheme, generated from the controllers and kept honest by
+`test/e2e/swagger.e2e-spec.ts`.
+
+The response bodies below are real, captured from the deployment on
+2026-09-08 (the degraded ones from a local stack with the container in question
+stopped, because production was healthy). Rates move, so the numbers date; the
+shapes do not.
 
 ### POST `/api/v1/convert`
 
@@ -70,11 +81,11 @@ Response `200`:
   "from": "EUR",
   "to": "GBP",
   "amount": 100,
-  "result": 84.73,
-  "rate": 0.847312,
+  "result": 84.75,
+  "rate": 0.847472,
   "strategy": "cross",
   "source": "cache",
-  "ratesTimestamp": "2026-09-08T12:00:00.000Z"
+  "ratesTimestamp": "2026-09-08T18:02:02.902Z"
 }
 ```
 
@@ -95,13 +106,18 @@ Returns the current snapshot the service would convert with:
 ```json
 {
   "source": "cache",
-  "fetchedAt": "2026-09-08T12:00:00.000Z",
+  "fetchedAt": "2026-09-08T18:02:02.902Z",
   "rates": [
-    { "base": "USD", "quote": "UAH", "buy": 44.35, "sell": 44.831, "date": "…" },
-    { "base": "GBP", "quote": "UAH", "cross": 60.7562, "date": "…" }
+    { "base": "USD", "quote": "UAH", "buy": 44.35, "sell": 44.831, "date": "2026-09-08T11:51:13.000Z" },
+    { "base": "EUR", "quote": "USD", "buy": 1.158, "sell": 1.168, "date": "2026-09-08T15:06:13.000Z" },
+    { "base": "GBP", "quote": "UAH", "cross": 60.7336, "date": "2026-09-08T18:01:49.000Z" }
   ]
 }
 ```
+
+A pair carries `buy` and `sell` when Monobank publishes a spread for it and
+`cross` when it publishes a mid rate instead; §5 is the rule for which of the
+three a direction multiplies by.
 
 `warnings` appears here on the same terms as on `/convert`.
 
@@ -143,16 +159,16 @@ nothing that reaches the repository port can ask it for the whole collection.
 {
   "items": [
     {
-      "id": "6f0000000000000000000001",
+      "id": "6aa04e94e54de00da51c08ce",
       "from": "EUR",
       "to": "GBP",
       "amount": 100,
-      "result": 84.73,
-      "rate": 0.847312,
+      "result": 84.75,
+      "rate": 0.847472,
       "strategy": "cross",
       "source": "cache",
-      "ratesTimestamp": "2026-09-08T12:00:00.000Z",
-      "createdAt": "2026-09-08T12:00:05.000Z"
+      "ratesTimestamp": "2026-09-08T18:02:02.902Z",
+      "createdAt": "2026-09-08T18:06:12.588Z"
     }
   ]
 }
@@ -249,7 +265,7 @@ carry a `warnings` array beside their answer:
 
 The request succeeded — that is what separates a warning from the error
 envelope below — and each entry says what degraded while it was being answered.
-Both routes assemble the array the same way and in the same place: the service
+All three assemble the array the same way and in the same place: the service
 reports what degraded (`RatesLookup.cacheDegraded`, `ConversionOutcome`) and the
 controller turns that into the field, so a stored conversion is a record of what
 was converted rather than of the request that converted it.
@@ -360,14 +376,19 @@ const RATES_PROVIDER = Symbol('RATES_PROVIDER');
 interface RatesProvider { fetchRates(): Promise<RatesSnapshot>; }
 
 const RATES_REPOSITORY = Symbol('RATES_REPOSITORY');
+
+// domain/cache-outcome.ts — what a cache operation did, and whether the cache
+// was there to do it. A read that answers `null` alone cannot tell a miss from
+// an outage, and the two are different answers on the response.
 interface CachedSnapshot { snapshot: RatesSnapshot | null; degraded: boolean; }
+interface CacheWrite { degraded: boolean; }
 
 interface RatesRepository {
-  getFresh(): Promise<CachedSnapshot>;   // degrades: { snapshot: null, degraded: true }
-  getStale(): Promise<CachedSnapshot>;   // degrades: { snapshot: null, degraded: true }
-  save(snapshot: RatesSnapshot): Promise<{ degraded: boolean }>;  // degrades: { degraded: true }
-  clear(): Promise<void>;                // rejects: CacheUnavailableError when
-                                         // the cache could not be reached
+  getFresh(): Promise<CachedSnapshot>;    // degrades: { snapshot: null, degraded: true }
+  getStale(): Promise<CachedSnapshot>;    // degrades: { snapshot: null, degraded: true }
+  save(snapshot: RatesSnapshot): Promise<CacheWrite>;  // degrades: { degraded: true }
+  clear(): Promise<void>;                 // rejects: CacheUnavailableError when
+                                          // the cache could not be reached
 }
 ```
 
@@ -475,8 +496,12 @@ than the six a rate is published to, so composing the two legs of a cross rate
 cannot move the answer either.
 
 ```ts
+// common/conversion/conversion-strategy-name.ts — shared vocabulary, because a
+// stored record names a strategy too (§9).
+type ConversionStrategyName = 'identity' | 'direct' | 'cross';
+
 interface ConversionStrategy {
-  readonly name: 'identity' | 'direct' | 'cross';
+  readonly name: ConversionStrategyName;
   price(from: CurrencyCode, to: CurrencyCode, rates: readonly ExchangeRate[]): Big | undefined;
 }
 ```
@@ -486,13 +511,6 @@ priced or it was not. `ConversionStrategyResolver.resolve` returns
 `{ strategy, rate }` — the first strategy of the chain that answered and the
 rate it answered with — so nothing prices the pair twice and "the precondition
 of `rate` is `supports`" is unrepresentable rather than commented.
-
-`result` is computed from the **unrounded** rate, and `rate` is rounded to six
-decimals separately: half a unit in the sixth decimal is 29 groszy on a million
-pounds crossed to zloty, so `rate` is a report of the rate that was used rather
-than the input the result was derived from. Both roundings are half-up, in
-`big.js`, at the edge that publishes the number — nothing in between is ever a
-float.
 
 ## 6. Resilience (`apps/api/src/common/resilience`)
 
@@ -701,7 +719,9 @@ apps/api
 │       │   ├── currencies.controller.ts  GET /currencies
 │       │   └── currencies.module.ts
 │       ├── rates/
-│       │   ├── domain/          ExchangeRate, RatesSnapshot, RatesSource, ports + tokens
+│       │   ├── domain/          ExchangeRate, RatesSnapshot, RatesSource, BASE_CURRENCY,
+│       │   │                    CachedSnapshot / CacheWrite, the RatesLookup a caller reads
+│       │   │                    `cacheDegraded` off, ports + tokens
 │       │   ├── dto/             ExchangeRateDto, RatesSnapshotResponseDto
 │       │   ├── infrastructure/
 │       │   │   ├── monobank/    provider, zod payload schema, mapper, retry predicate
@@ -735,6 +755,9 @@ apps/api
 │                             HealthIndicatorPort + Redis / Mongo / Monobank indicators
 └── test
     ├── e2e/                     supertest suites over the real HTTP surface
+    │   ├── create-e2e-app.ts    boots through the same configureHttp and setupSwagger main.ts uses
+    │   ├── override-*.ts        swaps Redis, the Mongo connection and the history repository for fakes
+    │   ├── setup-e2e-env.ts     the environment every suite starts from
     │   ├── env/                 per-suite environment, imported before AppModule
     │   └── fixtures/            snapshots the suites assert against
     └── jest-e2e.json
@@ -899,7 +922,7 @@ newest-first page and the retention ride on the same key rather than on two.
 | Layer                | Tool                         | What is covered                                   |
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
-| E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history` with a store that is up and one that is down, `/health`, `/health/live` while the dependencies report down |
+| E2E (api)            | Jest + supertest             | seven suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger` |
 | Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, error display, history list and its loading and empty states, health rendering, every HTTP repository |
 
 A `*.module.ts` is wiring and is excluded from coverage, so anything a module
@@ -926,8 +949,15 @@ against whatever a developer happens to be running.
 
 ## 12. Conventions
 
-- Conventional Commits (`feat(api): …`, `fix(web): …`, `chore: …`, `docs: …`, `test(api): …`).
+- Conventional Commits (`feat(api): …`, `fix(web): …`, `refactor(api): …`,
+  `test(web): …`, `chore: …`, `ci: …`, `docs: …`). The subject says what changed;
+  the body says why, and is where a decision that is not obvious from the diff
+  gets argued.
 - Every change lands through a pull request into `main`; CI must be green.
+- The implementation was AI-assisted under human direction and review: this
+  document was written first and each pull request was reviewed against it. The
+  commits carry a `Co-Authored-By` trailer naming the assistant, so the record
+  is in the history rather than in a footnote.
 - ESLint + Prettier, `noImplicitAny`, `strictNullChecks`, no `any`, no
   non-null assertions outside tests.
 - Files are small and named after the single thing they export.
@@ -980,3 +1010,97 @@ extends it:
   which is what discards copies written against an older API contract: a release
   that changes a persisted response shape has to bump that version, or browsers
   hydrate the previous shape into code that no longer reads it.
+
+## 13. Requirements mapping
+
+The original task is eight numbered sections; each of their atoms is traced to
+the code, the test and the live URL that satisfies it in the **Requirements
+traceability** table of [`README.md`](../README.md#requirements-traceability) —
+30 atoms, all met, re-verified against the current `main` rather than copied
+forward. It lives there rather than here because it is what a reviewer reads
+first and because it cites test names, which drift faster than design does;
+duplicating it would give the project two versions of the same claim.
+
+This document is the other half of that answer: the table says *where* a
+requirement is met, and the sections above say *why* it is met that way.
+
+## 14. Known limitations and follow-ups
+
+Nothing below is a defect against the task. They are the places where a
+deliberate scope line was drawn, and each is the first thing to move if the
+project were taken further.
+
+**Runtime and scale**
+
+- **Breaker and throttle state are per process.** `CircuitBreaker` holds its
+  state in memory and `@nestjs/throttler` uses its default in-process storage,
+  so with more than one replica each has its own breaker and its own buckets:
+  the documented `THROTTLE_LIMIT` becomes per replica, and one instance can be
+  OPEN while another still calls the upstream. Correct for the single instance
+  this deploys as; a second one wants both moved into Redis.
+- **The cache is one global snapshot.** `rates:latest` holds the whole
+  snapshot, so `DELETE /rates/cache` is all-or-nothing and there is no
+  per-currency invalidation. That matches an upstream that publishes every pair
+  in one document and allows one request a minute; a source with per-pair
+  endpoints would want per-pair keys.
+- **History paging is a limit, not a cursor.** `GET /history` answers the
+  newest `1..50` and has no offset or cursor, so there is no way to read past
+  the first page. Deliberate for a demo surface, and the `{ createdAt: -1 }`
+  index is already the one a cursor would ride on.
+- **A timed-out history write may still land.** `withTimeout` stops waiting but
+  cannot cancel the work, so a conversion answered with `HISTORY_NOT_RECORDED`
+  can appear in `/history` a moment later (§9). The warning is honest about
+  what was observed, not about what the database eventually did.
+
+**Security posture**
+
+- **`ApiKeyGuard` is a no-op while `ADMIN_API_KEY` is unset.** The schema's
+  `superRefine` refuses to start a `production` process without one, so the
+  exposure is bounded to a deployment deliberately run as `development` or
+  `test`. There is no per-caller auth on the read routes at all, which is the
+  right scope for a public rate converter and the wrong one for anything with a
+  user in it.
+- **Swagger is served in production, by design.** `/docs` and `/docs-json` are
+  public on the deployment because the API is a portfolio surface a reviewer is
+  meant to explore. A real service would gate them or publish the document out
+  of band.
+
+**Testing**
+
+- **No browser end-to-end layer.** There is no Playwright or Cypress suite; the
+  web tests are component-level with repository fakes injected through the real
+  provider, and the API e2e suites stop at supertest. The one thing nothing
+  covers automatically is the two running together in a browser — that path is
+  exercised by CI's `orchestration` job only as far as `/health`, and by hand
+  otherwise.
+- **E2E coverage is not merged into the unit report.** `test:e2e` runs
+  uninstrumented, so `configure-http.ts` and `setup-swagger.ts` read 0% in a
+  report whose gate they are not the subject of (§11). Merging the two reports
+  would make the number honest; leaving them apart keeps the gate on the logic.
+- **Live-deployment smoke is manual.** Nothing polls the Railway services; the
+  numbers in the README were captured by hand.
+
+**Client**
+
+- **The amount field breaks native undo.** `formatAmountInput` rewrites the
+  input's value on every keystroke, which clears the browser's own undo stack,
+  so ⌘Z in that field does not restore what was typed. Fixing it means driving
+  the edits through `document.execCommand('insertText')` or keeping an undo
+  stack by hand.
+- **The persister API is deprecated upstream.** `createSyncStoragePersister`
+  from `@tanstack/query-sync-storage-persister` carries an `@deprecated` tag in
+  the installed version pointing at `createAsyncStoragePersister`. It works and
+  is tested; the migration is a follow-up, not a fix.
+- **The offline estimate is a second implementation of §5.** `convertOffline`
+  reimplements the pricing rules in the browser on a `big.js` constructor
+  configured like the API's `Money`. That is what makes an estimate possible
+  with the API unreachable, and it is also a rule in two places that can drift.
+  Both are unit-tested against the same cases, which is the mitigation, not a
+  guarantee.
+
+**Documentation**
+
+- **This document and the code are kept in step by review, not by a test.**
+  Only the API surface has a mechanical check (`swagger.e2e-spec.ts` fails on a
+  route documented but not served, or served but not documented). Everything
+  else here is prose a reviewer has to keep true.
