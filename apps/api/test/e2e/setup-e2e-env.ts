@@ -10,3 +10,8 @@ process.env.THROTTLE_LIMIT = '1000';
 // depth or the admin key one suite sets would still be in place for the next.
 process.env.TRUST_PROXY = 'false';
 delete process.env.ADMIN_API_KEY;
+// Every suite overrides REDIS_CLIENT with the fake, and this is what keeps that
+// true: pointed at a port nothing listens on, a suite that forgot the override
+// reports the cache down on /health instead of passing on whatever Redis the
+// developer happens to have running.
+process.env.REDIS_URL = 'redis://127.0.0.1:1';

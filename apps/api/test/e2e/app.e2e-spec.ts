@@ -3,9 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
-import { FakeRedisClient } from '../../src/infrastructure/redis/__tests__/fake-redis-client';
-import { REDIS_CLIENT } from '../../src/infrastructure/redis/redis-client.token';
 import { createE2eApp } from './create-e2e-app';
+import { overrideRedis } from './override-redis';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const UUID_PATTERN =
@@ -16,16 +15,9 @@ describe('API (e2e)', () => {
   let server: Server;
 
   beforeAll(async () => {
-    // The suite has no Redis to talk to, and /health reporting the cache down
-    // would say more about the runner than about the app.
     app = await createE2eApp(
       { imports: [AppModule] },
-      {
-        customise: (builder) =>
-          builder
-            .overrideProvider(REDIS_CLIENT)
-            .useValue(new FakeRedisClient().asRedis()),
-      },
+      { customise: overrideRedis },
     );
 
     // INestApplication.getHttpServer is typed as any.

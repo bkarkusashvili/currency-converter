@@ -7,6 +7,7 @@ import { API_KEY_HEADER } from '../../src/common/guards/api-key.constant';
 import { ADMIN_SECURITY_SCHEME } from '../../src/common/swagger/build-swagger-config';
 import { RATES_SOURCES } from '../../src/modules/rates/domain/rates-source';
 import { createE2eApp } from './create-e2e-app';
+import { overrideRedis } from './override-redis';
 
 // Every route the API serves, with the method it answers. A route that is
 // added without reaching the document fails here, which is the point: later
@@ -33,7 +34,10 @@ describe('OpenAPI document (e2e)', () => {
   let document: OpenAPIObject;
 
   beforeAll(async () => {
-    app = await createE2eApp({ imports: [AppModule] }, { withSwagger: true });
+    app = await createE2eApp(
+      { imports: [AppModule] },
+      { withSwagger: true, customise: overrideRedis },
+    );
 
     // INestApplication.getHttpServer is typed as any.
     server = app.getHttpServer() as Server;

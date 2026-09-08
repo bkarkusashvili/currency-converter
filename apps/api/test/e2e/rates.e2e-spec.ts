@@ -8,10 +8,10 @@ import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
 import { API_KEY_HEADER } from '../../src/common/guards/api-key.constant';
 import { FakeRedisClient } from '../../src/infrastructure/redis/__tests__/fake-redis-client';
-import { REDIS_CLIENT } from '../../src/infrastructure/redis/redis-client.token';
 import { RATES_PROVIDER } from '../../src/modules/rates/domain/rates-provider.token';
 import { RATES_CACHE_KEYS } from '../../src/modules/rates/infrastructure/rates-cache-keys';
 import { createE2eApp } from './create-e2e-app';
+import { overrideRedis } from './override-redis';
 import { RATES_SNAPSHOT, SNAPSHOT_CURRENCIES } from './fixtures/rates-snapshot';
 
 const RATES_PATH = '/api/v1/rates';
@@ -38,9 +38,7 @@ describe('rates (e2e)', () => {
       { imports: [AppModule] },
       {
         customise: (builder) =>
-          builder
-            .overrideProvider(REDIS_CLIENT)
-            .useValue(redis.asRedis())
+          overrideRedis(builder, redis)
             .overrideProvider(RATES_PROVIDER)
             .useValue(provider),
       },
