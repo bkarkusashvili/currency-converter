@@ -93,7 +93,7 @@ describe('ConvertRequestDto', () => {
   it('reports a code of the wrong length once', async () => {
     const [error] = await reject({ ...VALID, from: 'US' });
 
-    expect(error.messages).toStrictEqual([
+    expect(error!.messages).toStrictEqual([
       'from must match /^[A-Za-z]{3}$/ regular expression',
     ]);
   });

@@ -101,7 +101,7 @@ describe('listenOrExit', () => {
       await listen();
 
       expect(app.close.mock.invocationCallOrder[0]).toBeLessThan(
-        exit.mock.invocationCallOrder[0],
+        exit.mock.invocationCallOrder[0]!,
       );
     });
 
