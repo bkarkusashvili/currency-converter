@@ -1,72 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import type { RatesSnapshotResponse } from '../../../api/types';
+import { goldenConversions, goldenSnapshot } from '../../../test/goldenFixtures';
 import { convertOffline } from '../lib/convertOffline';
 
-const QUOTED_AT = '2026-09-08T11:00:00.000Z';
-const FETCHED_AT = '2026-09-08T12:00:00.000Z';
-
 /**
- * The numbers the API's e2e suite converts with: the major pairs carry a
- * spread, the thinner ones only a mid rate, and EUR/USD is the pair that never
- * touches the hryvnia. Same input, same output — that is the point of the file
- * under test.
+ * The rates the API's e2e suite converts with, read from
+ * `fixtures/rates-snapshot.json` — the same file, not a copy of the numbers.
+ * Same input, same output is the point of the file under test, and it is now
+ * something CI can check rather than something a comment claims.
  */
-const snapshot: RatesSnapshotResponse = {
-  source: 'cache',
-  fetchedAt: FETCHED_AT,
-  rates: [
-    { base: 'USD', quote: 'UAH', buy: 44.35, sell: 44.831, date: QUOTED_AT },
-    { base: 'EUR', quote: 'UAH', buy: 51.47, sell: 52.0698, date: QUOTED_AT },
-    { base: 'EUR', quote: 'USD', buy: 1.157, sell: 1.167, date: QUOTED_AT },
-    { base: 'GBP', quote: 'UAH', cross: 60.7562, date: QUOTED_AT },
-    { base: 'PLN', quote: 'UAH', cross: 12.1834, date: QUOTED_AT },
-  ],
-};
+const snapshot = goldenSnapshot();
+const vectors = goldenConversions();
+const QUOTED_AT = snapshot.rates[0]?.date ?? '';
 
 describe('convertOffline', () => {
-  it('prices base to quote at what the bank buys the base at', () => {
-    expect(convertOffline({ from: 'USD', to: 'UAH', amount: 100 }, snapshot)).toEqual({
-      from: 'USD',
-      to: 'UAH',
-      amount: 100,
-      result: 4435,
-      rate: 44.35,
-      strategy: 'direct',
-      ratesTimestamp: FETCHED_AT,
-    });
-  });
-
-  it('prices quote to base at one over what the bank sells the base at', () => {
-    expect(convertOffline({ from: 'UAH', to: 'USD', amount: 1000 }, snapshot)).toMatchObject({
-      result: 22.31,
-      rate: 0.022306,
-      strategy: 'direct',
-    });
-  });
-
-  it('uses the published pair for two currencies that both trade against the hryvnia', () => {
-    expect(convertOffline({ from: 'EUR', to: 'USD', amount: 100 }, snapshot)).toMatchObject({
-      result: 115.7,
-      rate: 1.157,
-      strategy: 'direct',
-    });
-  });
-
-  it('crosses through the hryvnia when no pair is published', () => {
-    expect(convertOffline({ from: 'GBP', to: 'PLN', amount: 250 }, snapshot)).toMatchObject({
-      result: 1246.7,
-      rate: 4.986802,
-      strategy: 'cross',
-    });
-  });
-
-  it('converts a currency to itself at one', () => {
-    expect(convertOffline({ from: 'USD', to: 'USD', amount: 100 }, snapshot)).toMatchObject({
-      result: 100,
-      rate: 1,
-      strategy: 'identity',
-    });
-  });
+  // Every row of fixtures/golden-conversions.json, asserted here in the browser
+  // copy of §5 and over HTTP by apps/api/test/e2e/conversion.e2e-spec.ts. A
+  // change to either implementation that moves a number fails on both sides.
+  it.each(vectors)(
+    'prices $amount $from to $to at $rate ($strategy)',
+    ({ from, to, amount, rate, result, strategy }) => {
+      expect(convertOffline({ from, to, amount }, snapshot)).toEqual({
+        from,
+        to,
+        amount,
+        rate,
+        result,
+        strategy,
+        ratesTimestamp: snapshot.fetchedAt,
+      });
+    },
+  );
 
   it('normalises the codes it is given', () => {
     expect(convertOffline({ from: 'usd', to: 'uah', amount: 100 }, snapshot)).toMatchObject({
@@ -107,15 +71,5 @@ describe('convertOffline', () => {
     expect(
       convertOffline({ from: 'USD', to: 'UAH', amount: Number.NaN }, snapshot),
     ).toBeUndefined();
-  });
-
-  it('rounds the rate and the money separately, as the API does', () => {
-    // 1 / 12.1834 carries far more precision than the six decimals a rate is
-    // published to, and the money is the amount times all of it: multiplying by
-    // the published 0.082079 instead would answer 82,079.00, eleven kopiyky out.
-    const converted = convertOffline({ from: 'UAH', to: 'PLN', amount: 1_000_000 }, snapshot);
-
-    expect(converted?.rate).toBe(0.082079);
-    expect(converted?.result).toBe(82078.89);
   });
 });

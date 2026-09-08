@@ -1,0 +1,113 @@
+{
+  "$comment": "Conversions of fixtures/rates-snapshot.json, computed once by hand from docs/architecture.md §5 and asserted by both implementations: apps/api/test/e2e/conversion.e2e-spec.ts over HTTP, and apps/web/src/features/converter/__tests__/convertOffline.test.ts in the browser copy. The rate is rounded half-up to six decimals and the money to two, and the money is computed from the *unrounded* rate — the UAH -> PLN million is the vector that fails if either side rounds the rate first. Run `npm run check:fixtures` after editing.",
+  "vectors": [
+    {
+      "from": "USD",
+      "to": "UAH",
+      "amount": 100,
+      "rate": 44.35,
+      "result": 4435,
+      "strategy": "direct",
+      "note": "Base into quote pays what the bank buys the base at."
+    },
+    {
+      "from": "UAH",
+      "to": "USD",
+      "amount": 1000,
+      "rate": 0.022306,
+      "result": 22.31,
+      "strategy": "direct",
+      "note": "Quote back into base pays one over what the bank sells the base at: 1 / 44.831."
+    },
+    {
+      "from": "EUR",
+      "to": "USD",
+      "amount": 100,
+      "rate": 1.1655,
+      "result": 116.55,
+      "strategy": "direct",
+      "note": "The published pair wins over the path through the hryvnia, which would lose a second spread."
+    },
+    {
+      "from": "USD",
+      "to": "EUR",
+      "amount": 100,
+      "rate": 0.851861,
+      "result": 85.19,
+      "strategy": "direct",
+      "note": "The same pair the other way: 1 / 1.1739."
+    },
+    {
+      "from": "GBP",
+      "to": "PLN",
+      "amount": 250,
+      "rate": 4.986802,
+      "result": 1246.7,
+      "strategy": "cross",
+      "note": "Both legs on mid rates: 60.7562 out, 1 / 12.1834 back."
+    },
+    {
+      "from": "PLN",
+      "to": "GBP",
+      "amount": 100,
+      "rate": 0.200529,
+      "result": 20.05,
+      "strategy": "cross",
+      "note": "The same cross reversed: 12.1834 / 60.7562."
+    },
+    {
+      "from": "EUR",
+      "to": "GBP",
+      "amount": 100,
+      "rate": 0.850942,
+      "result": 85.09,
+      "strategy": "cross",
+      "note": "§3's own worked example: two currencies quoted against the hryvnia and not against each other."
+    },
+    {
+      "from": "USD",
+      "to": "USD",
+      "amount": 100,
+      "rate": 1,
+      "result": 100,
+      "strategy": "identity",
+      "note": "A quoted code against itself is one, before any pair is looked up."
+    },
+    {
+      "from": "UAH",
+      "to": "USD",
+      "amount": 0.01,
+      "rate": 0.022306,
+      "result": 0,
+      "strategy": "direct",
+      "note": "Less than half a cent is worth zero, and it is a success: `rate` is what makes the zero readable."
+    },
+    {
+      "from": "UAH",
+      "to": "PLN",
+      "amount": 1000000,
+      "rate": 0.082079,
+      "result": 82078.89,
+      "strategy": "direct",
+      "note": "The rounding order made visible: multiplying by the published 0.082079 would answer 82079.00, eleven kopiyky out."
+    },
+    {
+      "from": "GBP",
+      "to": "UAH",
+      "amount": 10,
+      "rate": 60.7562,
+      "result": 607.56,
+      "strategy": "direct",
+      "note": "A mid-rate pair with no spread to choose between."
+    },
+    {
+      "from": "EUR",
+      "to": "UAH",
+      "amount": 1,
+      "rate": 51.7,
+      "result": 51.7,
+      "strategy": "direct",
+      "note": "The row the two suites used to disagree on: the web fixture said 51.47."
+    }
+  ]
+}

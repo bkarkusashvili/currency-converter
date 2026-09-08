@@ -1,0 +1,11 @@
+{
+  "$comment": "The one rates snapshot both implementations of docs/architecture.md §5 are tested against — the API's e2e conversion suite and the web app's offline estimate. Small on purpose, and shaped like what Monobank publishes: the major pairs carry a spread, the thinner ones only a mid rate, and EUR/USD is the pair that never touches the hryvnia. Change a number here and both suites re-price against it.",
+  "fetchedAt": "2026-09-08T12:00:00.000Z",
+  "rates": [
+    { "base": "USD", "quote": "UAH", "buy": 44.35, "sell": 44.831, "date": "2026-09-08T11:00:00.000Z" },
+    { "base": "EUR", "quote": "UAH", "buy": 51.7, "sell": 52.4501, "date": "2026-09-08T11:00:00.000Z" },
+    { "base": "EUR", "quote": "USD", "buy": 1.1655, "sell": 1.1739, "date": "2026-09-08T11:00:00.000Z" },
+    { "base": "GBP", "quote": "UAH", "cross": 60.7562, "date": "2026-09-08T11:00:00.000Z" },
+    { "base": "PLN", "quote": "UAH", "cross": 12.1834, "date": "2026-09-08T11:00:00.000Z" }
+  ]
+}

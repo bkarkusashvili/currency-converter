@@ -14,6 +14,7 @@
     "lint": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api run lint\" \"npm --prefix apps/web run lint\"",
     "typecheck": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api run typecheck\" \"npm --prefix apps/web run typecheck\"",
     "format:check": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api run format:check\" \"npm --prefix apps/web run format:check\"",
+    "check:fixtures": "node scripts/check-fixtures.mjs",
     "test": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api test\" \"npm --prefix apps/web test\"",
     "build": "concurrently --group --names api,web -c blue,magenta \"npm --prefix apps/api run build\" \"npm --prefix apps/web run build\"",
     "up": "docker compose up --build -d --wait",
