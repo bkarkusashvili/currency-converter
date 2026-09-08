@@ -23,23 +23,21 @@ from the same images.
 ## Status
 
 Merged on `main`: the API foundation (config, logging, error envelope, rate
-limiting, Redis client, `GET /health`, Swagger at `/docs` and `/docs-json`) and
-the web app (converter and `/about` pages, i18n, repository layer, nginx image).
-**`/health`, `/docs` and `/docs-json` are the only endpoints the API serves
-today.**
+limiting, Redis client, `GET /health`, Swagger at `/docs` and `/docs-json`), the
+rates module (Monobank provider, retry + circuit breaker, Redis cache-aside with
+a stale fallback, `GET /api/v1/rates` and `GET /api/v1/currencies`), the
+conversion endpoint (`POST /api/v1/convert`) and the web app (converter and
+`/about` pages, i18n, repository layer, nginx image).
 
-In progress:
+In review:
 
-- **Rates and currencies** — Monobank provider, retry + circuit breaker, Redis
-  cache-aside with a stale fallback, `GET /api/v1/rates` and
-  `GET /api/v1/currencies`:
-  [#3](https://github.com/bkarkusashvili/currency-converter/pull/3).
-- **Conversion and history** — `POST /api/v1/convert` and
-  `GET /api/v1/history` over MongoDB: next, per
-  [`docs/architecture.md`](docs/architecture.md) §3–§5.
+- **Conversion history** — the record every conversion writes on its way out,
+  `GET /api/v1/history` over MongoDB and the `mongodb` health indicator:
+  [#6](https://github.com/bkarkusashvili/currency-converter/pull/6).
 
-The web app already renders against these endpoints, so it shows an error state
-until the API side lands.
+With it the API serves every endpoint
+[`docs/architecture.md`](docs/architecture.md) §3 describes, and the web app
+renders against all of them.
 
 ## Quick start
 
@@ -160,6 +158,8 @@ in `.env` form.
 | `CORS_ORIGINS`                      | `http://localhost:5173,http://localhost:8080`    | Comma-separated browser origins allowed to call the API                          |
 | `REDIS_URL`                         | `redis://localhost:6379`                         | Rates cache and its stale fallback                                               |
 | `MONGO_URL`                         | `mongodb://localhost:27017/currency_converter`   | Conversion history                                                               |
+| `MONGO_SERVER_SELECTION_TIMEOUT_MS` | `3000`                                           | How long the driver looks for a server; a bound on time a conversion spends on a database that is down |
+| `HISTORY_TTL_DAYS`                  | `30`                                             | How long a conversion record is kept, enforced by a TTL index                    |
 | `MONOBANK_API_URL`                  | `https://api.monobank.ua/bank/currency`          | Upstream rate source                                                             |
 | `MONOBANK_TIMEOUT_MS`               | `5000`                                           | Per-request upstream timeout                                                     |
 | `MONOBANK_RETRY_ATTEMPTS`           | `3`                                              | Total attempts including the first; 429 is never retried                         |
@@ -192,7 +192,8 @@ want to change locally: `API_PORT`, `WEB_PORT`, `REDIS_PORT`, `MONGO_PORT`,
 apps/
 ├── api/                NestJS 11, TypeScript strict, own package + lockfile
 │   ├── src/            config, common (logging, filters, throttling, swagger),
-│   │                   infrastructure (redis), modules (health)
+│   │                   infrastructure (redis, mongo), modules (rates,
+│   │                   currencies, conversion, history, health)
 │   ├── test/e2e/       supertest suites over the real HTTP surface
 │   ├── Dockerfile      multi-stage, prod deps only, runs as `node`
 │   └── railway.json
@@ -264,6 +265,7 @@ Service variables:
 | `api`   | `PORT`          | `3000`                                                                   |
 | `api`   | `TRUST_PROXY`   | `1` — one proxy in front, so rate-limit buckets and logs key on the real client |
 | `api`   | `REDIS_URL`     | `${{Redis.REDIS_URL}}?family=0`                                          |
+| `api`   | `MONGO_URL`     | `${{MongoDB.MONGO_URL}}/currency_converter?authSource=admin`             |
 | `api`   | `CORS_ORIGINS`  | the web service's public URL, plus the local origins                     |
 | `web`   | `PORT`          | `8080`                                                                   |
 | `web`   | `API_URL`       | the api service's **public** URL — the browser fetches it, so the private domain would not resolve |
@@ -271,7 +273,11 @@ Service variables:
 `?family=0` on `REDIS_URL` is not decoration: Railway's private network is
 IPv6-only, and ioredis otherwise resolves `redis.railway.internal` as IPv4 and
 fails to connect. `family=0` lets it use whichever the DNS answer provides.
-`MONGO_URL` joins the list with the history module.
+
+`MONGO_URL` is the plugin's own variable with two things appended: the database
+name, which the reference does not carry, and `authSource=admin`, because the
+root user the plugin creates is defined in the `admin` database and
+authenticating against `currency_converter` would fail.
 
 ## Documentation
 

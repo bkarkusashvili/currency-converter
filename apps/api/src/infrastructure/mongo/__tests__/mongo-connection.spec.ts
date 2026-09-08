@@ -2,7 +2,7 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../common/logging/__tests__/fake-pino-logger';
-import type { TypedConfigService } from '../../../config/typed-config.service';
+import { fakeConfig } from '../../../config/__tests__/fake-config';
 import { MongoConnection } from '../mongo-connection';
 import { FakeMongoConnection } from './fake-mongo-connection';
 
@@ -10,13 +10,10 @@ import { FakeMongoConnection } from './fake-mongo-connection';
 // encode the constant it is checking the effect of.
 const PAST_ANY_RETRY_MS = 60_000;
 
-const config = {
-  get: (key: string): unknown =>
-    ({
-      MONGO_URL: 'mongodb://localhost:27017/currency_converter',
-      MONGO_SERVER_SELECTION_TIMEOUT_MS: 3000,
-    })[key],
-} as unknown as TypedConfigService;
+const config = fakeConfig({
+  MONGO_URL: 'mongodb://localhost:27017/currency_converter',
+  MONGO_SERVER_SELECTION_TIMEOUT_MS: 3000,
+});
 
 function createConnection(connection: FakeMongoConnection): {
   lifecycle: MongoConnection;

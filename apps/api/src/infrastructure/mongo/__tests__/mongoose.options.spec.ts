@@ -1,17 +1,14 @@
-import type { TypedConfigService } from '../../../config/typed-config.service';
+import { fakeConfig } from '../../../config/__tests__/fake-config';
 import { buildMongoConnectOptions } from '../mongo-connect.options';
 import { buildMongooseOptions } from '../mongoose.options';
 
 const SERVER_SELECTION_TIMEOUT_MS = 2500;
 const MONGO_URL = 'mongodb://mongo:27017/currency_converter';
 
-const config = {
-  get: (key: string): unknown =>
-    ({
-      MONGO_URL,
-      MONGO_SERVER_SELECTION_TIMEOUT_MS: SERVER_SELECTION_TIMEOUT_MS,
-    })[key],
-} as unknown as TypedConfigService;
+const config = fakeConfig({
+  MONGO_URL,
+  MONGO_SERVER_SELECTION_TIMEOUT_MS: SERVER_SELECTION_TIMEOUT_MS,
+});
 
 describe('buildMongoConnectOptions', () => {
   // The three options §2 rests on: a command issued while the connection is
