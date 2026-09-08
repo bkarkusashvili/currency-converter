@@ -4,8 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { LoggingModule } from '../../../../common/logging/logging.module';
 import { CircuitBreaker } from '../../../../common/resilience/circuit-breaker';
 import type { TypedConfigService } from '../../../../config/typed-config.service';
+import { MONOBANK_CIRCUIT_BREAKER } from '../../domain/monobank-circuit-breaker.token';
 import { RATES_PROVIDER } from '../../domain/rates-provider.token';
-import { MONOBANK_CIRCUIT_BREAKER } from './monobank-circuit-breaker.token';
 import { MonobankRatesProvider } from './monobank-rates.provider';
 
 function buildHttpOptions(config: TypedConfigService): HttpModuleOptions {
@@ -40,7 +40,8 @@ function buildCircuitBreaker(config: TypedConfigService): CircuitBreaker {
     { provide: RATES_PROVIDER, useClass: MonobankRatesProvider },
   ],
   // The breaker is exported so the health indicator reports the state of the
-  // instance the provider actually trips.
+  // instance the provider actually trips; RatesModule re-exports it, which is
+  // how the indicator reaches it without importing this module.
   exports: [RATES_PROVIDER, MONOBANK_CIRCUIT_BREAKER],
 })
 export class MonobankModule {}

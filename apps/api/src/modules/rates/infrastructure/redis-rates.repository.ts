@@ -35,14 +35,16 @@ export class RedisRatesRepository implements RatesRepository {
     return this.read(RATES_CACHE_KEYS.stale);
   }
 
-  // Both keys are written in one round trip: two separate calls could leave the
-  // fallback holding an older snapshot than the fresh key it is meant to back.
+  // Both keys are written in one transaction: a pipeline buys the round trip
+  // but not atomicity, so another instance's two SETs could land between these
+  // and leave the fallback holding an older snapshot than the fresh key it is
+  // meant to back.
   async save(snapshot: RatesSnapshot): Promise<void> {
     const value = JSON.stringify(snapshot);
 
     try {
       const results = await this.client
-        .pipeline()
+        .multi()
         .set(
           RATES_CACHE_KEYS.fresh,
           value,
@@ -57,10 +59,14 @@ export class RedisRatesRepository implements RatesRepository {
         )
         .exec();
 
-      // A command that fails on a live connection comes back as an entry error
-      // rather than a rejection, so an unchecked exec reports a write that
-      // never happened as a success.
-      const failure = results?.find(([error]) => error !== null)?.[0];
+      // Two ways a write is lost without the call rejecting: exec resolves null
+      // when the transaction was aborted, and a command that failed on a live
+      // connection comes back as an entry error. Read either as success and the
+      // cache is reported written when it is not.
+      const failure =
+        results === null
+          ? new Error('the transaction was aborted')
+          : results.find(([error]) => error !== null)?.[0];
 
       if (failure) {
         this.degrade('save', failure);

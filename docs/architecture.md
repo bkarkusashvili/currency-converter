@@ -126,6 +126,9 @@ Most recent conversions, newest first. `limit` is `1..50`, default `10`.
 
 - `redis` — `PING` under a short budget of its own. `up`, or `down` with the
   reason `ping failed` or `timeout`.
+- `mongodb` — not registered yet. It lands with the history module, which is
+  what introduces Mongo; until then the response carries `redis` and `monobank`
+  only.
 - `monobank` — the circuit-breaker state; it does **not** call the upstream,
   which allows one request per minute and would be starved by a probe running
   every few seconds. `CLOSED` is `up`, `HALF_OPEN` is `up` with the reason
@@ -319,10 +322,19 @@ float.
   `resetTimeoutMs`, closes on success / reopens on failure. Exposes `state` for
   the health indicator. Implemented in-house (~80 lines) so it is fully unit
   tested and dependency-free. The instance is bound to the
-  `MONOBANK_CIRCUIT_BREAKER` token and exported by `MonobankModule`, so the
+  `MONOBANK_CIRCUIT_BREAKER` token (declared beside the other rates tokens in
+  `rates/domain`) by `MonobankModule`, which `RatesModule` re-exports, so the
   health indicator reports the breaker the provider actually trips rather than
-  one of its own that nothing ever opens.
-- **Timeout** on every upstream request (`MONOBANK_TIMEOUT_MS`).
+  one of its own that nothing ever opens — and reaches it through the rates
+  module's exports instead of importing its infrastructure folder.
+- **Timeout** on every upstream request (`MONOBANK_TIMEOUT_MS`), and an overall
+  budget on the whole call (`MONOBANK_TOTAL_BUDGET_MS`, 8 s):
+  `withTimeout(retry(...), budget)` inside the breaker. The per-request timeout
+  bounds one attempt, so the attempts plus the backoff between them add up to
+  far longer than any of them, and single-flight makes every concurrent caller
+  wait out the same sum — for a stale copy that was already in Redis when the
+  first one arrived. The budget sits inside the breaker so an expiry counts as
+  an upstream failure rather than passing through unnoticed.
 - **Throttling** via `@nestjs/throttler` on all routes.
 - **Single-flight** cache refresh (see §4) so a burst of misses produces one
   upstream call.
@@ -380,18 +392,37 @@ reads.
 | `CORS_ORIGINS`                      | `http://localhost:5173,http://localhost:8080` |
 | `TRUST_PROXY`                       | `false`                                   |
 | `REDIS_URL`                         | `redis://localhost:6379`                  |
+| `REDIS_COMMAND_TIMEOUT_MS`          | `300`                                     |
 | `MONGO_URL`                         | `mongodb://localhost:27017/currency_converter` |
 | `MONOBANK_API_URL`                  | `https://api.monobank.ua/bank/currency`   |
 | `MONOBANK_TIMEOUT_MS`               | `5000`                                    |
 | `MONOBANK_RETRY_ATTEMPTS`           | `3`                                       |
 | `MONOBANK_RETRY_BASE_DELAY_MS`      | `300`                                     |
+| `MONOBANK_TOTAL_BUDGET_MS`          | `8000`                                    |
 | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5`                                       |
 | `CIRCUIT_BREAKER_RESET_TIMEOUT_MS`  | `30000`                                   |
 | `RATES_CACHE_TTL_SECONDS`           | `300`                                     |
 | `RATES_STALE_TTL_SECONDS`           | `86400`                                   |
 | `THROTTLE_TTL_SECONDS`              | `60`                                      |
 | `THROTTLE_LIMIT`                    | `60`                                      |
-| `ADMIN_API_KEY`                     | *(unset → cache invalidation is open)*    |
+| `ADMIN_API_KEY`                     | *(unset → cache invalidation is open; required in production)* |
+
+`ADMIN_API_KEY` is optional in development and test, where an unset key makes
+`ApiKeyGuard` a no-op so a local run needs no secret, and required when
+`NODE_ENV=production`: the schema's `superRefine` fails startup without one.
+`DELETE /rates/cache` clears the snapshot every instance reads, so leaving it
+open on a deployment hands anyone who can reach it a lever on an upstream that
+allows one request a minute — alternating `DELETE` and `GET` spends exactly the
+budget the cache exists to protect. Swagger also advertises the route as
+secured, which is only true once the key is set.
+
+`REDIS_COMMAND_TIMEOUT_MS` is the deadline on a single Redis command.
+`maxRetriesPerRequest` bounds the reconnects that follow a socket error and
+`enableOfflineQueue: false` refuses a command issued while the socket is down,
+but neither ends a command already written to a socket that stops answering.
+The cache is on the request path, so without a deadline `GET /rates` waits on it
+indefinitely; with one, the command rejects and `RedisRatesRepository` degrades
+it to a miss and an upstream call.
 
 `TRUST_PROXY` feeds Express's `trust proxy`: `false` trusts nobody, `true` trusts
 every hop, and a number is how many proxies sit in front of the process. It
@@ -434,7 +465,7 @@ apps/api
 │       │   ├── domain/          ExchangeRate, RatesSnapshot, RatesSource, ports + tokens
 │       │   ├── dto/             ExchangeRateDto, RatesSnapshotResponseDto
 │       │   ├── infrastructure/
-│       │   │   ├── monobank/    provider, zod payload schema, mapper, retry predicate, breaker token
+│       │   │   ├── monobank/    provider, zod payload schema, mapper, retry predicate
 │       │   │   ├── cached-rates-snapshot.schema.ts  zod schema for a cached value
 │       │   │   ├── rates-cache-keys.ts
 │       │   │   └── redis-rates.repository.ts
@@ -474,17 +505,43 @@ still returned.
 ## 10. Web app
 
 - React 19, Vite, TypeScript strict, Tailwind CSS, React Router, TanStack Query,
-  i18next for every user-visible string.
+  i18next + react-i18next.
 - Routes: `/` converter (form, result card, recent conversions), `/about`
   reviewer page (what was built, why, links to repo / API docs / health).
 - Runtime configuration: `public/config.js` sets `window.__APP_CONFIG__.apiUrl`;
   the Docker image regenerates it from `API_URL` at container start so the same
-  image runs locally and on Railway.
-- `src/api/` is the only place that knows about HTTP, layered
-  `http` → `repositories` → `hooks`; components consume the typed hooks
-  (`useConvert`, `useCurrencies`, `useHistory`). See §12.
-- Tests: Vitest + Testing Library for the form, result rendering and error
-  states, with a fake repository injected through the provider.
+  image runs locally and on Railway. The value is JSON-escaped as it is written,
+  so a quote in the URL cannot break the file.
+- **Ports and adapters, client side.** `src/api/repositories` declares one
+  interface per resource (`ConversionRepository`, `CurrenciesRepository`,
+  `HistoryRepository`, `HealthRepository`) with an HTTP implementation factory
+  each, bound through a React context (`RepositoriesProvider` /
+  `useRepositories`). `src/api/hooks` wraps them in TanStack Query hooks
+  (`useConvert`, `useCurrencies`, `useHistory`, `useHealth`) that depend only on
+  the interfaces. `src/api/http` is the only place that knows about `fetch`; a
+  component imports nothing from it but the `ApiError` and field-error types it
+  renders.
+- `GET /health` goes through that same transport, with `[200, 503]` passed as
+  its accepted statuses: both carry the terminus report, so a degraded API is
+  rendered indicator by indicator instead of as unreachable. A transport
+  failure, a body that does not parse and a report that fails its guard are the
+  only errors, each carrying the status it arrived on, and the query does not
+  retry.
+- **Internationalisation.** Every user-facing string lives in
+  `src/i18n/en.json`, loaded through `react-i18next`; the `CustomTypeOptions`
+  augmentation type-checks keys against the JSON. Numbers and dates are
+  formatted with `Intl` in the active language, and the document's `lang`
+  attribute follows i18next's resolved language. Adding a language is a new JSON
+  file plus a language switch, with no component changes. API failures map the
+  envelope `code` to a translated message and fall back to the server `message`;
+  `details.errors` entries are shown as returned, and the ones naming `amount`,
+  `from` or `to` are routed onto that input, where they clear as soon as the
+  user edits the field they describe.
+- Feature folders carry their own structure (`components/`, `hooks/`, `lib/`,
+  `__tests__/`); shared test helpers and fakes live in `src/test/`.
+- Tests: Vitest + Testing Library, rendered through the i18n and repository
+  providers with in-memory repository fakes, plus fetch-level tests asserting
+  the URL, method, headers and body of every endpoint.
 
 ## 11. Testing strategy
 
@@ -492,11 +549,12 @@ still returned.
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
 | E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history`, `/health` |
-| Unit (web)           | Vitest + Testing Library     | form validation, result display, error display, history list |
+| Unit (web)           | Vitest + Testing Library     | amount parsing, form validation, per-field server errors, result display and provenance fallbacks, error display, history list, health rendering, every HTTP repository |
 
-Coverage threshold for `apps/api`: 85% lines/branches enforced in Jest config;
-nothing under a `__tests__` folder counts as source. Unit tests never touch the
-network, Redis or Mongo.
+Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
+90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
+runs the coverage script, not the plain one, plus `format:check`.
+Unit tests never touch the network, Redis or Mongo.
 
 ## 12. Conventions
 
@@ -543,9 +601,10 @@ extends it:
 - Data access is layered and each layer is the only one that knows its concern:
   `src/api/http` is the fetch client (base url, headers, decoding the error
   envelope), `src/api/repositories` holds one interface per resource with its
-  implementation (`RatesRepository`, `ConversionRepository`,
-  `HistoryRepository`) handed to the tree through a provider, and
-  `src/api/hooks` exposes the TanStack Query hooks components consume
-  (`useConvert`, `useCurrencies`, `useHistory`). A component never fetches.
+  implementation (`ConversionRepository`, `CurrenciesRepository`,
+  `HistoryRepository`, `HealthRepository`) handed to the tree through a
+  provider, and `src/api/hooks` exposes the TanStack Query hooks components
+  consume (`useConvert`, `useCurrencies`, `useHistory`, `useHealth`). A
+  component never fetches.
 - Tests inject a fake repository through that same provider rather than mocking
   `fetch` or the network, so a component test never depends on the transport.

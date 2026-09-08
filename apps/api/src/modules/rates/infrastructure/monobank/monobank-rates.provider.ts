@@ -5,10 +5,11 @@ import { PinoLogger } from 'nestjs-pino';
 import { firstValueFrom } from 'rxjs';
 import { CircuitBreaker } from '../../../../common/resilience/circuit-breaker';
 import { retry } from '../../../../common/resilience/retry';
+import { withTimeout } from '../../../../common/utils/with-timeout';
 import type { TypedConfigService } from '../../../../config/typed-config.service';
+import { MONOBANK_CIRCUIT_BREAKER } from '../../domain/monobank-circuit-breaker.token';
 import { RatesProvider } from '../../domain/rates-provider.port';
 import { RatesSnapshot } from '../../domain/rates-snapshot';
-import { MONOBANK_CIRCUIT_BREAKER } from './monobank-circuit-breaker.token';
 import { monobankRatesSchema } from './monobank-rate.schema';
 import { mapMonobankRates } from './monobank-rates.mapper';
 import { shouldRetryMonobank } from './should-retry-monobank';
@@ -32,16 +33,26 @@ export class MonobankRatesProvider implements RatesProvider {
   // The breaker wraps the retries rather than the other way round, so an
   // exhausted call counts as one failure against the threshold instead of
   // tripping the circuit on a single bad minute.
+  //
+  // The budget wraps the retries in turn. MONOBANK_TIMEOUT_MS bounds a single
+  // request, so the attempts and the backoff between them add up to far longer
+  // than any of them, and single-flight makes every concurrent caller wait out
+  // the same sum — for a stale copy that was already in Redis when the first
+  // one arrived. Inside the breaker, so an expired budget counts as the
+  // upstream failure it is rather than passing through unnoticed.
   fetchRates(): Promise<RatesSnapshot> {
     return this.breaker.execute(() =>
-      retry(() => this.requestSnapshot(), {
-        attempts: this.config.get('MONOBANK_RETRY_ATTEMPTS', { infer: true }),
-        baseDelayMs: this.config.get('MONOBANK_RETRY_BASE_DELAY_MS', {
-          infer: true,
+      withTimeout(
+        retry(() => this.requestSnapshot(), {
+          attempts: this.config.get('MONOBANK_RETRY_ATTEMPTS', { infer: true }),
+          baseDelayMs: this.config.get('MONOBANK_RETRY_BASE_DELAY_MS', {
+            infer: true,
+          }),
+          maxDelayMs: MAX_RETRY_DELAY_MS,
+          shouldRetry: shouldRetryMonobank,
         }),
-        maxDelayMs: MAX_RETRY_DELAY_MS,
-        shouldRetry: shouldRetryMonobank,
-      }),
+        this.config.get('MONOBANK_TOTAL_BUDGET_MS', { infer: true }),
+      ),
     );
   }
 

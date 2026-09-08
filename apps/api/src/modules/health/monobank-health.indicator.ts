@@ -4,7 +4,7 @@ import {
   HealthIndicatorService,
 } from '@nestjs/terminus';
 import { CircuitBreaker } from '../../common/resilience/circuit-breaker';
-import { MONOBANK_CIRCUIT_BREAKER } from '../rates/infrastructure/monobank/monobank-circuit-breaker.token';
+import { MONOBANK_CIRCUIT_BREAKER } from '../rates/domain/monobank-circuit-breaker.token';
 import { HealthIndicatorPort } from './health-indicator.port';
 
 const INDICATOR_KEY = 'monobank';

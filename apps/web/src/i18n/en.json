@@ -1,0 +1,237 @@
+{
+  "app": {
+    "title": "Currency Converter",
+    "nav": {
+      "label": "Main",
+      "converter": "Converter",
+      "about": "About",
+      "repository": "GitHub"
+    },
+    "footer": {
+      "rates": "Rates from Monobank, crossed through UAH",
+      "api": "API {{url}}"
+    }
+  },
+  "common": {
+    "unknownTime": "—"
+  },
+  "converter": {
+    "eyebrow": "Monobank rates · cross rates through UAH",
+    "heading": "Convert at a rate you can trace.",
+    "intro": "Every conversion reports the strategy that produced the rate and whether it came from the cache, from Monobank, or from the last good snapshot.",
+    "form": {
+      "amount": "Amount",
+      "from": "From",
+      "to": "To",
+      "swap": "Swap the two currencies",
+      "submit": "Convert",
+      "submitting": "Converting…",
+      "currencyOption": "{{code}} — {{name}}",
+      "currenciesUnavailable": "The currency list did not load ({{message}}) — the two defaults are still available."
+    },
+    "amountErrors": {
+      "empty": "Enter an amount to convert.",
+      "notANumber": "Amount must be a number, for example 250.75 or 1,250.75.",
+      "notPositive": "Amount must be greater than zero.",
+      "tooLarge": "Amount must be {{max}} or less."
+    },
+    "result": {
+      "heading": "Result",
+      "rateLead": "1 {{from}} = ",
+      "rateTrail": " {{to}}",
+      "ratesFetched": "Rates fetched",
+      "pathLabel": "Conversion path: {{path}}",
+      "provenanceHeading": "Where this rate came from",
+      "strategyTerm": "Strategy",
+      "sourceTerm": "Source"
+    },
+    "badge": {
+      "strategy": "strategy",
+      "source": "source"
+    },
+    "strategy": {
+      "identity": {
+        "value": "identity",
+        "note": "Both sides are the same currency, so nothing was converted."
+      },
+      "direct": {
+        "value": "direct",
+        "note": "Monobank publishes this pair, so its rate was used as it stands."
+      },
+      "cross": {
+        "value": "cross",
+        "note": "No pair is published for these two currencies, so the rate was derived through {{hub}}."
+      },
+      "unknown": {
+        "note": "This client does not recognise the strategy the API reported, so it is shown exactly as it was returned."
+      }
+    },
+    "source": {
+      "cache": {
+        "value": "cache",
+        "note": "Served from the cached rate snapshot."
+      },
+      "provider": {
+        "value": "provider",
+        "note": "Fetched from Monobank while handling this request."
+      },
+      "stale-cache": {
+        "value": "stale cache",
+        "note": "Monobank was unreachable, so the last good snapshot was used. This rate may be out of date."
+      },
+      "unknown": {
+        "note": "This client does not recognise the source the API reported, so it is shown exactly as it was returned."
+      }
+    },
+    "history": {
+      "heading": "Recent conversions",
+      "limit": "Last {{count}}",
+      "empty": "No conversions yet. The last {{count}} will be listed here.",
+      "unavailable": "Recent conversions are unavailable. Converting still works.",
+      "rate": "1 {{from}} = {{rate}} {{to}}"
+    }
+  },
+  "about": {
+    "eyebrow": "For the reviewer",
+    "heading": "A currency converter, built as a service.",
+    "purpose": [
+      "Currency Converter turns an amount in one currency into another using Monobank’s published exchange rates. It exists to show a small service built the way a production service is built: a domain that does not know what a database is, a cache that can fail without taking the request down with it, one error shape for every failure, and a client that tells you where each number came from.",
+      "The design is written down first, in docs/architecture.md, and the code lands against it one pull request at a time. The section below says which parts have merged."
+    ],
+    "live": {
+      "heading": "Live",
+      "repository": "Source on GitHub",
+      "repositoryHint": "bkarkusashvili/currency-converter",
+      "apiDocs": "API documentation",
+      "health": "Health endpoint"
+    },
+    "status": {
+      "title": "Where it stands",
+      "items": [
+        "The API foundation — typed configuration, pino request logging, the shared error envelope, the health endpoint, its Docker image and CI — has merged.",
+        "The rates, conversion and history modules follow in subsequent pull requests, and the Docker Compose file that runs api, web, Redis and Mongo together lands with them.",
+        "This client is complete and is built against the API contract in docs/architecture.md, not against a running service. Until the conversion module merges, converting against a local API returns a 404 through the same error envelope.",
+        "Everything below describes the design the code implements as those modules land."
+      ]
+    },
+    "whatWasBuilt": {
+      "title": "What was built",
+      "points": [
+        {
+          "term": "A NestJS API",
+          "description": "REST endpoints under /api/v1 for convert, rates, currencies and history, documented with Swagger at /docs, plus a terminus health endpoint that reports the Redis, MongoDB and Monobank indicators as those modules land — today it answers with an empty report, and this page renders whatever indicators it carries."
+        },
+        {
+          "term": "Ports and adapters",
+          "description": "The domain depends on RatesProvider, RatesRepository and HistoryRepository interfaces bound through DI tokens. Monobank, Redis and Mongo are adapters behind them, so changing the rate source or the cache is a module binding, not a rewrite."
+        },
+        {
+          "term": "A strategy per rate path",
+          "description": "Identity, direct pair and cross rate through UAH, selected by a resolver at request time. Amounts are computed with big.js and rounded half-up; floating point never touches money."
+        },
+        {
+          "term": "Cache-aside with a stale fallback",
+          "description": "Each successful upstream fetch writes a fresh key (five minutes) and a fallback key (24 hours) in Redis. Concurrent misses share one in-flight call, so a burst of traffic produces a single request to Monobank."
+        },
+        {
+          "term": "Resilience around the upstream",
+          "description": "A per-request timeout, retry with exponential backoff and full jitter, and an in-house circuit breaker (CLOSED → OPEN → HALF_OPEN) whose state feeds the health endpoint. 429 is never retried: Monobank allows one request a minute."
+        },
+        {
+          "term": "One typed error envelope",
+          "description": "A small hierarchy of domain errors normalised by a global exception filter into { statusCode, code, message, details } with a timestamp, path and request id. /health is the one exception: it answers with the terminus report so a caller can see which dependency is down."
+        },
+        {
+          "term": "Graceful degradation",
+          "description": "Redis or Mongo being down is logged and surfaced on /health without failing a conversion. When Monobank is unreachable the response is served from the fallback snapshot and says so."
+        },
+        {
+          "term": "Operations",
+          "description": "pino request logging with a request id, environment validated by a zod schema at boot, a multi-stage Docker image per app, and GitHub Actions running lint, formatting, typecheck, tests with coverage thresholds, build and the image build — one job per app, both gated the same way."
+        },
+        {
+          "term": "This client",
+          "description": "React 19, Vite, TanStack Query and Tailwind v4 with a dark-aware token palette. Components depend on repository interfaces, never on HTTP; every string comes from an i18n dictionary. Vitest and Testing Library cover the repositories, the amount parser, the form, the history panel and this page."
+        }
+      ]
+    },
+    "whyTheseDecisions": {
+      "title": "Why these decisions",
+      "points": [
+        {
+          "term": "Interfaces before infrastructure",
+          "description": "Depending on ports keeps the conversion rules testable without Redis, Mongo or the network, and it keeps infrastructure concerns from leaking into the part of the code that has the actual business rules in it. The client does the same thing: components take a repository interface, and the tests hand them an in-memory one."
+        },
+        {
+          "term": "Three strategies instead of one branch",
+          "description": "Identity, direct and cross are three different rules with three different failure modes. Keeping them apart keeps each one small and lets the API report which one it used — the strategy badge on the converter is that decision, surfaced."
+        },
+        {
+          "term": "Stale data beats no data",
+          "description": "Monobank rate-limits to one request a minute and does go down. An hour-old snapshot is more useful than a 503, as long as the response admits which one you are looking at. That is what the source badge is for."
+        },
+        {
+          "term": "Fail fast on config, degrade slowly at runtime",
+          "description": "Invalid environment stops the process at boot, where the mistake is cheap to notice. A dependency dying at runtime only removes the feature that needs it, and the health endpoint names it."
+        },
+        {
+          "term": "One error shape",
+          "description": "A single envelope means the client renders every failure through one component, mapping the code to a translated message. VALIDATION_ERROR carries per-field messages, and the converter routes the ones it recognises back onto the matching input."
+        },
+        {
+          "term": "Runtime configuration over build-time env",
+          "description": "A Vite build bakes env vars into the bundle. Reading window.__APP_CONFIG__ from config.js, rewritten by the container at start, means the same image runs locally and on a hosted environment with one variable changed."
+        }
+      ]
+    },
+    "howToRun": {
+      "title": "How to run it",
+      "intro": "Follow the README in the repository for the current instructions; it is updated as each app lands. These two are what this app supports today.",
+      "readmeLabel": "README in the repository",
+      "blocks": [
+        {
+          "caption": "From source",
+          "commands": [
+            "git clone https://github.com/bkarkusashvili/currency-converter",
+            "cd currency-converter/apps/web",
+            "npm ci && npm run dev"
+          ]
+        },
+        {
+          "caption": "As a container",
+          "commands": [
+            "docker build -t currency-web:local .",
+            "docker run --rm -e API_URL=https://api.example.com -e PORT=8080 -p 8080:8080 currency-web:local"
+          ]
+        }
+      ],
+      "notes": [
+        "The dev server listens on :5173 and the container on the port given by PORT.",
+        "The web app reads its API URL from public/config.js at runtime, so pointing it at another API needs no rebuild — the container rewrites that file from API_URL at start."
+      ]
+    }
+  },
+  "health": {
+    "checking": "Checking the API…",
+    "unreachable": "The health endpoint did not answer.",
+    "ok": "API reports every dependency up",
+    "degraded": "API reports a degraded dependency",
+    "statusUp": "up",
+    "statusDown": "down"
+  },
+  "errors": {
+    "requestId": "request {{id}}",
+    "fieldErrorsLead": "The messages below say what needs fixing.",
+    "codes": {
+      "VALIDATION_ERROR": "The request did not pass validation.",
+      "UNAUTHORIZED": "This request needs an admin API key.",
+      "NOT_FOUND": "The API does not have that endpoint.",
+      "UNSUPPORTED_CURRENCY": "That currency is not in the current rate snapshot.",
+      "RATE_NOT_AVAILABLE": "No rate path connects those two currencies right now.",
+      "TOO_MANY_REQUESTS": "Too many requests. Wait a moment and try again.",
+      "RATES_UNAVAILABLE": "Exchange rates are unavailable: Monobank could not be reached and there is no recent snapshot to fall back on.",
+      "INTERNAL_ERROR": "The API failed unexpectedly. Try again in a moment.",
+      "NETWORK_ERROR": "Cannot reach the API at {{url}}. Check that it is running and reachable."
+    }
+  }
+}

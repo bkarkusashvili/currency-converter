@@ -15,3 +15,8 @@ delete process.env.ADMIN_API_KEY;
 // reports the cache down on /health instead of passing on whatever Redis the
 // developer happens to have running.
 process.env.REDIS_URL = 'redis://127.0.0.1:1';
+// Same reason, one dependency further out: only the rates suite overrides
+// RATES_PROVIDER, so a future suite that touches /rates and forgets to would
+// call Monobank for real from CI. Pointed at a port nothing listens on, it
+// fails instead.
+process.env.MONOBANK_API_URL = 'http://127.0.0.1:1';

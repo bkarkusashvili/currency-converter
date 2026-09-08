@@ -19,6 +19,12 @@ import { RatesController } from './rates.controller';
   ],
   // Conversion and currencies read the snapshot through the same service, so
   // they share its cache and its single flight rather than fetching again.
-  exports: [RatesService],
+  //
+  // MonobankModule is re-exported so the health indicator can inject the
+  // breaker the provider trips without importing this module's infrastructure
+  // folder: which adapter is wired stays a decision of the line above. Nest
+  // re-exports modules rather than individual tokens, so the module is what
+  // travels; MONOBANK_CIRCUIT_BREAKER and RATES_PROVIDER are all it exports.
+  exports: [RatesService, MonobankModule],
 })
 export class RatesModule {}
