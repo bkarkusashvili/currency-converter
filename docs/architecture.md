@@ -1,0 +1,395 @@
+# Architecture
+
+This document is the design contract for the project. Every module, endpoint and
+behaviour described here is implemented; deviations must be reflected here.
+
+## 1. Overview
+
+```
+Browser ──▶ web (React SPA, nginx) ──▶ api (NestJS) ──▶ Redis     (rates cache)
+                                              ├──────▶ MongoDB   (conversion history)
+                                              └──────▶ Monobank  (upstream rates)
+```
+
+Monorepo layout:
+
+| Path              | What                                                     |
+| ----------------- | -------------------------------------------------------- |
+| `apps/api`        | NestJS 11, TypeScript strict, REST API                   |
+| `apps/web`        | React 19 + Vite + TypeScript SPA                         |
+| `docker-compose.yml` | api, web, redis, mongo for local orchestration        |
+| `docs/`           | This document and the API reference                      |
+| `.github/workflows` | CI: lint, typecheck, unit + e2e tests, build per app   |
+
+Each app is an independent npm package with its own lockfile so it can be built
+and deployed in isolation (Docker, Railway).
+
+## 2. Design principles
+
+- **Ports and adapters.** Domain code depends on interfaces (`RatesProvider`,
+  `RatesRepository`, `HistoryRepository`); infrastructure (Monobank, Redis,
+  Mongo) implements them and is bound through NestJS DI tokens. Swapping the
+  rate source or the cache is a one-line module change.
+- **Strategy pattern** for conversion (identity, direct pair, cross via UAH),
+  chosen by a resolver at runtime.
+- **Cache-aside** with a fresh key and a long-lived fallback key, explicit
+  invalidation, and single-flight de-duplication of concurrent misses.
+- **Resilience** around the upstream: timeout, retry with exponential backoff
+  and jitter, circuit breaker (CLOSED → OPEN → HALF_OPEN).
+- **Graceful degradation.** Redis or Mongo being down never breaks a
+  conversion; it is logged, surfaced on `/health`, and the request still
+  succeeds when the upstream (or a stale copy) is reachable.
+- **One error envelope** for every failure, produced by a global exception
+  filter from a small hierarchy of typed domain errors.
+- **Strict typing, small files, no comments that restate the code.** Comments
+  are reserved for non-obvious *why*s.
+
+## 3. API contract
+
+Base path: `/api/v1`. All responses are JSON. Swagger UI at `/docs`,
+OpenAPI JSON at `/docs-json`.
+
+### POST `/api/v1/convert`
+
+Request body:
+
+```json
+{ "from": "EUR", "to": "GBP", "amount": 100 }
+```
+
+| Field    | Rules                                                          |
+| -------- | -------------------------------------------------------------- |
+| `from`   | ISO 4217 alpha-3, case-insensitive, normalised to upper case   |
+| `to`     | same as `from`                                                 |
+| `amount` | finite number, `> 0`, `<= 1_000_000_000_000`                   |
+
+Response `200`:
+
+```json
+{
+  "from": "EUR",
+  "to": "GBP",
+  "amount": 100,
+  "result": 84.73,
+  "rate": 0.847312,
+  "strategy": "cross",
+  "source": "cache",
+  "ratesTimestamp": "2026-09-08T12:00:00.000Z"
+}
+```
+
+- `rate` is the effective `to`-per-`from` rate, rounded to 6 decimals.
+- `result` is `amount × rate`, rounded half-up to 2 decimals. Arithmetic uses
+  `big.js`; floating point is never used for money.
+- `strategy`: `identity` | `direct` | `cross`.
+- `source`: `cache` | `provider` | `stale-cache`.
+
+### GET `/api/v1/rates`
+
+Returns the current snapshot the service would convert with:
+
+```json
+{
+  "source": "cache",
+  "fetchedAt": "2026-09-08T12:00:00.000Z",
+  "rates": [
+    { "base": "USD", "quote": "UAH", "buy": 44.35, "sell": 44.831, "date": "…" },
+    { "base": "GBP", "quote": "UAH", "cross": 60.7562, "date": "…" }
+  ]
+}
+```
+
+### DELETE `/api/v1/rates/cache`
+
+Invalidates both cache keys. Returns `204`. If `ADMIN_API_KEY` is configured
+the request must carry it in the `x-api-key` header (`401` otherwise).
+
+### GET `/api/v1/currencies`
+
+Currencies present in the current snapshot plus `UAH`, sorted by code:
+
+```json
+{ "currencies": [{ "code": "EUR", "numericCode": 978, "name": "Euro" }] }
+```
+
+### GET `/api/v1/history?limit=10`
+
+Most recent conversions, newest first. `limit` is `1..50`, default `10`.
+
+```json
+{ "items": [{ "id": "…", "from": "EUR", "to": "GBP", "amount": 100, "result": 84.73, "rate": 0.847312, "strategy": "cross", "createdAt": "…" }] }
+```
+
+### GET `/health`
+
+`@nestjs/terminus` response with indicators `redis`, `mongodb`, `monobank`.
+The Monobank indicator reports the circuit-breaker state and does **not** call
+the upstream (Monobank allows one request per minute).
+
+### Error envelope
+
+Every non-2xx response has this shape:
+
+```json
+{
+  "statusCode": 422,
+  "code": "UNSUPPORTED_CURRENCY",
+  "message": "Currency 'XYZ' is not supported",
+  "details": { "currency": "XYZ" },
+  "timestamp": "2026-09-08T12:00:00.000Z",
+  "path": "/api/v1/convert",
+  "requestId": "…"
+}
+```
+
+| HTTP | `code`                 | When                                              |
+| ---- | ---------------------- | ------------------------------------------------- |
+| 400  | `VALIDATION_ERROR`     | DTO validation failed; `details.errors` lists fields |
+| 401  | `UNAUTHORIZED`         | Missing/invalid admin API key                     |
+| 404  | `NOT_FOUND`            | Unknown route                                     |
+| 422  | `UNSUPPORTED_CURRENCY` | Code is not in the snapshot                       |
+| 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                |
+| 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                          |
+| 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists          |
+| 500  | `INTERNAL_ERROR`       | Anything unexpected; message is generic           |
+
+## 4. Rates domain
+
+```ts
+type CurrencyCode = string; // ISO 4217 alpha-3, upper case
+
+interface ExchangeRate {
+  base: CurrencyCode;   // currencyCodeA
+  quote: CurrencyCode;  // currencyCodeB
+  buy?: number;         // rateBuy  – bank buys `base`, pays `quote`
+  sell?: number;        // rateSell – bank sells `base`, receives `quote`
+  cross?: number;       // rateCross – mid rate when buy/sell are absent
+  date: string;         // ISO timestamp from Monobank `date`
+}
+
+interface RatesSnapshot {
+  fetchedAt: string;    // ISO timestamp of the upstream fetch
+  rates: ExchangeRate[];
+}
+```
+
+Monobank returns numeric ISO codes; they are mapped to alpha-3 with the
+`currency-codes` package. Entries whose numeric code is unknown are dropped
+(logged at debug level). Entries with no usable rate are dropped.
+
+### Ports
+
+```ts
+const RATES_PROVIDER = Symbol('RATES_PROVIDER');
+interface RatesProvider { fetchRates(): Promise<RatesSnapshot>; }
+
+const RATES_REPOSITORY = Symbol('RATES_REPOSITORY');
+interface RatesRepository {
+  getFresh(): Promise<RatesSnapshot | null>;
+  getStale(): Promise<RatesSnapshot | null>;
+  save(snapshot: RatesSnapshot): Promise<void>;
+  clear(): Promise<void>;
+}
+```
+
+### `RatesService.getSnapshot()` (cache-aside)
+
+```
+fresh = repo.getFresh()            → hit: return { snapshot, source: 'cache' }
+miss → single-flight:
+  try   snapshot = provider.fetchRates()   (retry + circuit breaker inside)
+        repo.save(snapshot)                (errors logged, not thrown)
+        return { snapshot, source: 'provider' }
+  catch stale = repo.getStale()
+        stale ? { snapshot: stale, source: 'stale-cache' } : throw RatesUnavailableError
+```
+
+- Concurrent callers during a miss share one in-flight promise.
+- Every `RatesRepository` method catches Redis errors, logs a warning with the
+  operation name, and degrades (`null` on reads, no-op on writes).
+
+### Redis keys
+
+| Key               | TTL env                    | Default |
+| ----------------- | -------------------------- | ------- |
+| `rates:latest`    | `RATES_CACHE_TTL_SECONDS`  | 300     |
+| `rates:fallback`  | `RATES_STALE_TTL_SECONDS`  | 86400   |
+
+Both are written on every successful upstream fetch. `DELETE /rates/cache`
+removes both. Values are the JSON-serialised `RatesSnapshot`.
+
+## 5. Conversion semantics
+
+Monobank publishes `1 base = X quote`. `rateBuy` is the price at which the bank
+buys `base`; `rateSell` is the price at which it sells `base`; `rateCross` is
+a mid rate for pairs without a spread. From the client's point of view:
+
+| Direction            | Multiply amount by                     |
+| -------------------- | -------------------------------------- |
+| `base → quote`       | `buy ?? cross`                         |
+| `quote → base`       | `1 / (sell ?? cross)`                  |
+
+Strategies, tried in order by `ConversionStrategyResolver`:
+
+1. **`IdentityStrategy`** — `from === to` → rate `1`.
+2. **`DirectPairStrategy`** — a rate exists for `(from, to)` or `(to, from)`
+   (e.g. `USD/UAH`, `UAH/USD`, `EUR/USD`).
+3. **`CrossRateStrategy`** — both `from` and `to` have a pair against the base
+   currency `UAH`; rate = `rate(from→UAH) × rate(UAH→to)`.
+
+If no strategy applies: `UNSUPPORTED_CURRENCY` when a code is absent from the
+snapshot entirely, otherwise `RATE_NOT_AVAILABLE`.
+
+```ts
+interface ConversionStrategy {
+  readonly name: 'identity' | 'direct' | 'cross';
+  supports(from: CurrencyCode, to: CurrencyCode, rates: ExchangeRate[]): boolean;
+  rate(from: CurrencyCode, to: CurrencyCode, rates: ExchangeRate[]): Big;
+}
+```
+
+## 6. Resilience (`apps/api/src/common/resilience`)
+
+- **`retry(fn, { attempts, baseDelayMs, maxDelayMs, shouldRetry })`** —
+  exponential backoff with full jitter. Monobank calls retry only on network
+  errors, timeouts and `5xx`. `429` is never retried (the limit is 1 req/min;
+  retrying makes it worse) and falls through to the stale cache.
+- **`CircuitBreaker`** — states `CLOSED`, `OPEN`, `HALF_OPEN`. Opens after
+  `failureThreshold` consecutive failures, rejects immediately with
+  `CircuitOpenError` while open, allows a single trial call after
+  `resetTimeoutMs`, closes on success / reopens on failure. Exposes `state` for
+  the health indicator. Implemented in-house (~80 lines) so it is fully unit
+  tested and dependency-free.
+- **Timeout** on every upstream request (`MONOBANK_TIMEOUT_MS`).
+- **Throttling** via `@nestjs/throttler` on all routes.
+- **Single-flight** cache refresh (see §4) so a burst of misses produces one
+  upstream call.
+
+## 7. Errors and logging
+
+```ts
+abstract class AppError extends Error {
+  abstract readonly code: ErrorCode;
+  abstract readonly status: HttpStatus;
+  constructor(message: string, readonly details?: Record<string, unknown>) {}
+}
+```
+
+Concrete: `UnsupportedCurrencyError`, `RateNotAvailableError`,
+`RatesUnavailableError`, `UnauthorizedError`. `CircuitOpenError` is internal
+and is translated to `RatesUnavailableError` by `RatesService`.
+
+`GlobalExceptionFilter` (registered with `APP_FILTER`):
+
+- `AppError` → its status/code, message and details.
+- Nest `HttpException` (validation, throttler, 404) → normalised into the
+  envelope with the codes from §3.
+- Anything else → `500 INTERNAL_ERROR`, generic message, full stack logged.
+
+Logging uses `nestjs-pino`: JSON in production, `pino-pretty` in development,
+one request-scoped log line per request with `requestId`, method, path, status
+and duration. Services use the injected `PinoLogger` with a context.
+
+## 8. Configuration
+
+`@nestjs/config` with a `zod` schema; the process fails fast on invalid env.
+`ConfigService<AppConfig, true>` is used everywhere for typed, non-nullable
+reads.
+
+| Variable                            | Default                                   |
+| ----------------------------------- | ----------------------------------------- |
+| `NODE_ENV`                          | `development`                             |
+| `PORT`                              | `3000`                                    |
+| `LOG_LEVEL`                         | `info`                                    |
+| `CORS_ORIGINS`                      | `http://localhost:5173,http://localhost:8080` |
+| `REDIS_URL`                         | `redis://localhost:6379`                  |
+| `MONGO_URL`                         | `mongodb://localhost:27017/currency_converter` |
+| `MONOBANK_API_URL`                  | `https://api.monobank.ua/bank/currency`   |
+| `MONOBANK_TIMEOUT_MS`               | `5000`                                    |
+| `MONOBANK_RETRY_ATTEMPTS`           | `3`                                       |
+| `MONOBANK_RETRY_BASE_DELAY_MS`      | `300`                                     |
+| `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5`                                       |
+| `CIRCUIT_BREAKER_RESET_TIMEOUT_MS`  | `30000`                                   |
+| `RATES_CACHE_TTL_SECONDS`           | `300`                                     |
+| `RATES_STALE_TTL_SECONDS`           | `86400`                                   |
+| `THROTTLE_TTL_SECONDS`              | `60`                                      |
+| `THROTTLE_LIMIT`                    | `60`                                      |
+| `ADMIN_API_KEY`                     | *(unset → cache invalidation is open)*    |
+
+## 9. API module layout
+
+```
+apps/api/src
+├── main.ts                      bootstrap: pino logger, helmet, cors, validation pipe, swagger, shutdown hooks
+├── app.module.ts
+├── config/                      zod schema, typed AppConfig, ConfigModule setup
+├── common/
+│   ├── errors/                  AppError, ErrorCode, concrete errors
+│   ├── filters/                 GlobalExceptionFilter
+│   ├── guards/                  ApiKeyGuard
+│   ├── resilience/              retry, CircuitBreaker, CircuitOpenError
+│   └── utils/                   money rounding helpers (big.js)
+├── infrastructure/
+│   ├── redis/                   RedisModule → REDIS_CLIENT (ioredis) with lifecycle hooks
+│   └── mongo/                   MongoModule (MongooseModule.forRootAsync)
+├── modules/
+│   ├── currencies/              ISO 4217 numeric↔alpha mapping, GET /currencies
+│   ├── rates/
+│   │   ├── domain/              ExchangeRate, RatesSnapshot, ports + tokens
+│   │   ├── infrastructure/
+│   │   │   ├── monobank/        MonobankRatesProvider, raw types, mapper
+│   │   │   └── redis-rates.repository.ts
+│   │   ├── application/         RatesService
+│   │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
+│   │   └── rates.module.ts
+│   ├── conversion/
+│   │   ├── dto/                 ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
+│   │   ├── strategies/          interface, identity, direct, cross, resolver
+│   │   ├── conversion.service.ts
+│   │   ├── conversion.controller.ts  POST /convert
+│   │   └── conversion.module.ts
+│   ├── history/
+│   │   ├── schemas/             ConversionRecord (Mongoose)
+│   │   ├── history.repository.ts  port + MongoHistoryRepository
+│   │   ├── history.service.ts
+│   │   ├── history.controller.ts  GET /history
+│   │   └── history.module.ts
+│   └── health/                  controller + Redis / Mongo / Monobank indicators
+└── test/                        e2e (supertest, ioredis-mock, stubbed provider & history repo)
+```
+
+Conversion persists a `ConversionRecord` after a successful conversion. The
+write is awaited but wrapped: a Mongo failure is logged and the response is
+still returned.
+
+## 10. Web app
+
+- React 19, Vite, TypeScript strict, Tailwind CSS, React Router, TanStack Query.
+- Routes: `/` converter (form, result card, recent conversions), `/about`
+  reviewer page (what was built, why, links to repo / API docs / health).
+- Runtime configuration: `public/config.js` sets `window.__APP_CONFIG__.apiUrl`;
+  the Docker image regenerates it from `API_URL` at container start so the same
+  image runs locally and on Railway.
+- `src/api/` is the only place that knows about HTTP; components consume typed
+  hooks (`useConvert`, `useCurrencies`, `useHistory`).
+- Tests: Vitest + Testing Library for the form, result rendering and error
+  states, with the API client mocked.
+
+## 11. Testing strategy
+
+| Layer                | Tool                         | What is covered                                   |
+| -------------------- | ---------------------------- | ------------------------------------------------- |
+| Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
+| E2E (api)            | Jest + supertest             | `/convert` happy path, validation errors, unsupported currency, upstream down with/without stale cache, `/rates`, `/history`, `/health` |
+| Unit (web)           | Vitest + Testing Library     | form validation, result display, error display, history list |
+
+Coverage threshold for `apps/api`: 85% lines/branches enforced in Jest config.
+Unit tests never touch the network, Redis or Mongo.
+
+## 12. Conventions
+
+- Conventional Commits (`feat(api): …`, `fix(web): …`, `chore: …`, `docs: …`, `test(api): …`).
+- Every change lands through a pull request into `main`; CI must be green.
+- ESLint + Prettier, `noImplicitAny`, `strictNullChecks`, no `any`, no
+  non-null assertions outside tests.
+- Files are small and named after the single thing they export.
