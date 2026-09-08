@@ -31,6 +31,13 @@ export function createPersistOptions(
     persister: createSyncStoragePersister({ storage, key: STORAGE_KEY }),
     maxAge: MAX_AGE_MS,
     buster: __APP_VERSION__,
-    dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+    dehydrateOptions: {
+      shouldDehydrateQuery: shouldPersistQuery,
+      // `dehydrate` keeps a paused mutation by default, on the assumption that
+      // something will resume it. Nothing here does: an offline convert is
+      // answered by the estimate and never retried, so persisting the attempt
+      // would leave its variables in storage as state no code reads.
+      shouldDehydrateMutation: () => false,
+    },
   };
 }

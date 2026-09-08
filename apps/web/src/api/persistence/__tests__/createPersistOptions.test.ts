@@ -1,4 +1,4 @@
-import { dehydrate, QueryClient } from '@tanstack/react-query';
+import { dehydrate, MutationObserver, onlineManager, QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '../../queryKeys';
 import { createPersistOptions } from '../createPersistOptions';
@@ -39,8 +39,27 @@ async function fetchRates(client: QueryClient, queryFn: () => Promise<unknown>):
   await client.fetchQuery({ queryKey: queryKeys.rates, queryFn }).catch(() => undefined);
 }
 
+/**
+ * An offline convert attempt. query-core pauses a mutation it cannot send, and
+ * that is the state `dehydrate` keeps by default.
+ */
+async function pausedMutation(client: QueryClient): Promise<void> {
+  onlineManager.setOnline(false);
+  const observer = new MutationObserver(client, {
+    mutationFn: () => Promise.resolve('converted'),
+    networkMode: 'online',
+  });
+
+  void observer.mutate();
+
+  await vi.waitFor(() => {
+    expect(client.getMutationCache().getAll()[0]?.state.isPaused).toBe(true);
+  });
+}
+
 afterEach(() => {
   vi.useRealTimers();
+  onlineManager.setOnline(true);
 });
 
 describe('createPersistOptions', () => {
@@ -84,6 +103,16 @@ describe('createPersistOptions', () => {
     const dehydrated = dehydrate(client, options?.dehydrateOptions);
 
     expect(dehydrated.queries).toEqual([]);
+  });
+
+  it('writes no mutations, so an offline attempt does not outlive the page', async () => {
+    const options = createPersistOptions(memoryStorage());
+    const client = new QueryClient();
+    await pausedMutation(client);
+
+    // Left to itself, `dehydrate` would carry the attempt and its variables into storage.
+    expect(dehydrate(client).mutations).toHaveLength(1);
+    expect(dehydrate(client, options?.dehydrateOptions).mutations).toEqual([]);
   });
 
   it('keeps a cache for a week and busts it on a new app version', () => {
