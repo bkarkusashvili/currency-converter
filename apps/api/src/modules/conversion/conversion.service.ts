@@ -64,13 +64,11 @@ export class ConversionService {
     };
 
     // Awaited so a client that reads /history straight after a conversion finds
-    // it there, and caught so a store that is down cannot turn a conversion the
-    // client has already been priced for into a 500. The history service makes
-    // the same promise; this is the seam keeping it, because the conversion is
-    // the answer and the record is a side effect of it (§2).
-    await this.history.record(answer).catch((error: unknown) => {
-      this.logger.warn({ err: error }, 'Recording the conversion failed');
-    });
+    // it there. Nothing is caught here: HistoryService.record never rejects —
+    // that is the promise it exists to keep, because the conversion is the
+    // answer and the record is a side effect of it (§2) — and a second guard
+    // over it would only be a branch no test can reach honestly.
+    await this.history.record(answer);
 
     return answer;
   }

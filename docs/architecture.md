@@ -616,8 +616,9 @@ by `src/common/filters/__tests__/global-exception.filter.spec.ts`.
 
 Conversion persists a `ConversionRecord` after a successful conversion. The
 write is awaited, so a client that reads `/history` straight after a conversion
-finds it there, and wrapped: a Mongo failure is logged and the response is still
-returned.
+finds it there. It is not guarded again at the call site: `HistoryService.record`
+never rejects — a store that cannot take the record logs it and resolves — so a
+Mongo failure costs a log line and the response is still returned.
 
 Awaiting is only safe because nothing on that path waits for a database that is
 down, which is what the Mongo module is built for:

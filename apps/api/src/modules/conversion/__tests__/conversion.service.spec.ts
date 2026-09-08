@@ -158,26 +158,10 @@ describe('ConversionService', () => {
       expect(history.record).toHaveBeenCalledTimes(1);
     });
 
-    // The client has already been priced; a store that cannot take the record
-    // costs a log line and nothing else (§2).
-    it('answers the conversion whatever the history does', async () => {
-      history.record.mockRejectedValue(new Error('mongo is gone'));
-
-      await expect(
-        service.convert({ from: 'USD', to: 'UAH', amount: 100 }),
-      ).resolves.toMatchObject({ result: 4435, rate: 44.35 });
-    });
-
-    it('reports a record that could not be written', async () => {
-      history.record.mockRejectedValue(new Error('mongo is gone'));
-
-      await service.convert({ from: 'USD', to: 'UAH', amount: 100 });
-
-      expect(logger.warn).toHaveBeenCalledWith(
-        { err: expect.any(Error) as Error },
-        'Recording the conversion failed',
-      );
-    });
+    // What keeps a store that is down from turning a priced conversion into a
+    // 500 is HistoryService.record never rejecting, which its own suite
+    // asserts. Restating it here would mean mocking the service into breaking
+    // a promise it does not break, and calling the result coverage.
 
     // A pair the rates cannot price is not a conversion, so there is nothing
     // to record.
