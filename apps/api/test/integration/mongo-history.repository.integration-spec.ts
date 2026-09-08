@@ -145,20 +145,26 @@ describeAgainst(
     });
 
     // The adapter refuses to build a query it cannot bound, whatever a caller
-    // that is not the DTO asks for.
-    it('clamps a limit past the ceiling rather than scanning the collection', async () => {
-      await repository.record(ENTRY);
+    // that is not the DTO asks for. Seeded one row past the ceiling, because
+    // that is the smallest collection where the clamp is the only thing
+    // standing between the request and a row it must not return: with fewer
+    // rows than the ceiling the assertion holds whether or not `Math.min` is
+    // there, which is what this case used to assert.
+    it('clamps a page past the ceiling to the ceiling, newest first', async () => {
+      const amounts = Array.from(
+        { length: MAX_HISTORY_LIMIT + 1 },
+        (_unused, index) => index + 1,
+      );
+      await seed(amounts);
 
-      const explained = (await model
-        .find()
-        .sort({ createdAt: -1 })
-        .limit(MAX_HISTORY_LIMIT)
-        .explain('queryPlanner')) as { queryPlanner?: unknown };
+      const page = await repository.findRecent(MAX_HISTORY_LIMIT + 500);
 
-      expect(explained.queryPlanner).toBeDefined();
-      await expect(
-        repository.findRecent(MAX_HISTORY_LIMIT + 500),
-      ).resolves.toHaveLength(1);
+      expect(page).toHaveLength(MAX_HISTORY_LIMIT);
+      // The clamp truncates the page, it does not reorder it: the row that
+      // falls off is the oldest, not the last one written.
+      expect(page.map((record) => record.amount)).toStrictEqual(
+        [...amounts].reverse().slice(0, MAX_HISTORY_LIMIT),
+      );
     });
 
     it('refuses a value the schema does not allow into the collection', async () => {
