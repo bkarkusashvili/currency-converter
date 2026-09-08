@@ -15,6 +15,7 @@ const EXPECTED_PATHS: ReadonlyArray<readonly [string, string]> = [
   ['/health', 'get'],
   ['/api/v1/rates', 'get'],
   ['/api/v1/rates/cache', 'delete'],
+  ['/api/v1/currencies', 'get'],
 ];
 
 // Every schema the document has to describe by name.
@@ -22,6 +23,8 @@ const EXPECTED_SCHEMAS: readonly string[] = [
   'ErrorResponseDto',
   'ExchangeRateDto',
   'RatesSnapshotResponseDto',
+  'CurrencyDto',
+  'CurrenciesResponseDto',
 ];
 
 describe('OpenAPI document (e2e)', () => {

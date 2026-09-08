@@ -1,4 +1,4 @@
-import { alphaFromNumeric, currencyName } from '../iso-4217';
+import { alphaFromNumeric, describeCurrency } from '../iso-4217';
 
 describe('alphaFromNumeric', () => {
   it.each([
@@ -24,12 +24,22 @@ describe('alphaFromNumeric', () => {
   );
 });
 
-describe('currencyName', () => {
-  it('names a currency the table knows', () => {
-    expect(currencyName('UAH')).toBe('Hryvnia');
+describe('describeCurrency', () => {
+  it('names a currency the table knows and numbers it', () => {
+    expect(describeCurrency('UAH')).toStrictEqual({
+      code: 'UAH',
+      numericCode: 980,
+      name: 'Hryvnia',
+    });
   });
 
-  it('has no name for a code outside ISO 4217', () => {
-    expect(currencyName('XYZ')).toBeUndefined();
+  // The table stores the numeric code padded to three digits; the API answers
+  // with the number, so ALL has to come back as 8 rather than '008'.
+  it('reports the numeric code as a number, not the padded string', () => {
+    expect(describeCurrency('ALL')).toMatchObject({ numericCode: 8 });
+  });
+
+  it('describes nothing for a code outside ISO 4217', () => {
+    expect(describeCurrency('XYZ')).toBeUndefined();
   });
 });
