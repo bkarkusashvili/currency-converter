@@ -6,7 +6,7 @@ import {
   type RefObject,
 } from 'react';
 import { WarningIcon } from '../../../components/WarningIcon';
-import { formatAmountInput, type AmountSeparators } from '../lib/formatAmountInput';
+import { formatAmountInput, type AmountSeparators } from '../lib/amount/formatAmountInput';
 
 interface AmountFieldProps {
   id: string;

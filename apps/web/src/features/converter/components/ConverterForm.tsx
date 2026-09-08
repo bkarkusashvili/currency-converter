@@ -8,7 +8,7 @@ import { useApiErrorMessage } from '../../../lib/useApiErrorMessage';
 import { useFormatters } from '../../../lib/useFormatters';
 import { useConverterForm } from '../hooks/useConverterForm';
 import { currencyOptions } from '../lib/currencyOptions';
-import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../lib/formatAmountInput';
+import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../lib/amount/formatAmountInput';
 import type { FormFieldErrors } from '../lib/serverFieldErrors';
 import { AmountField } from './AmountField';
 import { CurrencySelect } from './CurrencySelect';

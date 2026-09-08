@@ -1,5 +1,5 @@
 import { ApiError } from '../../api/http/ApiError';
-import type { Repositories } from '../../api/repositories/Repositories';
+import type { Repositories } from '../../api/repositories/repositories';
 import type {
   ConvertRequest,
   ConvertResponse,

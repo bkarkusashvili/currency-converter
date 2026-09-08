@@ -4,7 +4,7 @@ import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { MemoryRouter } from 'react-router';
 import { RepositoriesProvider } from '../api/repositories/RepositoriesProvider';
-import type { Repositories } from '../api/repositories/Repositories';
+import type { Repositories } from '../api/repositories/repositories';
 import { i18nInstance } from '../i18n';
 import { createFakeRepositories } from './fakes/createFakeRepositories';
 

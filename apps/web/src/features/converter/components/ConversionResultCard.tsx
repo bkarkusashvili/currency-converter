@@ -4,7 +4,7 @@ import { Timestamp } from '../../../components/Timestamp';
 import { WarningNotes } from '../../../components/WarningNotes';
 import { useFormatters } from '../../../lib/useFormatters';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
-import { inverseRate } from '../lib/inverseRate';
+import { inverseRate } from '../lib/money';
 import { HUB_CURRENCY, OFFLINE_ESTIMATE, sourceCopy, strategyCopy } from '../lib/provenance';
 import { ConversionPath } from './ConversionPath';
 

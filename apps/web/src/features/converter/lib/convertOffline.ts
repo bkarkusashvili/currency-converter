@@ -5,7 +5,7 @@ import type {
   ExchangeRate,
   RatesSnapshotResponse,
 } from '../../../api/types';
-import { Money } from './money';
+import { Money, RATE_DECIMALS, RESULT_DECIMALS, roundHalfUp } from './money';
 import { HUB_CURRENCY } from './provenance';
 
 /**
@@ -20,10 +20,6 @@ import { HUB_CURRENCY } from './provenance';
  * computed here is written to history, and §5 is the contract both sides
  * implement: a change there changes both.
  */
-
-/** §3: the effective rate to six decimals, the money to two. */
-const RATE_DECIMALS = 6;
-const RESULT_DECIMALS = 2;
 
 export interface OfflineConversion {
   from: string;
@@ -154,9 +150,4 @@ function findPair(
  */
 function usable(rate: number | undefined): number | undefined {
   return rate !== undefined && rate > 0 ? rate : undefined;
-}
-
-/** Half away from zero, the rounding a price list uses; the mode is passed rather than left to a default. */
-function roundHalfUp(value: Big, decimals: number): number {
-  return value.round(decimals, Money.roundHalfUp).toNumber();
 }

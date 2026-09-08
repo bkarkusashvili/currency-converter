@@ -2,9 +2,9 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ConvertRequest } from '../../../api/types';
 import { useFormatters } from '../../../lib/useFormatters';
-import { canonicalAmount } from '../lib/canonicalAmount';
-import { DEFAULT_FROM, DEFAULT_TO } from '../lib/defaultCurrencies';
-import { MAX_AMOUNT, parseAmount, type AmountErrorCode } from '../lib/parseAmount';
+import { canonicalAmount } from '../lib/amount/formatAmountInput';
+import { DEFAULT_FROM, DEFAULT_TO } from '../lib/currencyOptions';
+import { MAX_AMOUNT, parseAmount, type AmountErrorCode } from '../lib/amount/parseAmount';
 import type { FormField, FormFieldErrors } from '../lib/serverFieldErrors';
 
 const DEFAULT_AMOUNT = '100';
