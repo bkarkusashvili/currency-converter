@@ -33,7 +33,7 @@ In review:
 
 - **Conversion history** — the record every conversion writes on its way out,
   `GET /api/v1/history` over MongoDB and the `mongodb` health indicator:
-  [#6](https://github.com/bkarkusashvili/currency-converter/pull/6).
+  [#7](https://github.com/bkarkusashvili/currency-converter/pull/7).
 
 With it the API serves every endpoint
 [`docs/architecture.md`](docs/architecture.md) §3 describes, and the web app
