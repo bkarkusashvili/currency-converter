@@ -142,10 +142,10 @@
       "title": "Where it stands",
       "items": [
         "Everything below is merged on main and deployed; there is nothing outstanding and no branch waiting. Every change landed through a pull request into main, each carrying review comments anchored to the lines they concern and a round of commits answering them before the author merged it with CI green. GitHub does not allow approving your own pull request, so the record is those comments and the fixes rather than an approval decision; nothing was pushed to main directly.",
-        "Every module the architecture describes is in: rates, conversion through three strategies, currencies, history, the health endpoints and this client.",
+        "Every module the architecture describes is in: rates behind a cache, a stale fallback and a daily snapshot archive, conversion through three strategies, currencies, history, the health endpoints and this client.",
         "The API and this client are two independent images, built by one CI workflow that runs lint, formatting, typecheck, tests with coverage thresholds, the build and the image build per app — plus a job that validates the shared conversion fixtures, boots the whole Docker Compose stack, probes it, and runs the integration suites against the Redis and MongoDB it started.",
         "Both run on Railway behind the platform edge, each on its own hostname; the panel above reads the live health endpoint every 30 seconds.",
-        "1032 tests pass: 661 API unit, 124 API end-to-end, 12 integration against a real Redis and MongoDB, and 235 in this client, with coverage gates of 85% on the API and 90% here."
+        "1249 tests pass: 767 API unit, 163 API end-to-end, 25 integration against a real Redis and MongoDB, and 294 in this client, with coverage gates of 85% on the API and 90% here. The counts in the Process section below carry the date they were taken."
       ]
     },
     "whatWasBuilt": {
@@ -246,6 +246,14 @@
         {
           "term": "Runtime configuration over build-time env",
           "description": "A Vite build bakes env vars into the bundle. Reading window.__APP_CONFIG__ from config.js, rewritten by the container at start, means the same image runs locally and on a hosted environment with one variable changed."
+        },
+        {
+          "term": "A fourth tier behind the cache",
+          "description": "Redis holds a fresh key and a stale one, and both expire. Behind them MongoDB keeps one rate snapshot per UTC day, so an outage longer than the stale key still has an answer — dated to a day rather than to a minute, refused past a configured age, and labelled as the archive it came from. It is also the series the rate history reads."
+        },
+        {
+          "term": "A theme the reader chooses",
+          "description": "Light, dark and system, persisted, with system following the OS. Every colour is a token defined once and redefined per theme, so no component names one and a third theme is a block of variables rather than a pass over the components."
         }
       ]
     },

@@ -131,6 +131,9 @@ describe('AboutPage', () => {
     expect(screen.getByText(/merged on main and deployed/i)).toBeInTheDocument();
     expect(screen.queryByText(/subsequent pull requests/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/in review/i)).not.toBeInTheDocument();
+    // The status describes what is deployed now, not what was deployed when it
+    // was written: the archive tier is part of the answer this API gives.
+    expect(screen.getByText(/daily snapshot archive/i)).toBeInTheDocument();
   });
 
   it('traces each numbered requirement to where it is met', () => {
@@ -196,6 +199,11 @@ describe('AboutPage', () => {
     expect(screen.getByText('Two layers of fallback, not one')).toBeInTheDocument();
     expect(screen.getByText('A warning is not an error')).toBeInTheDocument();
     expect(screen.getByText('Liveness and readiness are different questions')).toBeInTheDocument();
+    // The decisions taken after the first pass are decisions too, and a
+    // reviewer reading the deployed page should not have to find them in a
+    // changelog.
+    expect(screen.getByText('A fourth tier behind the cache')).toBeInTheDocument();
+    expect(screen.getByText('A theme the reader chooses')).toBeInTheDocument();
   });
 
   // "What manages state?" is asked of every React submission, and the answer
