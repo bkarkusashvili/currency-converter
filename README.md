@@ -33,19 +33,30 @@ to `main` directly. Those pull requests built:
 
 - **API** (`apps/api`) — NestJS 11, TypeScript strict. `POST /api/v1/convert`
   through a strategy chain (identity, direct pair, cross via UAH),
-  `GET /api/v1/rates` over a Redis cache-aside with a long-lived stale fallback,
-  `GET /api/v1/currencies`, `GET /api/v1/history` over MongoDB, `GET /health`
-  with three indicators and `GET /health/live` for deploy gates. Retry with
-  jittered backoff, an in-house circuit breaker and per-call budgets around
-  Monobank; one error envelope for every failure; a `warnings` array that says
-  what degraded on a request that still succeeded.
-- **Web** (`apps/web`) — React 19, Vite, TanStack Query, i18next. Converter and
-  `/about` pages, a services layer mirroring the API's ports, and a persisted
-  rates snapshot that keeps the converter answering when the API is unreachable.
+  `GET /api/v1/rates` over a Redis cache-aside with a long-lived stale fallback
+  and a daily MongoDB snapshot archive behind both as a fourth tier,
+  `GET /api/v1/rates/history` reading that archive, `GET /api/v1/currencies`,
+  `GET /api/v1/history` over MongoDB, `DELETE /api/v1/rates/cache` behind an
+  admin key, `GET /health` with three indicators and `GET /health/live` for
+  deploy gates. Retry with jittered backoff, an in-house circuit breaker and
+  per-call budgets around Monobank; one error envelope for every failure; a
+  `warnings` array that says what degraded on a request that still succeeded.
+- **Web** (`apps/web`) — React 19, Vite, TanStack Query, i18next, Tailwind v4 on
+  a token palette with a light/dark/system switcher. The converter and the
+  `/about` reviewer page, a services layer mirroring the API's ports, and a
+  persisted rates snapshot that keeps the converter answering when the API is
+  unreachable. Every screen was drawn on a design canvas before it was built,
+  and each pull request lists the boards it implements and the deviations it
+  took from them.
 - **Orchestration** — Docker Compose for `api`, `web`, `redis` and `mongo`; a
   dev overlay that runs the backing services alone; GitHub Actions running
   lint, format, typecheck, build, tests with coverage gates and an image build
   per app, plus a job that boots the whole Compose stack and probes it.
+
+How the work itself was done — the stages, the review loop every pull request
+went through, the audits, the counts as of a date, and the honest limits of a
+process reviewed by agents rather than by a second person — is
+[`docs/process.md`](docs/process.md).
 
 ## Quick start
 
@@ -582,6 +593,7 @@ apps/
     ├── Dockerfile      node build stage, nginx runtime
     └── railway.json
 docs/architecture.md    the design contract
+docs/process.md         how it was built: stages, the review loop, audits, counts
 docs/openapi.json       the published API contract, generated (`openapi:write`)
 fixtures/               the rates snapshot and golden conversions both suites price against
 scripts/check-fixtures.mjs  validates and re-prices them; `npm run check:fixtures`
@@ -597,12 +609,12 @@ Four suites, all green on this commit:
 
 | Suite           | Command                                  | Result                    | Coverage                                                                 | Gate                       |
 | --------------- | ---------------------------------------- | ------------------------- | ------------------------------------------------------------------------ | -------------------------- |
-| API unit        | `apps/api: npm run test:cov`             | 74 suites, **767** tests  | stmts 98.99% · branches 87.80% · funcs 98.67% · lines 98.93%              | 85% lines + branches       |
-| API e2e         | `apps/api: npm run test:e2e`             | 9 suites, **161** tests   | not instrumented — see below                                             | none                       |
+| API unit        | `apps/api: npm run test:cov`             | 74 suites, **767** tests  | stmts 98.99% · branches 87.84% · funcs 98.67% · lines 98.93%              | 85% lines + branches       |
+| API e2e         | `apps/api: npm run test:e2e`             | 9 suites, **163** tests   | not instrumented — see below                                             | none                       |
 | API integration | `apps/api: npm run test:integration`     | 3 suites, **25** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
-| Web             | `apps/web: npm run test:coverage`        | 27 files, **235** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
+| Web             | `apps/web: npm run test:coverage`        | 37 files, **294** tests   | stmts 99.28% (696/701) · branches 97.16% (515/530) · funcs 100% (221/221) · lines 99.27% (680/685) | 90% on all four            |
 
-**1188 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
+**1249 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
 `npm run typecheck`, `npm run format:check` and `npm run build` run the same
 checks across both apps and let both report, so a failure in one does not hide
 the other. Coverage gates and the e2e suite stay per-app.
@@ -822,7 +834,11 @@ is implemented and covered:
 | Strict typing | `tsc --noEmit` / `tsc -b` clean, `no-unsafe-*` on, `ConfigService<AppConfig, true>` so an unknown config key is a compile error |
 | Multi-commit history through PRs | Conventional-commit subjects, a branch per feature, and every change merged into `main` through a reviewed pull request with CI green |
 | Railway hosting | `apps/api/railway.json`, `apps/web/railway.json`, both services live at the URLs above |
-| Reviewer page | `/about` in the web app — status, traceability, how to run, decisions, live health check |
+| Reviewer page | `/about` in the web app — status, traceability, how to run, decisions, the process record, live health check. `apps/web/src/features/about/`, `apps/web/src/features/about/__tests__/AboutPage.test.tsx` |
+| Light, dark and system theme | `apps/web/src/components/ThemeSwitcher.tsx` over the token palette in `apps/web/src/index.css`; the choice persists and `system` follows the OS. Tokens are defined once and redefined per theme, so no component names a colour |
+| Naming conventions and enforced boundaries | NestJS suffixes across `apps/api/src`, an `index.ts` public surface per API module, per `common/` package and per top-level web folder, and `no-restricted-imports` in both ESLint configs failing the build on an import that reaches inside one. `apps/api/eslint.config.mjs`, `apps/web/eslint.config.js` |
+| Designed before it was built | Every screen and state was drawn on a design canvas first — both themes, 1280 and 360 — and implemented as three stacked redesign pull requests, each listing the boards it implements and the deviations it took from them, with the reason |
+| A written process record | [`docs/process.md`](docs/process.md) — the stages, the loop every pull request went through, the audits, the counts as of a date, five things the loop caught, and the limits of the process itself |
 
 ## Design decisions
 
@@ -850,6 +866,9 @@ Known limitations and follow-ups are listed honestly in
 - [`docs/architecture.md`](docs/architecture.md) — the design contract: module
   layout, API contract, caching and resilience, error envelope, configuration,
   testing strategy, requirements mapping, known limitations.
+- [`docs/process.md`](docs/process.md) — how it was built: the stages, the loop
+  every pull request went through, the audits, what that loop caught, and where
+  the process is weaker than it looks.
 - [Swagger UI](https://api-production-c5b65.up.railway.app/docs) — generated
   from the code; OpenAPI JSON at
   [`/docs-json`](https://api-production-c5b65.up.railway.app/docs-json).

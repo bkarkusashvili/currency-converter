@@ -95,12 +95,12 @@ suites on the merge commit this document landed in.
 | Deploys — API · client, as `railway deployment list` reports them | 12 · 7 |
 | Agent runs behind all of the above | roughly 75, as reported by the orchestrating session |
 
-Everything above except the agent runs is recoverable from the repository:
-the pull request counts and the two comment counts from
-`gh api repos/bkarkusashvili/currency-converter/pulls/N/reviews` and
-`.../comments`, the commit count from `git rev-list --count main`, the test
-counts from a run of both suites. The agent-run figure is the one number here
-with no artefact behind it, and it is approximate for that reason.
+Everything above except the agent runs is recoverable: the pull request, review
+and comment counts from the GitHub API's reviews and comments endpoints for each
+pull request, the commit count from `git rev-list --count main`, the test counts
+from a run of both suites, the deploy counts from the Railway CLI. The agent-run
+figure is the one number here with no artefact behind it, and it is approximate
+for that reason.
 
 
 ## What the loop caught
