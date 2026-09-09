@@ -982,14 +982,15 @@ newest-first page and the retention ride on the same key rather than on two.
 | Integration (api)    | Jest against real servers    | the two adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp. Each suite runs on its own database — Redis 15, a Mongo database of its own — so a URL pointed at a running stack is never flushed. Skipped, with a `SKIPPED:` line naming the variable, unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI`, whose `orchestration` job points them at the stack it already starts |
 | Contract             | Jest (api) + ajv (web)       | `docs/openapi.json` regenerated from the application's decorators and compared with the committed file; on the web side every sample response the suite renders validated against the schema that document publishes for its route |
 
-A `*.module.ts` is wiring and is excluded from coverage, so anything a module
-*decides* lives in a file of its own beside it — `buildMonobankHttpOptions`,
-`buildMonobankCircuitBreaker`, `buildConfiguredConversionRecordSchema` — where
-the gate can see it. A factory that only hands back what was injected into it
-decides nothing, and a spec asserting that it does so is a tautology, so the
-two of those stay inline in their modules: the order of `CONVERSION_STRATEGIES`
-is asserted by resolving the token through a testing module, which is where the
-`inject` list and the parameters it fills can actually disagree.
+A `*.module.ts` is wiring and an `index.ts` is a list of names; both are
+excluded from coverage, so anything a module *decides* lives in a file of its
+own beside it — `buildMonobankHttpOptions`, `buildMonobankCircuitBreaker`,
+`buildConfiguredConversionRecordSchema` — where the gate can see it. A factory
+that only hands back what was injected into it decides nothing, and a spec
+asserting that it does so is a tautology, so the two of those stay inline in
+their modules: the order of `CONVERSION_STRATEGIES` is asserted by resolving
+the token through a testing module, which is where the `inject` list and the
+parameters it fills can actually disagree.
 
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
 90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI

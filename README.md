@@ -533,7 +533,7 @@ Four suites, all green on this commit:
 
 | Suite           | Command                                  | Result                    | Coverage                                                                 | Gate                       |
 | --------------- | ---------------------------------------- | ------------------------- | ------------------------------------------------------------------------ | -------------------------- |
-| API unit        | `apps/api: npm run test:cov`             | 65 suites, **661** tests  | stmts 98.23% · branches 88.28% · funcs 92.80% · lines 98.42%              | 85% lines + branches       |
+| API unit        | `apps/api: npm run test:cov`             | 65 suites, **661** tests  | stmts 98.79% · branches 88.28% · funcs 98.43% · lines 98.72%              | 85% lines + branches       |
 | API e2e         | `apps/api: npm run test:e2e`             | 8 suites, **124** tests   | not instrumented — see below                                             | none                       |
 | API integration | `apps/api: npm run test:integration`     | 2 suites, **12** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
 | Web             | `apps/web: npm run test:coverage`        | 27 files, **235** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
@@ -548,14 +548,11 @@ are the **unit** suites alone, and the 85% gate is on those. `npm run test:e2e`
 runs uninstrumented, so what only it exercises is missing from the report rather
 than uncovered: `configure-http.ts` and `setup-swagger.util.ts` read 0% while every
 e2e suite boots through both, which is what drags the `src` root row to 52.38%
-and `src/common/swagger` to 71.42%. `main.ts` and every `*.module.ts` are
-excluded outright — a module is wiring, and what a module *decides* lives in a
-file of its own beside it so the gate does see it. The function figure reads
-lower than the statement one because a module's `index.ts` compiles to one
-getter per re-export, and a unit test that never reads a given name never calls
-its getter; the gate is on lines and branches for that reason. Read the two as what they
-are: the unit suites cover the logic, the e2e suites cover the surface, and only
-the first is counted.
+and `src/common/swagger` to 93.1%. `main.ts`, every `*.module.ts` and every
+`index.ts` are excluded outright — a module is wiring and a barrel is a list of
+names, and what a module *decides* lives in a file of its own beside it so the
+gate does see it. Read the two as what they are: the unit suites cover the
+logic, the e2e suites cover the surface, and only the first is counted.
 
 Unit tests never touch the network, Redis or Mongo. The e2e suites do not
 either: the shared factory swaps the Redis client, the Mongo connection and the
