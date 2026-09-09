@@ -25,6 +25,11 @@
      swap button standing off the seam it sits on. */
   --shadow: 0 16px 40px rgba(20, 25, 27, 0.14);
   --shadow-sm: 0 2px 8px rgba(20, 25, 27, 0.08);
+  /* What a modal surface dims the page behind it with (§2.1). */
+  --scrim: rgba(0, 0, 0, 0.55);
+  /* The edge of a popover, sheet or dialog: --line in light, the stronger one
+     in dark, where an elevated surface needs it to read as raised (§6.11). */
+  --overlay-line: var(--line);
 }
 
 /* The dark palette, written twice on purpose. `System` is the default and has
@@ -53,6 +58,9 @@
     --danger-soft: #3a1d1d;
     --shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --scrim: rgba(0, 0, 0, 0.55);
+    /* An elevated surface needs the stronger edge on a dark ground (§6.11). */
+    --overlay-line: var(--line-strong);
   }
 }
 
@@ -77,6 +85,8 @@
   --danger-soft: #3a1d1d;
   --shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --overlay-line: var(--line-strong);
 }
 
 /* `dark:` has to mean what the palette means: the OS preference unless an
@@ -103,6 +113,7 @@
   --color-faint: var(--ink-faint);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-overlay-line: var(--overlay-line);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-contrast: var(--accent-contrast);
@@ -437,6 +448,391 @@
     overflow-wrap: anywhere;
   }
 
+  /* ── Currency combobox (§3.7) ──────────────────────────────────────────── */
+
+  /* Full width and 48 tall on a phone, where the pane is the whole screen;
+     shrink-to-fit and 44 tall beside a second pane, where a trigger as wide as
+     its column would claim room the amount field needs. */
+  .combobox-trigger {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.625rem;
+    height: 3rem;
+    padding: 0 0.75rem 0 0.375rem;
+    background-color: var(--surface-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: 0.625rem;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+
+  .combobox-trigger:hover:not(:disabled) {
+    border-color: var(--ink-faint);
+  }
+
+  /* The design's 2px accent border, drawn as a border plus an inset ring so
+     opening the popover does not move the row by a pixel. */
+  .combobox-trigger[aria-expanded='true'] {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
+  .combobox-trigger:disabled {
+    cursor: not-allowed;
+  }
+
+  .combobox-code {
+    flex-shrink: 0;
+    background-color: var(--surface-sunken);
+    border-radius: 0.375rem;
+    padding: 0.3125rem 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  .combobox-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9375rem;
+  }
+
+  /* Popover, sheet and dialog are one elevation: raised ground, the edge the
+     theme calls for, and the same lift. */
+  .overlay-surface {
+    background-color: var(--surface-raised);
+    border: 1px solid var(--overlay-line);
+    box-shadow: var(--shadow);
+  }
+
+  .combobox-popover {
+    position: absolute;
+    z-index: 30;
+    width: 20rem;
+    max-width: calc(100vw - 2rem);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .combobox-search {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    height: 3rem;
+    padding: 0 0.875rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .combobox-search input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    outline: none;
+  }
+
+  .combobox-search input::placeholder {
+    color: var(--ink-faint);
+  }
+
+  /* Five rows and their gaps, then the list scrolls (§3.7): 5 × 44 + 4 × 2,
+     plus the list's own 6px of padding. */
+  .combobox-list {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0.375rem;
+    margin: 0;
+    max-height: 15rem;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .combobox-list[data-empty='true'] {
+    padding: 0;
+  }
+
+  .combobox-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    height: 2.75rem;
+    padding: 0 0.625rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+  }
+
+  .combobox-option[data-active='true'] {
+    background-color: var(--surface-sunken);
+  }
+
+  .combobox-option[aria-selected='true'] {
+    background-color: var(--accent-soft);
+  }
+
+  /* Already chosen on the other pane. Identity is a valid conversion, so the
+     row stays pickable; it is dimmed to say the pair would collapse. */
+  .combobox-option[data-other='true'] {
+    color: var(--ink-faint);
+  }
+
+  .combobox-option-code {
+    width: 2.5rem;
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  .combobox-option-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+  }
+
+  .combobox-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-top: 1px solid var(--line);
+    padding: 0.5rem 0.875rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .mark-match {
+    background-color: var(--accent);
+    color: var(--accent-contrast);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
+  .key-hint {
+    flex-shrink: 0;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+  }
+
+  /* ── Modal surfaces: the picker sheet and the clear-cache dialog ───────── */
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background-color: var(--scrim);
+  }
+
+  .sheet {
+    position: fixed;
+    z-index: 50;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 72vh;
+    height: 72dvh;
+    max-height: 80dvh;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    border: 0;
+    border-top: 1px solid var(--line-strong);
+    border-radius: 1rem 1rem 0 0;
+  }
+
+  .sheet .combobox-list {
+    max-height: none;
+    padding: 0 0.5rem;
+  }
+
+  .sheet .combobox-option {
+    height: 3.25rem;
+    padding: 0 0.75rem;
+  }
+
+  .sheet .combobox-option-code {
+    width: 2.75rem;
+    font-size: 0.875rem;
+  }
+
+  .sheet .combobox-option-name {
+    font-size: 0.9375rem;
+  }
+
+  /* On a sheet the row itself is the hit target and the accent block would sit
+     under a finger; the softer pair says the same thing more quietly. */
+  .sheet .mark-match {
+    background-color: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .sheet .combobox-meta {
+    padding: 0.75rem 1rem 1.25rem;
+  }
+
+  .sheet-grabber {
+    width: 2.25rem;
+    height: 0.25rem;
+    border-radius: 2px;
+    background-color: var(--line-strong);
+  }
+
+  /* 16px so iOS does not zoom the page when the field takes focus. */
+  .control-search {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    height: 3rem;
+    padding: 0 0.875rem;
+    background-color: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 0.625rem;
+  }
+
+  .control-search input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    outline: none;
+  }
+
+  .modal-card {
+    width: min(28rem, calc(100vw - 2rem));
+    border-radius: var(--radius-card);
+    border-color: var(--line-strong);
+    padding: 1.5rem;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .modal-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  /* ── Operations page (§3.23) ───────────────────────────────────────────── */
+
+  .ops-card {
+    background-color: var(--surface-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    padding: 1.25rem;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .ops-card-title {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .ops-stat-value {
+    font-family: var(--font-mono);
+    font-size: 1.125rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ops-meter {
+    height: 0.375rem;
+    border-radius: 3px;
+    background-color: var(--surface-sunken);
+    overflow: hidden;
+  }
+
+  .ops-meter > div {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  .button-ghost {
+    background-color: transparent;
+    color: var(--ink-muted);
+  }
+
+  .button-ghost:hover:not(:disabled) {
+    background-color: var(--surface-sunken);
+    color: var(--ink);
+  }
+
+  .button-danger {
+    background-color: var(--danger);
+    color: #ffffff;
+  }
+
+  .button-danger-outline {
+    background-color: transparent;
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  .button-danger-outline:hover:not(:disabled) {
+    background-color: var(--danger-soft);
+  }
+
+  .button-outline {
+    background-color: transparent;
+    border-color: var(--line-strong);
+    color: var(--ink);
+  }
+
+  .button-outline:hover:not(:disabled) {
+    border-color: var(--ink-faint);
+  }
+
+  /* Flat by design (§6.14) — "Recheck now", "Forget", "Cancel" are drawn as
+     text — but each keeps a 44px hit area and the shared focus ring. */
+  .button-flat {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 0.5rem;
+    background: none;
+    border: 0;
+    color: var(--ink-muted);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .button-flat:hover:not(:disabled) {
+    color: var(--ink);
+  }
+
   @media (min-width: 40rem) {
     .shell {
       padding-inline: 1.5rem;
@@ -462,6 +858,21 @@
 
     .figure {
       font-size: 2.5rem;
+    }
+
+    .combobox-trigger {
+      width: fit-content;
+      max-width: 100%;
+      height: 2.75rem;
+    }
+
+    .ops-card {
+      padding: 1.5rem 1.75rem;
+      gap: 1.25rem;
+    }
+
+    .ops-stat-value {
+      font-size: 1.25rem;
     }
 
     .converter-card {

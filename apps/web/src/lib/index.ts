@@ -9,5 +9,7 @@ export {
   TRACEABILITY_URL,
 } from './links';
 export { useApiErrorMessage } from './useApiErrorMessage';
+export { useFocusTrap } from './useFocusTrap';
 export { useFormatters } from './useFormatters';
+export { useIsCompact } from './useIsCompact';
 export { useWarningMessage } from './useWarningMessage';
