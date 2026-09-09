@@ -4,10 +4,9 @@ import type { ResponseWarning } from '../../../api';
 import { ApiErrorNotice } from '../../../components';
 import { useFormatters } from '../../../lib';
 import { useConvertWithFallback } from '../hooks/useConvertWithFallback';
-import type { ConversionOutcome } from '../lib/conversionOutcome';
 import { splitServerFieldErrors } from '../lib/serverFieldErrors';
-import { ConversionResultCard } from './ConversionResultCard';
-import { ConverterForm } from './ConverterForm';
+import { historyHighlightKey } from '../lib/historyHighlight';
+import { ConverterCard } from './ConverterCard';
 import { HistoryPanel } from './HistoryPanel';
 
 export function ConverterPage() {
@@ -23,38 +22,43 @@ export function ConverterPage() {
   const formWarnings = distinctWarnings(currencies.data?.warnings, snapshot.data?.warnings);
 
   return (
-    <div className="shell pt-10 sm:pt-16">
-      <p className="eyebrow">{t('converter.eyebrow')}</p>
-      <h1 className="mt-3 max-w-xl text-[clamp(1.9rem,5.5vw,2.75rem)] text-balance">
-        {t('converter.heading')}
-      </h1>
-      <p className="text-muted mt-4 max-w-xl text-pretty">{t('converter.intro')}</p>
+    <div className="shell lg:grid lg:min-h-[40rem] lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-14">
+      <div className="grid gap-5 sm:gap-7">
+        <div className="grid max-w-[40rem] gap-2.5 sm:gap-3">
+          <p className="eyebrow">{t('converter.eyebrow')}</p>
+          <h1 className="page-title">{t('converter.heading')}</h1>
+          <p className="text-muted text-sm text-pretty sm:text-[0.9375rem]">
+            {t('converter.intro')}
+          </p>
+        </div>
 
-      <div className="mt-9 grid gap-4">
-        <ConverterForm
-          currencies={currencies.data?.currencies}
-          currenciesError={currencies.error}
-          currenciesLoading={currencies.isPending}
-          warnings={formWarnings}
-          serverErrors={serverErrors.fields}
-          isSubmitting={conversion.isPending}
-          onSubmit={(request) => {
-            conversion.convert(request);
-          }}
-        />
-
-        {conversion.error !== null && (
-          <ApiErrorNotice
-            error={conversion.error}
-            fieldErrors={serverErrors.rest}
-            note={conversion.withoutSnapshot ? t('converter.offline.withoutSnapshot') : undefined}
+        <div className="grid gap-4">
+          <ConverterCard
+            currencies={currencies.data?.currencies}
+            currenciesError={currencies.error}
+            currenciesLoading={currencies.isPending}
+            warnings={formWarnings}
+            serverErrors={serverErrors.fields}
+            isSubmitting={conversion.isPending}
+            outcome={conversion.outcome}
+            onSubmit={(request) => {
+              conversion.convert(request);
+            }}
           />
-        )}
 
-        {/* The answer, in one sentence. The card itself is outside this region:
+          {conversion.error !== null && (
+            <ApiErrorNotice
+              error={conversion.error}
+              fieldErrors={serverErrors.rest}
+              note={conversion.withoutSnapshot ? t('converter.offline.withoutSnapshot') : undefined}
+            />
+          )}
+        </div>
+
+        {/* The answer, in one sentence. The pane itself is outside this region:
             announcing it whole reads every badge, both rate directions, the
             path and two provenance notes before the number, and it stays
-            available to read at leisure below. */}
+            available to read at leisure in the card. */}
         <div aria-live="polite" aria-atomic="true" className="sr-only">
           {conversion.outcome !== undefined &&
             t('converter.result.announcement', {
@@ -64,15 +68,13 @@ export function ConverterPage() {
               to: conversion.outcome.to,
             })}
         </div>
-
-        {conversion.outcome !== undefined && (
-          // Keyed by the answer, so a new one remounts the card and plays its
-          // entrance again instead of swapping numbers in place.
-          <ConversionResultCard key={outcomeKey(conversion.outcome)} result={conversion.outcome} />
-        )}
       </div>
 
-      <HistoryPanel />
+      {/* Beside the card where there is room for a 320px column, below it where
+          there is not. Either way it is the same panel reading the same query. */}
+      <aside className="mt-7 lg:mt-0 lg:pt-1">
+        <HistoryPanel highlight={historyHighlightKey(conversion.outcome)} />
+      </aside>
     </div>
   );
 }
@@ -91,16 +93,4 @@ function distinctWarnings(...lists: (ResponseWarning[] | undefined)[]): Response
   }
 
   return [...byCode.values()];
-}
-
-function outcomeKey(outcome: ConversionOutcome): string {
-  return [
-    outcome.from,
-    outcome.to,
-    outcome.amount,
-    outcome.result,
-    outcome.rate,
-    outcome.source,
-    outcome.ratesTimestamp,
-  ].join('|');
 }
