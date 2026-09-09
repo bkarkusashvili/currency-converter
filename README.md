@@ -191,7 +191,7 @@ in `.env` form.
 | `CIRCUIT_BREAKER_RESET_TIMEOUT_MS`  | `30000`                                          | How long the breaker stays open before one trial call                            |
 | `RATES_CACHE_TTL_SECONDS`           | `300`                                            | TTL of the fresh cache key `rates:latest`                                        |
 | `RATES_STALE_TTL_SECONDS`           | `86400`                                          | TTL of the long-lived stale fallback key `rates:fallback`                        |
-| `RATES_ARCHIVE_TTL_DAYS`            | `90`                                             | How long an archived daily snapshot is kept, enforced by a TTL index. It is also the widest window `GET /rates/history` accepts and the depth of the archive fallback |
+| `RATES_ARCHIVE_TTL_DAYS`            | `90`                                             | How long an archived daily snapshot is kept, enforced by a TTL index. Must be at least the 90-day window `GET /rates/history` accepts — the process refuses to start below it — and it is the depth of the archive fallback |
 | `RATES_ARCHIVE_OPERATION_TIMEOUT_MS`| `1000`                                           | Deadline on a single archive upsert or read, so a Mongo that answers slowly cannot hold open the response that fetched the snapshot it is archiving |
 | `THROTTLE_TTL_SECONDS`              | `60`                                             | Rate-limit window                                                                |
 | `THROTTLE_LIMIT`                    | `60`                                             | Requests per window per client                                                   |

@@ -185,9 +185,10 @@ curl -s 'http://localhost:3000/api/v1/rates/history?base=USD&quote=UAH&days=7'
 
 Oldest first, one point per archived day inside the window, counting today as
 the first. A day the archive has no snapshot for is absent rather than null, so
-a gap is visible as a gap and the series can be shorter than `days`. Days expire
-after `RATES_ARCHIVE_TTL_DAYS` (90 by default), enforced by a TTL index — which
-is also why `days` stops at 90.
+a gap is visible as a gap and the series can be shorter than `days`. `days`
+stops at 90 because that is the widest window this API answers; days expire
+after `RATES_ARCHIVE_TTL_DAYS` (90 by default, and never below the window — the
+process refuses to start below it), enforced by a TTL index.
 
 The orientation is the upstream's own: `USD/UAH` is a pair Monobank publishes
 and `UAH/USD` is not, and this route reports what was published rather than what

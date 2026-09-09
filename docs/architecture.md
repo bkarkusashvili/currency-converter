@@ -150,9 +150,12 @@ snapshot — and this route reads a window of them.
 letters, case-insensitive, echoed upper-cased — and `days` is an integer
 `1..90`, default `7`, validated rather than clamped: `?days=0`, `?days=91` and
 `?days=abc` each answer `400` naming the field. The `90` is
-`MAX_RATE_HISTORY_DAYS`, which is also the `RATES_ARCHIVE_TTL_DAYS` default: a
-window wider than the retention is one that could never be answered rather than
-one answered short.
+`MAX_RATE_HISTORY_DAYS`, the widest window this API answers, and
+`RATES_ARCHIVE_TTL_DAYS` defaults to the same number. A retention below it is
+refused at boot (§8), so every day the route accepts is a day the archive is
+still keeping; a deployment that keeps more simply holds days past what the
+route will ask for. Either way a wider window is refused by the API rather than
+by expiry.
 
 A point carries `buy` and `sell`, or `cross`, on the same terms as a snapshot
 row, and the window counts today as its first day. A day the archive has no
@@ -825,13 +828,15 @@ the write is dropped with the same one-per-outage warning, and the read answers
 `HISTORY_TTL_DAYS` drives the TTL index on that collection — a log nobody prunes
 grows without bound, and nothing reads a conversion from a month ago.
 
-`RATES_ARCHIVE_TTL_DAYS` is two things at once, deliberately: the retention of
-the `rate_snapshots` collection and the widest window `/rates/history` will
-accept. `MAX_RATE_HISTORY_DAYS` is its default, so asking for a day past the
-retention is a window that could never be answered rather than one answered
-short — and if a deployment shortens the retention, the route keeps accepting a
-window whose older days have already expired and answers them as the gaps they
-are.
+`RATES_ARCHIVE_TTL_DAYS` is the retention of the `rate_snapshots` collection,
+and it is checked against `MAX_RATE_HISTORY_DAYS` — the widest window
+`/rates/history` accepts — rather than assumed equal to it. Both default to 90,
+and `buildConfiguredRateSnapshotSchema`, the one step that reads the retention,
+throws at boot when it is lower: the days between the two would be days the
+route accepts and the TTL index has already deleted, answered as the gaps §3
+reserves for an outage, and nothing else in the process reads both numbers. A
+longer retention starts and is a decision rather than a mistake — those days
+exist in the collection and are simply past what the route will ask for.
 
 `RATES_ARCHIVE_OPERATION_TIMEOUT_MS` bounds a single archive upsert or read,
 exactly as `HISTORY_OPERATION_TIMEOUT_MS` bounds a history one and for the same

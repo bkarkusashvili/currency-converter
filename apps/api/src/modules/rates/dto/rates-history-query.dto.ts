@@ -54,9 +54,12 @@ export class RatesHistoryQueryDto implements RateHistoryQuery {
   @ApiPropertyOptional({
     description:
       'How many UTC days back to read, counting today as the first. The ' +
-      'upper bound is the archive retention: a day past ' +
-      '`RATES_ARCHIVE_TTL_DAYS` has already expired, so asking for one is a ' +
-      'window that could never be answered rather than one answered short.',
+      'upper bound is the widest window this API answers; a wider one is ' +
+      'refused here rather than answered short. The archive retention ' +
+      '(`RATES_ARCHIVE_TTL_DAYS`) is never below it — the process refuses to ' +
+      'start if it is — so every day inside the bound is one the archive is ' +
+      'still keeping. A deployment may keep more than that; those days are ' +
+      'past what this route accepts.',
     minimum: 1,
     maximum: MAX_RATE_HISTORY_DAYS,
     default: DEFAULT_RATE_HISTORY_DAYS,

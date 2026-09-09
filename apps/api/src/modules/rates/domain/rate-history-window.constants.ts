@@ -4,8 +4,11 @@
 // from whoever calls it, and an unbounded one is a scan of the whole
 // collection in a route that answers a chart.
 //
-// The ceiling is the archive's own retention default (RATES_ARCHIVE_TTL_DAYS):
-// asking for more days than are ever kept is a request that cannot be answered
-// rather than one that answers short.
+// The ceiling is the widest window this API answers, and it is the number the
+// archive's retention is held against rather than the other way round:
+// RATES_ARCHIVE_TTL_DAYS defaults to the same 90 and the schema factory refuses
+// to build a shorter one, so every day a request may ask for is a day the
+// collection still holds. A window past the ceiling is refused by the API, not
+// by expiry.
 export const DEFAULT_RATE_HISTORY_DAYS = 7;
 export const MAX_RATE_HISTORY_DAYS = 90;
