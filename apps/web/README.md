@@ -28,14 +28,17 @@ src/
 │   ├── services/       services.ts (one interface per resource + the aggregate),
 │   │                   createHttpServices.ts, React context, provider and hook
 │   ├── persistence/    the query client and its localStorage persister
-│   ├── hooks/          useConvert, useCurrencies, useHistory, useHealth
+│   ├── hooks/          useConvert, useCurrencies, useRatesSnapshot, useHistory,
+│   │                   useHealth, useClearRatesCache
 │   └── index.ts        what the rest of the app may import from api/
 ├── components/         shell and cross-feature presentation (+ index.ts)
 ├── features/
-│   ├── about/          components/, __tests__/, index.ts
-│   └── converter/      components/, hooks/, lib/ (with lib/amount/), __tests__/, index.ts
+│   ├── about/          components/, hooks/, __tests__/, index.ts
+│   ├── converter/      components/, hooks/, lib/ (with lib/amount/), __tests__/, index.ts
+│   └── ops/            components/, hooks/, lib/, __tests__/, index.ts
 ├── i18n/               en.json, i18next setup, key typings (index.ts)
-├── lib/                formatters and external links (+ index.ts)
+├── lib/                formatters, hooks and external links (+ index.ts)
+├── theme/              the preference, its storage and the pre-paint script (+ index.ts)
 └── test/               setup, render helper, in-memory service fakes
 ```
 

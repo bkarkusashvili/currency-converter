@@ -1259,6 +1259,15 @@ rather than constrain it.
   `details.errors` entries are shown as returned, and the ones naming `amount`,
   `from` or `to` are routed onto that input, where they clear as soon as the
   user edits the field they describe.
+- **Motion.** The interface does not move on its own; the one exception is the
+  answer landing. The spans holding the figure and the two rate lines are keyed
+  by `conversionIdentity`, so a new answer remounts the text and replays
+  `result-rise` — 4px up with a 1px overshoot over 200ms, ease-out, transform
+  and opacity only. Nothing that carries layout is keyed, so the pane, the rows
+  and the card around them keep their nodes and nothing below is pushed down;
+  `prefers-reduced-motion` turns the animation off outright rather than running
+  it at the 0.01ms the blanket rule would leave. `result-fade-in` stays on the
+  two rows themselves, which mount once, so it is still the first answer alone.
 - Feature folders carry their own structure (`components/`, `hooks/`, `lib/`,
   `__tests__/`); shared test helpers and fakes live in `src/test/`.
 - Tests: Vitest + Testing Library, rendered through the i18n and services
@@ -1529,6 +1538,14 @@ project were taken further.
   `test`. There is no per-caller auth on the read routes at all, which is the
   right scope for a public rate converter and the wrong one for anything with a
   user in it.
+- **The admin key is one shared secret, not an identity.** `DELETE
+  /rates/cache` is guarded by a single header key, so everyone who can clear
+  the cache is the same caller as far as the API is concerned: nothing to
+  revoke per person, nothing in the log that says which of them it was. It is
+  what makes the Operations page a demo convenience rather than an operator
+  console — the page holds the key in React state for the life of the tab and
+  never persists it, which limits where it can leak from but not what it can
+  do. A real console wants a per-operator credential and an audit line.
 - **Swagger is served in production, by design.** `/docs` and `/docs-json` are
   public on the deployment because the API is a portfolio surface a reviewer is
   meant to explore. A real service would gate them or publish the document out
@@ -1560,6 +1577,15 @@ project were taken further.
   so ⌘Z in that field does not restore what was typed. Fixing it means driving
   the edits through `document.execCommand('insertText')` or keeping an undo
   stack by hand.
+- **The Operations page derives what the API does not publish.** The two cache
+  windows are computed in the browser from `fetchedAt` plus the 300 s and
+  86 400 s §4 documents, and the breaker state is read back off the wording of
+  the Monobank indicator's `reason`. Both are correct for a deployment running
+  the documented defaults and both go quietly wrong for one that does not: a
+  changed `RATES_CACHE_TTL_SECONDS` moves the meter and not the number behind
+  it, and a reworded reason reads as an unknown state. The page says on its
+  face that the three are derived, which is the mitigation; publishing a
+  remaining TTL and a state name on `/health` would be the fix.
 - **The persister API is deprecated upstream.** `createSyncStoragePersister`
   from `@tanstack/query-sync-storage-persister` carries an `@deprecated` tag in
   the installed version pointing at `createAsyncStoragePersister`. It works and

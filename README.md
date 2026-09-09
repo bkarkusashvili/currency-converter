@@ -16,6 +16,7 @@ comes up with one command locally and deploys from the same images.
 | ------------------- | ------------------------------------------------------------ |
 | Web app             | https://web-production-36ebc.up.railway.app                  |
 | Reviewer page       | https://web-production-36ebc.up.railway.app/about            |
+| Operations page     | https://web-production-36ebc.up.railway.app/ops              |
 | Swagger UI          | https://api-production-c5b65.up.railway.app/docs             |
 | OpenAPI JSON        | https://api-production-c5b65.up.railway.app/docs-json         |
 | Dependency report   | https://api-production-c5b65.up.railway.app/health            |
@@ -42,12 +43,20 @@ to `main` directly. Those pull requests built:
   per-call budgets around Monobank; one error envelope for every failure; a
   `warnings` array that says what degraded on a request that still succeeded.
 - **Web** (`apps/web`) — React 19, Vite, TanStack Query, i18next, Tailwind v4 on
-  a token palette with a light/dark/system switcher. The converter and the
-  `/about` reviewer page, a services layer mirroring the API's ports, and a
-  persisted rates snapshot that keeps the converter answering when the API is
-  unreachable. Every screen was drawn on a design canvas before it was built,
-  and each pull request lists the boards it implements and the deviations it
-  took from them.
+  a token palette with a light/dark/system switcher that persists and follows
+  the OS. The converter, the `/about` reviewer page and `/ops`, a services layer
+  mirroring the API's ports, and a persisted rates snapshot that keeps the
+  converter answering when the API is unreachable. The currency pickers are
+  searchable comboboxes — a popover under the trigger above 640px, a modal
+  bottom sheet below it — and the archived series for the pair on screen is
+  drawn beside them as an inline SVG chart, with an `archive` badge on an answer
+  the API priced from that same archive. `/ops` is the operations surface: the
+  health report on a 30-second poll, the rate snapshot with the two cache
+  windows derived in the browser and labelled as derived, and
+  `DELETE /rates/cache` behind a confirmation, with the admin key held in the
+  tab's memory and never stored. Every screen was drawn on a design canvas
+  before it was built, and each pull request lists the boards it implements and
+  the deviations it took from them.
 - **Orchestration** — Docker Compose for `api`, `web`, `redis` and `mongo`; a
   dev overlay that runs the backing services alone; GitHub Actions running
   lint, format, typecheck, build, tests with coverage gates and an image build
@@ -598,7 +607,8 @@ apps/
 │   └── railway.json
 └── web/                React 19 + Vite + TypeScript, own package + lockfile
     ├── src/            api (http, services, persistence, hooks),
-    │                   components, features (converter, about), i18n, lib, test
+    │                   components, features (converter, about, ops), i18n,
+    │                   lib, theme, test
     ├── nginx/          config template + shared security-headers snippet
     ├── docker/         entrypoint that writes config.js from API_URL
     ├── Dockerfile      node build stage, nginx runtime
@@ -846,6 +856,9 @@ is implemented and covered:
 | Multi-commit history through PRs | Conventional-commit subjects, a branch per feature, and every change merged into `main` through a reviewed pull request with CI green |
 | Railway hosting | `apps/api/railway.json`, `apps/web/railway.json`, both services live at the URLs above |
 | Reviewer page | `/about` in the web app — status, traceability, how to run, decisions, the process record, live health check. `apps/web/src/features/about/`, `apps/web/src/features/about/__tests__/AboutPage.test.tsx` |
+| Operations page | `/ops` in the web app — `GET /health` on a 30-second poll, the rate snapshot with the two cache windows derived in the browser from §4's TTLs and labelled as derived, and `DELETE /rates/cache` behind a confirmation dialog. The admin key lives in React state for the life of the tab: never `localStorage`, never a query key. `apps/web/src/features/ops/` |
+| Searchable currency picker | `apps/web/src/features/converter/components/CurrencyCombobox.tsx` — a `role="combobox"` trigger over a searchable listbox, a popover under it above 640px and a modal bottom sheet below. `apps/web/src/features/converter/lib/currencyFilter.ts` is the whole matching rule and is tested on its own |
+| Rate history in the client | `apps/web/src/features/converter/` — `GET /api/v1/rates/history` for the pair the form is on, drawn as an inline SVG chart with no charting dependency and the same series as a table beside it, plus an `archive` source badge on an answer the API priced from that archive |
 | Light, dark and system theme | `apps/web/src/components/ThemeSwitcher.tsx` over the token palette in `apps/web/src/index.css`; the choice persists and `system` follows the OS. Tokens are defined once and redefined per theme, so no component names a colour |
 | Naming conventions and enforced boundaries | NestJS suffixes across `apps/api/src`, an `index.ts` public surface per API module, per `common/` package and per top-level web folder, and `no-restricted-imports` in both ESLint configs failing the build on an import that reaches inside one. `apps/api/eslint.config.mjs`, `apps/web/eslint.config.js` |
 | Designed before it was built | Every screen and state was drawn on a design canvas first — both themes, 1280 and 360 — and implemented as three stacked redesign pull requests, each listing the boards it implements and the deviations it took from them, with the reason |

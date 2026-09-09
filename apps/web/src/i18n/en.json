@@ -155,7 +155,8 @@
         "Every module the architecture describes is in: rates behind a cache, a stale fallback and a daily snapshot archive, conversion through three strategies, currencies, history, the health endpoints and this client.",
         "The API and this client are two independent images, built by one CI workflow that runs lint, formatting, typecheck, tests with coverage thresholds, the build and the image build per app — plus a job that validates the shared conversion fixtures, boots the whole Docker Compose stack, probes it, and runs the integration suites against the Redis and MongoDB it started.",
         "Both run on Railway behind the platform edge, each on its own hostname; the panel above reads the live health endpoint every 30 seconds.",
-        "1252 tests pass: 767 API unit, 163 API end-to-end, 25 integration against a real Redis and MongoDB, and 297 in this client, with coverage gates of 85% on the API and 90% here. The counts in the Process section below carry the date they were taken."
+        "This client is three pages: the converter, with searchable currency pickers and the archived rate history for the pair it is on; this reviewer page; and an operations page at /ops holding the health report, the rate snapshot and cache invalidation behind a confirmation.",
+        "All four suites pass — API unit, API end-to-end, the integration suites against a real Redis and MongoDB, and this client — with coverage gates of 85% on the API and 90% here. The counts are in the Process section below, where they carry the date they were taken."
       ]
     },
     "whatWasBuilt": {
@@ -260,6 +261,18 @@
         {
           "term": "A fourth tier behind the cache",
           "description": "Redis holds a fresh key and a stale one, and both expire. Behind them MongoDB keeps one rate snapshot per UTC day, so an outage longer than the stale key still has an answer — dated to a day rather than to a minute, refused past a configured age, and labelled as the archive it came from. It is also the series the rate history reads."
+        },
+        {
+          "term": "A picker you can type into",
+          "description": "A native select over 180 currencies is a list nobody reads to the end, so each picker is a combobox: a trigger that opens a search, matching on the code first and the name second, with the matched letters marked in the row. It is a popover under the trigger on a wide screen and a modal bottom sheet on a phone, because a sheet is what a thumb reaches and what the platform lets you dismiss."
+        },
+        {
+          "term": "An operations page, not a curl command",
+          "description": "Everything the API says about itself, on one page: the health report on a 30-second poll, the rate snapshot with the two cache windows worked out in the browser and said on its face to be derived, and the cache invalidation behind a confirmation. The admin key stays in the tab's memory for as long as the tab lives and is never stored — one shared key with no identity behind it is a demo convenience rather than an operator console."
+        },
+        {
+          "term": "The archive is worth drawing",
+          "description": "The fourth tier is already a day-by-day series, so the panel beside the converter plots it for the pair on screen — an inline chart with no charting dependency, and the same days as a table beside it for a reader who wants the numbers. An answer priced from that archive says so with its own source badge and the day it was recorded."
         },
         {
           "term": "A theme the reader chooses",
