@@ -34,4 +34,10 @@ export interface RatesLookup {
   // ran. `source` says where the rates came from; this says what it cost —
   // together they are the `CACHE_UNAVAILABLE` warning §3 publishes.
   cacheDegraded: boolean;
+  // Whether a snapshot this lookup fetched could not be archived. Only a
+  // lookup that reached the upstream has anything to archive, so this is
+  // `false` on every other branch — and it is the `ARCHIVE_NOT_RECORDED`
+  // warning §3 publishes, which says the day is missing from /rates/history
+  // rather than anything about the answer being held.
+  archiveDegraded: boolean;
 }

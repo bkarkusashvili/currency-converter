@@ -191,11 +191,14 @@ in `.env` form.
 | `CIRCUIT_BREAKER_RESET_TIMEOUT_MS`  | `30000`                                          | How long the breaker stays open before one trial call                            |
 | `RATES_CACHE_TTL_SECONDS`           | `300`                                            | TTL of the fresh cache key `rates:latest`                                        |
 | `RATES_STALE_TTL_SECONDS`           | `86400`                                          | TTL of the long-lived stale fallback key `rates:fallback`                        |
+| `RATES_ARCHIVE_TTL_DAYS`            | `90`                                             | How long an archived daily snapshot is kept, enforced by a TTL index. Must be at least the 90-day window `GET /rates/history` accepts — the process refuses to start below it — and it is the depth of the archive fallback |
+| `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS`| `7`                                              | How old the newest archived day may be and still price an answer on the fourth fallback tier. Past it the tier declines and the lookup answers `503 RATES_UNAVAILABLE`: the retention above is what `/rates/history` charts, which is a different question from what may price a conversion |
+| `RATES_ARCHIVE_OPERATION_TIMEOUT_MS`| `1000`                                           | Deadline on a single archive upsert or read, so a Mongo that answers slowly cannot hold open the response that fetched the snapshot it is archiving |
 | `THROTTLE_TTL_SECONDS`              | `60`                                             | Rate-limit window                                                                |
 | `THROTTLE_LIMIT`                    | `60`                                             | Requests per window per client                                                   |
 | `ADMIN_API_KEY`                     | *(unset)*                                        | `x-api-key` for `DELETE /api/v1/rates/cache`. Unset makes `ApiKeyGuard` a no-op, so a local run needs no secret; startup **fails** when it is unset and `NODE_ENV=production`, because an open invalidation route is a lever on an upstream that allows one request a minute |
 
-That is the whole schema: 23 variables, and every one of them is in the table.
+That is the whole schema: 26 variables, and every one of them is in the table.
 
 ### Web (`apps/web`)
 
@@ -219,7 +222,7 @@ to `.env`; Compose picks it up automatically.
 Base path `/api/v1`; the two health routes are unversioned. The examples below
 are real responses, captured from the live deployment except where a
 degradation had to be induced locally. Swagger UI is at `/docs` and the OpenAPI
-JSON at `/docs-json` — 7 operations, 10 schemas, one `admin` security scheme.
+JSON at `/docs-json` — 8 operations, 12 schemas, one `admin` security scheme.
 
 Substitute `http://localhost:3000` for the live host to run these against a
 local stack.
@@ -247,7 +250,7 @@ curl -sX POST https://api-production-c5b65.up.railway.app/api/v1/convert \
 
 Codes are case-insensitive and echoed upper-cased; `amount` must be a JSON
 number, not a string. `strategy` is `identity` | `direct` | `cross`, `source` is
-`cache` | `provider` | `stale-cache`. `rate` is rounded half-up to 6 decimals
+`cache` | `provider` | `stale-cache` | `archive`. `rate` is rounded half-up to 6 decimals
 while `result` is computed from the **unrounded** rate, so on a large amount the
 two differ in the last cent — see
 [`docs/architecture.md` §5](docs/architecture.md#5-conversion-semantics).
@@ -317,6 +320,45 @@ Newest first. `limit` is `1..50`, default `10`, and it is validated rather than
 clamped: `?limit=0`, `?limit=51` and `?limit=abc` each answer `400` naming the
 field. An entry keeps the provenance the conversion was answered with, so a
 rate priced from the stale fallback can be reconciled afterwards.
+
+### `GET /api/v1/rates/history`
+
+```bash
+curl -s 'http://localhost:3000/api/v1/rates/history?base=USD&quote=UAH&days=7'
+```
+
+```json
+{
+  "base": "USD",
+  "quote": "UAH",
+  "days": 7,
+  "points": [{ "date": "2026-09-09", "buy": 44.43, "sell": 44.831 }]
+}
+```
+
+The archived daily rates for one published pair, oldest first. Every successful
+upstream fetch upserts its snapshot into MongoDB keyed by the UTC day, so the
+collection holds at most one document per day — always that day's latest
+snapshot — and this route reads a window of them. The example above is a local
+stack a few minutes old, so it has one day in it; a deployment that has been up
+a week has seven points.
+
+`base` and `quote` are required and validated like `/convert`'s codes;
+`days` is `1..90`, default `7`, validated rather than clamped. A day the archive
+has no snapshot for is absent rather than null, so a gap is visible as a gap.
+The orientation is the upstream's own — `USD/UAH` is a pair Monobank publishes
+and `UAH/USD` is not — and this route reports what was published rather than
+what could be derived from it:
+
+```
+GET ?base=XYZ&quote=UAH   → 422 UNSUPPORTED_CURRENCY  Currency 'XYZ' is not supported
+GET ?base=UAH&quote=USD   → 422 RATE_NOT_AVAILABLE    No exchange rate is available from UAH to USD
+GET ?base=USD&quote=UAH&days=91 → 400 VALIDATION_ERROR  days must not be greater than 90
+```
+
+With MongoDB unreachable it answers `503 ARCHIVE_UNAVAILABLE` with a
+`details.reason`, never an empty series: "never published" and "the store is
+down" are different answers.
 
 ### `DELETE /api/v1/rates/cache`
 
@@ -402,7 +444,7 @@ curl -sX POST https://api-production-c5b65.up.railway.app/api/v1/convert \
 | 422  | `UNSUPPORTED_CURRENCY` | Code is not in the snapshot                          |
 | 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                   |
 | 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                             |
-| 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists             |
+| 503  | `RATES_UNAVAILABLE`    | Upstream failed and nothing inside its age is cached or archived |
 | 503  | `CACHE_UNAVAILABLE`    | The cache could not be reached to invalidate it      |
 | 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read          |
 | 500  | `INTERNAL_ERROR`       | Anything unexpected; the message is generic          |
@@ -486,14 +528,36 @@ and nothing was kept for the next request:
 }
 ```
 
-`GET /api/v1/history` is the one route that changes its answer instead of
-warning: with the store down it is `503 HISTORY_UNAVAILABLE` with a
-`details.reason` (`"connection not ready"`), never an empty page.
+`GET /api/v1/rates` on a stack with **both** stores down — the rates are fetched
+and served, and the answer says what each outage cost:
+
+```json
+{
+  "source": "provider",
+  "fetchedAt": "2026-09-09T13:01:13.357Z",
+  "warnings": [
+    {
+      "code": "CACHE_UNAVAILABLE",
+      "message": "The rates cache could not be reached during this request, so it was not used; `source` says where the rates came from."
+    },
+    {
+      "code": "ARCHIVE_NOT_RECORDED",
+      "message": "The rates were fetched but today's snapshot could not be archived, so it will not appear in /rates/history and cannot back a later fallback."
+    }
+  ]
+}
+```
+
+`GET /api/v1/history` and `GET /api/v1/rates/history` are the two routes that
+change their answer instead of warning: with the store down they are
+`503 HISTORY_UNAVAILABLE` and `503 ARCHIVE_UNAVAILABLE` with a `details.reason`
+(`"connection not ready"`), never an empty page or an empty series.
 
 | `code`                 | When                                                                                                                |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `CACHE_UNAVAILABLE`    | Redis could not be read or written while the request was answered, so the cache neither served this response nor kept it for the next one. `source` says where the rates did come from |
 | `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but its record was dropped or timed out, so it will not appear in `/history` |
+| `ARCHIVE_NOT_RECORDED` | The snapshot behind this answer was fetched from the upstream but could not be archived, so that day is missing from `/rates/history` and cannot back a later fallback |
 
 ## Project layout
 
@@ -506,8 +570,8 @@ apps/
 │   │                   infrastructure (redis, mongo), modules (rates,
 │   │                   currencies, conversion, history, health)
 │   ├── test/e2e/       supertest suites over the real HTTP surface
-│   ├── test/integration/  the Redis and Mongo adapters against real servers,
-│   │                   skipped unless INTEGRATION_*_URL is set
+│   ├── test/integration/  the Redis and the two Mongo adapters against real
+│   │                   servers, skipped unless INTEGRATION_*_URL is set
 │   ├── Dockerfile      multi-stage, prod deps only, runs as `node`
 │   └── railway.json
 └── web/                React 19 + Vite + TypeScript, own package + lockfile
@@ -533,12 +597,12 @@ Four suites, all green on this commit:
 
 | Suite           | Command                                  | Result                    | Coverage                                                                 | Gate                       |
 | --------------- | ---------------------------------------- | ------------------------- | ------------------------------------------------------------------------ | -------------------------- |
-| API unit        | `apps/api: npm run test:cov`             | 65 suites, **661** tests  | stmts 98.79% · branches 88.28% · funcs 98.43% · lines 98.72%              | 85% lines + branches       |
-| API e2e         | `apps/api: npm run test:e2e`             | 8 suites, **124** tests   | not instrumented — see below                                             | none                       |
-| API integration | `apps/api: npm run test:integration`     | 2 suites, **12** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
+| API unit        | `apps/api: npm run test:cov`             | 74 suites, **767** tests  | stmts 98.99% · branches 87.80% · funcs 98.67% · lines 98.93%              | 85% lines + branches       |
+| API e2e         | `apps/api: npm run test:e2e`             | 9 suites, **161** tests   | not instrumented — see below                                             | none                       |
+| API integration | `apps/api: npm run test:integration`     | 3 suites, **25** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
 | Web             | `apps/web: npm run test:coverage`        | 27 files, **235** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
 
-**1032 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
+**1188 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
 `npm run typecheck`, `npm run format:check` and `npm run build` run the same
 checks across both apps and let both report, so a failure in one does not hide
 the other. Coverage gates and the e2e suite stay per-app.
@@ -555,17 +619,19 @@ gate does see it. Read the two as what they are: the unit suites cover the
 logic, the e2e suites cover the surface, and only the first is counted.
 
 Unit tests never touch the network, Redis or Mongo. The e2e suites do not
-either: the shared factory swaps the Redis client, the Mongo connection and the
-history repository for in-process fakes, and the environment points every URL at
+either: the shared factory swaps the Redis client, the Mongo connection, the
+history repository and the rate archive for in-process fakes, and the
+environment points every URL at
 a dead host, so a suite that forgets an override fails instead of passing
 against whatever happens to be running.
 
 **The integration suite is the deliberate exception**, and the reason it exists:
 every other test of the Redis and Mongo adapters runs against a hand-written
 fake, which can only confirm the assumption its author had about the driver.
-`npm run test:integration` runs the same two adapters against real servers — the
-TTLs both cache keys are actually written with, the index Mongo actually holds,
-the order the page actually comes back in. It runs only when
+`npm run test:integration` runs the same three adapters against real servers —
+the TTLs both cache keys are actually written with, the indexes Mongo actually
+holds, the order the page actually comes back in, and that a second fetch of a
+day replaces that day's archived document rather than adding one. It runs only when
 `INTEGRATION_REDIS_URL` and `INTEGRATION_MONGO_URL` point at one, and otherwise
 prints a line per suite naming the variable that would have run it — Jest says
 nothing about a file whose every suite is skipped, so the gap has to say so
@@ -733,8 +799,8 @@ test name, or a live URL; every row was re-verified against this commit.
 | #  | Requirement                              | Status | Evidence                                                                                                                    |
 | -- | ---------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | 8a | Comprehensive README with start instructions | met | This file: quick start in three forms, every root script, the full configuration table, the API reference above, real test numbers, the Railway deploy. Per-app READMEs add scripts and internals |
-| 8b | API documentation                        | met    | Swagger UI at `/docs`, OpenAPI at `/docs-json` (7 operations, 10 schemas, an `admin` scheme) generated from the code and committed as `docs/openapi.json`; `docs/architecture.md` §3 is the written contract. `test/e2e/swagger.e2e-spec.ts` keeps them in step — “documents no route that the API does not serve” — and `openapi-contract.e2e-spec.ts` fails when the committed document drifts from the decorators (`npm run openapi:write` regenerates it) |
-| 8c | Environment configuration                | met    | `apps/api/src/config/env.schema.ts` (zod, fails fast), `apps/api/.env.example` and root `.env.example`; the configuration table above lists all 23 variables |
+| 8b | API documentation                        | met    | Swagger UI at `/docs`, OpenAPI at `/docs-json` (8 operations, 12 schemas, an `admin` scheme) generated from the code and committed as `docs/openapi.json`; `docs/architecture.md` §3 is the written contract. `test/e2e/swagger.e2e-spec.ts` keeps them in step — “documents no route that the API does not serve” — and `openapi-contract.e2e-spec.ts` fails when the committed document drifts from the decorators (`npm run openapi:write` regenerates it) |
+| 8c | Environment configuration                | met    | `apps/api/src/config/env.schema.ts` (zod, fails fast), `apps/api/.env.example` and root `.env.example`; the configuration table above lists all 26 variables |
 
 ### Beyond the task
 
@@ -747,9 +813,10 @@ is implemented and covered:
 | Structured logging | `common/logging/` — nestjs-pino, `request-id.util.ts` (header, sanitiser, assigner, middleware), `serializers.util.ts`, level resolver, once-per-outage reporter. Credentials and connection strings never reach a client or a log line |
 | React frontend | `apps/web/` — React 19 + Vite + TanStack Query + React Router, converter and `/about` pages |
 | MongoDB history | `infrastructure/mongo/`, `modules/history/`, TTL index from `HISTORY_TTL_DAYS`, `GET /api/v1/history` |
+| Daily rate archive and history | `modules/rates/schemas/` + `infrastructure/mongo-rates-archive.repository.ts` — one `rate_snapshots` document per UTC day, TTL from `RATES_ARCHIVE_TTL_DAYS`; it is the fourth fallback tier behind the two cache keys (`source: "archive"`, up to `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` old and refused past it) and it is what `GET /api/v1/rates/history` reads, one projected pair per day. `test/e2e/rates-archive.e2e-spec.ts`, `test/integration/mongo-rates-archive.repository.integration-spec.ts` |
 | Service layer on the web | `apps/web/src/api/services/` — five interfaces in `services.ts`, their HTTP implementations in `createHttpServices.ts`, `ServicesProvider` / `useServices`; tests inject fakes through the same provider. It is a *service* layer and not a repository one because the client stores nothing; the API keeps the Repository pattern, where the stores are |
 | Offline fallback | `features/converter/lib/convertOffline.ts` + `api/persistence/` — a persisted snapshot re-priced in the browser, labelled `offline-estimate` and never written to history. Priced against the same `fixtures/golden-conversions.json` the API's e2e suite asserts |
-| Container-backed integration tests | `apps/api/test/integration/` — the Redis and Mongo adapters against real servers, run by CI's `orchestration` job against the stack it starts |
+| Container-backed integration tests | `apps/api/test/integration/` — the Redis and the two Mongo adapters against real servers, run by CI's `orchestration` job against the stack it starts |
 | Client/contract check | `docs/openapi.json` committed and regenerated by an e2e test; the web suite validates every sample response it renders against those schemas with `ajv` |
 | i18n-ready strings | `apps/web/src/i18n/` — every string in `en.json`, keys type-checked; `messageKeys.test.ts` proves every envelope and warning code has a sentence |
 | Strict typing | `tsc --noEmit` / `tsc -b` clean, `no-unsafe-*` on, `ConfigService<AppConfig, true>` so an unknown config key is a compile error |

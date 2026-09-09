@@ -69,6 +69,25 @@ export const envSchema = z
     CIRCUIT_BREAKER_RESET_TIMEOUT_MS: positiveInt.default(30000),
     RATES_CACHE_TTL_SECONDS: positiveInt.default(300),
     RATES_STALE_TTL_SECONDS: positiveInt.default(86400),
+    // How long an archived daily snapshot is kept, enforced by a TTL index on
+    // `fetchedAt`. It is the window /rates/history can be asked about as well
+    // as the retention: a day past it is a day the series has no point for.
+    RATES_ARCHIVE_TTL_DAYS: positiveInt.default(90),
+    // How old the newest archived day may be and still be served as the fourth
+    // tier. The archive is kept for RATES_ARCHIVE_TTL_DAYS so that
+    // /rates/history has a window to chart; that is a retention, not a
+    // statement about what may price a conversion. Without a ceiling the last
+    // tier answers 200 from a 90-day-old rate — a number no client would have
+    // accepted had it been asked, and one that looks exactly like a fresh one
+    // apart from `source` and `fetchedAt`. Past this many days the tier
+    // declines and the lookup ends in the documented 503 instead.
+    RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS: positiveInt.default(7),
+    // Deadline for a single archive upsert or read. Same reasoning as
+    // HISTORY_OPERATION_TIMEOUT_MS and deliberately its own variable: the
+    // archive sits on the rates path, which every route reads, while the
+    // history sits on /convert alone, so the two budgets are not the same
+    // decision even when they hold the same number.
+    RATES_ARCHIVE_OPERATION_TIMEOUT_MS: positiveInt.default(1000),
     THROTTLE_TTL_SECONDS: positiveInt.default(60),
     THROTTLE_LIMIT: positiveInt.default(60),
     // Null rather than undefined so that a validated read stays non-nullable in

@@ -23,6 +23,7 @@ const FETCHED_AT = '2026-09-08T12:00:00.000Z';
 const LOOKUP: RatesLookup = {
   source: RatesSource.Cache,
   cacheDegraded: false,
+  archiveDegraded: false,
   snapshot: { fetchedAt: FETCHED_AT, rates: [...RATES] },
 };
 

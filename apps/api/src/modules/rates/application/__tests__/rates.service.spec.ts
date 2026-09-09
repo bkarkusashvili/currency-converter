@@ -1,10 +1,12 @@
 import { RatesUnavailableError } from '../../../../common/errors/rates-unavailable.error';
+import { fakeConfig } from '../../../../config/__tests__/fake-config';
 import { CircuitOpenError } from '../../../../common/resilience/circuit-open.error';
 import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../../common/logging/__tests__/fake-pino-logger';
 import { CachedSnapshot } from '../../domain/rates-repository.interface';
+import { ArchivedSnapshot } from '../../domain/rate-history.types';
 import { RatesSnapshot } from '../../domain/exchange-rate.types';
 import { RatesService } from '../rates.service';
 
@@ -45,9 +47,45 @@ interface RepositoryDouble {
   clear: jest.Mock;
 }
 
+interface ArchiveDouble {
+  save: jest.Mock;
+  findLatest: jest.Mock;
+  findPairWindow: jest.Mock;
+}
+
+// How old the newest archived day may be and still price an answer.
+const MAX_AGE_DAYS = 7;
+
+// Dated against the clock rather than pinned: the tier now refuses a day past
+// the ceiling, so a fixed date would fall outside it the day after it was
+// written. Read once, so a suite that starts at 23:59:59 dates every fixture
+// from the same day.
+const TODAY = Date.now();
+
+function daysAgo(days: number): string {
+  return new Date(TODAY - days * 86_400_000).toISOString().slice(0, 10);
+}
+
+// Days older than the stale key by construction: the archive is what is left
+// when the fallback has expired too.
+function archived(days: number): ArchivedSnapshot {
+  const date = daysAgo(days);
+
+  return {
+    date,
+    fetchedAt: `${date}T12:00:00.000Z`,
+    rates: [
+      { base: 'USD', quote: 'UAH', buy: 41.9, date: `${date}T11:00:00.000Z` },
+    ],
+  };
+}
+
+const ARCHIVED = archived(1);
+
 describe('RatesService', () => {
   let provider: ProviderDouble;
   let repository: RepositoryDouble;
+  let archive: ArchiveDouble;
   let logger: FakePinoLogger;
   let service: RatesService;
 
@@ -59,8 +97,19 @@ describe('RatesService', () => {
       save: jest.fn().mockResolvedValue({ degraded: false }),
       clear: jest.fn().mockResolvedValue(undefined),
     };
+    archive = {
+      save: jest.fn().mockResolvedValue(true),
+      findLatest: jest.fn().mockResolvedValue(null),
+      findPairWindow: jest.fn().mockResolvedValue([]),
+    };
     logger = createFakePinoLogger();
-    service = new RatesService(provider, repository, logger.asPinoLogger());
+    service = new RatesService(
+      provider,
+      repository,
+      archive,
+      fakeConfig({ RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS: MAX_AGE_DAYS }),
+      logger.asPinoLogger(),
+    );
   });
 
   describe('on a cache hit', () => {
@@ -71,9 +120,22 @@ describe('RatesService', () => {
         snapshot: FRESH,
         source: 'cache',
         cacheDegraded: false,
+        archiveDegraded: false,
       });
 
       expect(provider.fetchRates).not.toHaveBeenCalled();
+    });
+
+    // The tiers below it are not reached either, and each is a store this would
+    // otherwise be paying for on the one path that should touch nothing: the
+    // fallback key, and the archive behind it.
+    it('reaches no tier below the fresh key', async () => {
+      repository.getFresh.mockResolvedValue(hit(FRESH));
+
+      await service.getSnapshot();
+
+      expect(repository.getStale).not.toHaveBeenCalled();
+      expect(archive.findLatest).not.toHaveBeenCalled();
     });
   });
 
@@ -83,9 +145,11 @@ describe('RatesService', () => {
         snapshot: FRESH,
         source: 'provider',
         cacheDegraded: false,
+        archiveDegraded: false,
       });
 
       expect(repository.save).toHaveBeenCalledWith(FRESH);
+      expect(archive.save).toHaveBeenCalledWith(FRESH);
     });
 
     it('serves concurrent callers from one upstream call', async () => {
@@ -134,6 +198,7 @@ describe('RatesService', () => {
         snapshot: STALE,
         source: 'stale-cache',
         cacheDegraded: false,
+        archiveDegraded: false,
       });
 
       expect(logger.warn).toHaveBeenCalled();
@@ -186,6 +251,7 @@ describe('RatesService', () => {
         snapshot: FRESH,
         source: 'provider',
         cacheDegraded: true,
+        archiveDegraded: false,
       });
     });
 
@@ -217,6 +283,162 @@ describe('RatesService', () => {
     it('says nothing about a key that had simply expired', async () => {
       await expect(service.getSnapshot()).resolves.toMatchObject({
         cacheDegraded: false,
+      });
+    });
+  });
+
+  // The fourth tier (§4): older than the fallback key by construction, and the
+  // last thing between an upstream outage that outlived both cache keys and a
+  // 503.
+  describe('when the upstream fails and both cache keys have expired', () => {
+    beforeEach(() => {
+      provider.fetchRates.mockRejectedValue(new Error('upstream down'));
+    });
+
+    it('serves the newest archived day and says where it came from', async () => {
+      archive.findLatest.mockResolvedValue(ARCHIVED);
+
+      await expect(service.getSnapshot()).resolves.toStrictEqual({
+        snapshot: { fetchedAt: ARCHIVED.fetchedAt, rates: ARCHIVED.rates },
+        source: 'archive',
+        cacheDegraded: false,
+        archiveDegraded: false,
+      });
+    });
+
+    // Days old and priced against a market that has moved: the operator hears
+    // about this one.
+    it('warns that it is answering from the archive', async () => {
+      archive.findLatest.mockResolvedValue(ARCHIVED);
+
+      await service.getSnapshot();
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining('archived rates') as string,
+      );
+    });
+
+    it('is reached only after the stale key has been tried', async () => {
+      repository.getStale.mockResolvedValue(hit(STALE));
+      archive.findLatest.mockResolvedValue(ARCHIVED);
+
+      await expect(service.getSnapshot()).resolves.toMatchObject({
+        source: 'stale-cache',
+      });
+
+      expect(archive.findLatest).not.toHaveBeenCalled();
+    });
+
+    it('fails with the documented error when the archive is empty too', async () => {
+      await expect(service.getSnapshot()).rejects.toBeInstanceOf(
+        RatesUnavailableError,
+      );
+    });
+
+    // The retention is how far back the chart goes; it is not a statement about
+    // what may price a conversion. Left uncapped this tier answers 200 from a
+    // 90-day-old rate that reads like any other answer.
+    describe('and the newest archived day is past the fallback ceiling', () => {
+      beforeEach(() => {
+        archive.findLatest.mockResolvedValue(archived(MAX_AGE_DAYS + 1));
+      });
+
+      it('declines rather than pricing from it', async () => {
+        await expect(service.getSnapshot()).rejects.toBeInstanceOf(
+          RatesUnavailableError,
+        );
+      });
+
+      // The reason travels to the client in the envelope, so it is the API's
+      // own vocabulary — the resilience decision and two numbers — and carries
+      // no upstream or driver message.
+      it('says how old the day was and what the ceiling is', async () => {
+        await expect(service.getSnapshot()).rejects.toMatchObject({
+          details: {
+            reason:
+              `upstream request failed; the newest archived rates are ` +
+              `${MAX_AGE_DAYS + 1} days old, past the ${MAX_AGE_DAYS} day ` +
+              `fallback ceiling`,
+          },
+        });
+      });
+
+      it('never carries the upstream message into the reason', async () => {
+        provider.fetchRates.mockRejectedValue(
+          new Error('connect ECONNREFUSED api.monobank.ua:443'),
+        );
+
+        await expect(service.getSnapshot()).rejects.not.toThrow(/monobank\.ua/);
+      });
+    });
+
+    // The ceiling is a maximum age, not a range that excludes its own bound: a
+    // day exactly that old is the oldest one this still prices from.
+    it('serves an archived day that is exactly at the ceiling', async () => {
+      archive.findLatest.mockResolvedValue(archived(MAX_AGE_DAYS));
+
+      await expect(service.getSnapshot()).resolves.toMatchObject({
+        source: 'archive',
+      });
+    });
+
+    // The client is already being told the rates are unavailable and why. An
+    // archive that cannot be read is a fallback with nothing in it, not a
+    // second failure to report — ARCHIVE_UNAVAILABLE is /rates/history's answer.
+    it('treats an unreadable archive as an empty one', async () => {
+      archive.findLatest.mockRejectedValue(new Error('mongo is gone'));
+
+      await expect(service.getSnapshot()).rejects.toMatchObject({
+        details: { reason: 'upstream request failed' },
+      });
+
+      expect(logger.warn).toHaveBeenCalled();
+    });
+  });
+
+  describe('when the archive cannot take the snapshot', () => {
+    it('serves the rates and reports the day that was dropped', async () => {
+      archive.save.mockResolvedValue(false);
+
+      await expect(service.getSnapshot()).resolves.toStrictEqual({
+        snapshot: FRESH,
+        source: 'provider',
+        cacheDegraded: false,
+        archiveDegraded: true,
+      });
+    });
+
+    // Nothing was fetched, so there was nothing to archive: reporting the
+    // archive as degraded on a hit would warn about a write that never was.
+    it('says nothing about the archive on a cache hit', async () => {
+      repository.getFresh.mockResolvedValue(hit(FRESH));
+
+      await expect(service.getSnapshot()).resolves.toMatchObject({
+        archiveDegraded: false,
+      });
+
+      expect(archive.save).not.toHaveBeenCalled();
+    });
+
+    it('says nothing about the archive on a stale answer', async () => {
+      provider.fetchRates.mockRejectedValue(new Error('upstream down'));
+      repository.getStale.mockResolvedValue(hit(STALE));
+
+      await expect(service.getSnapshot()).resolves.toMatchObject({
+        source: 'stale-cache',
+        archiveDegraded: false,
+      });
+    });
+
+    // The two stores fail independently and are reported independently: a
+    // client that sees only CACHE_UNAVAILABLE knows the archive took the day.
+    it('reports the two stores separately', async () => {
+      repository.save.mockResolvedValue({ degraded: true });
+
+      await expect(service.getSnapshot()).resolves.toMatchObject({
+        cacheDegraded: true,
+        archiveDegraded: false,
       });
     });
   });

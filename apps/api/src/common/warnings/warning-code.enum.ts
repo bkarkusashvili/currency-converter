@@ -4,4 +4,5 @@
 export enum WarningCode {
   CacheUnavailable = 'CACHE_UNAVAILABLE',
   HistoryNotRecorded = 'HISTORY_NOT_RECORDED',
+  ArchiveNotRecorded = 'ARCHIVE_NOT_RECORDED',
 }

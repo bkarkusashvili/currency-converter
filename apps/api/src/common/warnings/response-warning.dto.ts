@@ -9,7 +9,9 @@ export class ResponseWarningDto implements ResponseWarning {
       'reached while the request was answered, so it was neither read nor ' +
       'written — read `source` for where the rates came from; ' +
       '`HISTORY_NOT_RECORDED` means the conversion was answered but not ' +
-      'stored, so it will not appear in `/history`.',
+      'stored, so it will not appear in `/history`; ' +
+      '`ARCHIVE_NOT_RECORDED` means the snapshot behind this answer was ' +
+      'fetched but not archived, so it will not appear in `/rates/history`.',
     enum: WarningCode,
     example: WarningCode.CacheUnavailable,
   })
