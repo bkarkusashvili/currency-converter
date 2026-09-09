@@ -1,13 +1,17 @@
 export type ConversionStrategy = 'identity' | 'direct' | 'cross';
 
-export type RateSource = 'cache' | 'provider' | 'stale-cache';
+export type RateSource = 'cache' | 'provider' | 'stale-cache' | 'archive';
 
 /**
  * The list is the value and the type is read off it, as the API does: the suite
  * has to iterate the codes to check every one has a sentence, and a second copy
  * of the literals is one that can disagree with this one.
  */
-export const WARNING_CODES = ['CACHE_UNAVAILABLE', 'HISTORY_NOT_RECORDED'] as const;
+export const WARNING_CODES = [
+  'CACHE_UNAVAILABLE',
+  'HISTORY_NOT_RECORDED',
+  'ARCHIVE_NOT_RECORDED',
+] as const;
 
 export type ResponseWarningCode = (typeof WARNING_CODES)[number];
 
@@ -114,4 +118,32 @@ export interface RatesSnapshotResponse {
   fetchedAt: string;
   rates: ExchangeRate[];
   warnings?: ResponseWarning[];
+}
+
+/**
+ * One archived UTC day of a published pair, as `GET /rates/history` returns it.
+ * `date` is the day itself (`YYYY-MM-DD`), not an instant: the archive keeps
+ * the last snapshot of each day, so the point is that day at its close. A day
+ * the archive has no snapshot for is **absent rather than null**, which is why
+ * a series can be shorter than the window it was asked for and why a gap in it
+ * is a gap rather than a zero.
+ */
+export interface RateHistoryPoint {
+  date: string;
+  buy?: number;
+  sell?: number;
+  cross?: number;
+}
+
+/**
+ * The window that was read, echoed with what it held. `days` comes back so a
+ * client that relied on the default knows what it got, and `base`/`quote` are
+ * the pair as the upstream publishes it — this route inverts and crosses
+ * nothing (docs/architecture.md §3).
+ */
+export interface RateHistoryResponse {
+  base: string;
+  quote: string;
+  days: number;
+  points: RateHistoryPoint[];
 }

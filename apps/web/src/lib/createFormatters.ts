@@ -30,12 +30,30 @@ export interface FormattedTimestamp {
   kind: TimestampKind;
 }
 
+/** How much of an archived day to name: the number alone, the month with it, or the weekday too. */
+export type ArchivedDayStyle = 'day' | 'dayMonth' | 'dayMonthYear' | 'full';
+
 export interface Formatters {
   money(value: number): string;
   integer(value: number): string;
   rate(value: number): string;
   splitRate(value: number): { lead: string; tail: string };
   timestamp(isoTimestamp: string, now?: Date): FormattedTimestamp | null;
+  /**
+   * An archived day — either the day itself (`2026-09-09`) or an instant
+   * inside it — as `9 Sep`, `9`, `Wed 9 Sep` or `9 Sep 2026`.
+   *
+   * Always in UTC, because the archive keys its snapshots by the UTC day: a
+   * browser four hours east must not call the 7 Sep snapshot the 8th, and the
+   * date on the result card has to be the date in the table under it.
+   *
+   * Assembled from the locale's own parts rather than taken from a date style,
+   * because `dateStyle: 'medium'` writes `Sep 7, 2026` under `en-US` and this
+   * line has to read the same wherever it is opened (§6.15).
+   */
+  archivedDay(day: string, style?: ArchivedDayStyle): string | null;
+  /** A proportion as a percentage to one place: `0.003167` → `0.3%`. */
+  percent(fraction: number): string;
   /** The grouping and decimal marks of this locale, for the amount field to reuse. */
   separators: AmountSeparators;
 }
@@ -56,6 +74,31 @@ export function createFormatters(locale: string): Formatters {
   const dateAndTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
   const full = new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'long' });
   const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  const utcDay: Record<ArchivedDayStyle, Intl.DateTimeFormat> = {
+    day: new Intl.DateTimeFormat(locale, { day: 'numeric', timeZone: 'UTC' }),
+    dayMonth: new Intl.DateTimeFormat(locale, {
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+    }),
+    dayMonthYear: new Intl.DateTimeFormat(locale, {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }),
+    full: new Intl.DateTimeFormat(locale, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'UTC',
+    }),
+  };
+  const percent = new Intl.NumberFormat(locale, {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 
   return {
     money: (value) => money.format(value),
@@ -98,8 +141,30 @@ export function createFormatters(locale: string): Formatters {
       return { iso: date.toISOString(), text, title: full.format(date), kind };
     },
 
+    archivedDay(day, style = 'dayMonth') {
+      const date = new Date(day);
+      return Number.isNaN(date.getTime()) ? null : dayFirst(utcDay[style], date);
+    },
+
+    percent: (fraction) => percent.format(fraction),
+
     separators: separatorsOf(integer),
   };
+}
+
+/**
+ * The locale's own weekday, day, month and year, in that order and separated
+ * by spaces. Reordering the parts rather than letting the locale place them is
+ * what makes `7 Sep` of a format that would otherwise write `Sep 7`, and it
+ * keeps the month's name and numeral system the locale's.
+ */
+function dayFirst(format: Intl.DateTimeFormat, date: Date): string {
+  const parts = format.formatToParts(date);
+  const ORDER = ['weekday', 'day', 'month', 'year'] as const;
+
+  return ORDER.map((type) => parts.find((part) => part.type === type)?.value)
+    .filter((value): value is string => value !== undefined)
+    .join(' ');
 }
 
 /**

@@ -99,6 +99,10 @@
         "value": "stale cache",
         "note": "Monobank was unreachable, so the last good snapshot was used. This rate may be out of date."
       },
+      "archive": {
+        "value": "archive",
+        "note": "Monobank and the cache were unreachable, so the archived daily snapshot was used."
+      },
       "offline-estimate": {
         "value": "offline estimate",
         "note": "The API could not be reached, so this was priced in the browser from rates fetched"
@@ -120,6 +124,67 @@
       "rate": "1 {{from}} = {{rate}} {{to}}",
       "tags": "{{strategy}} · {{source}}"
     }
+  },
+  "rateHistory": {
+    "heading": "Rate history",
+    "pair": "{{base}} / {{quote}}",
+    "summaryTail": "· {{detail}}",
+    "changeUp": "Up {{percent}} over {{days}} days",
+    "changeDown": "Down {{percent}} over {{days}} days",
+    "changeFlat": "Unchanged over {{days}} days",
+    "detailSpread": "buy {{first}} → {{last}}",
+    "detailCross": "cross via {{hub}}, no spread",
+    "expand": "Show the rate history",
+    "collapse": "Hide the rate history",
+    "range": {
+      "label": "Range",
+      "d7": "7D",
+      "d30": "30D",
+      "d90": "90D"
+    },
+    "chartLabelSpread": "Buy and sell rate, last {{days}} days",
+    "chartLabelCross": "Cross rate, last {{days}} days",
+    "day": "{{date}}, {{values}}",
+    "legend": {
+      "buy": "buy",
+      "sell": "sell",
+      "spread": "spread"
+    },
+    "marker": {
+      "min": "min {{value}}",
+      "max": "max {{value}}",
+      "latest": "{{value}}",
+      "latestMin": "{{value}} · min",
+      "latestMax": "{{value}} · max"
+    },
+    "tooltipValues": "buy {{buy}} · sell {{sell}}",
+    "tooltipCross": "cross {{cross}}",
+    "tableCaption": "Archived daily rates for {{base}} / {{quote}}, newest day first",
+    "table": {
+      "date": "Date",
+      "buy": "Buy",
+      "sell": "Sell",
+      "deltaBuy": "Δ buy",
+      "cross": "Cross",
+      "delta": "Δ"
+    },
+    "delta": {
+      "up": "▲ {{value}}",
+      "down": "▼ {{value}}",
+      "none": "—",
+      "upLabel": "up {{value}}",
+      "downLabel": "down {{value}}",
+      "noneLabel": "no change"
+    },
+    "footnote": "One point per day · archived snapshots · kept 90 days",
+    "showing": "Showing {{shown}} of {{total}} days",
+    "showAll": "Show all {{total}}",
+    "loading": "Loading rate history…",
+    "emptySummary": "No days recorded yet",
+    "emptyHeading": "No history for this pair yet",
+    "empty": "History starts collecting from the first fetch. Today’s rate will be the first point tomorrow.",
+    "unavailable": "Rate history is unavailable. Converting still works.",
+    "lastShown": "Last shown: {{days}} days, {{time}}"
   },
   "about": {
     "eyebrow": "For the reviewer",
@@ -221,6 +286,10 @@
         {
           "term": "Two layers of fallback, not one",
           "description": "Monobank being down and the API being down are different outages with different answers. The API keeps a stale snapshot in Redis; the browser keeps a persisted one of its own. Each says which it used rather than pretending the number is fresh — the section above walks through both."
+        },
+        {
+          "term": "Third fallback tier: an archived daily snapshot in MongoDB with a 90-day TTL",
+          "description": "When both Monobank and the 24-hour Redis fallback are gone, the API answers from the last archived day and labels it archive with the snapshot date, so a day-old number is never mistaken for a live one. The same archive is what the rate-history panel reads, one point per day, and the TTL is why it shows at most 90."
         },
         {
           "term": "A warning is not an error",
@@ -333,7 +402,8 @@
   },
   "warnings": {
     "CACHE_UNAVAILABLE": "The rates cache could not be reached, so these rates came straight from Monobank and were not cached for the next request.",
-    "HISTORY_NOT_RECORDED": "This conversion was answered but could not be saved, so it will not appear under recent conversions."
+    "HISTORY_NOT_RECORDED": "This conversion was answered but could not be saved, so it will not appear under recent conversions.",
+    "ARCHIVE_NOT_RECORDED": "The rates behind this answer were fetched but could not be archived, so that day will be missing from the rate history and cannot back a later fallback."
   },
   "errors": {
     "requestId": "request {{id}}",
@@ -349,6 +419,7 @@
       "RATES_UNAVAILABLE": "Exchange rates are unavailable: Monobank could not be reached and there is no recent snapshot to fall back on.",
       "CACHE_UNAVAILABLE": "The rates cache could not be reached, so it could not be cleared.",
       "HISTORY_UNAVAILABLE": "Recent conversions cannot be read right now: the history store is unreachable.",
+      "ARCHIVE_UNAVAILABLE": "Rate history cannot be read right now: the rate archive is unreachable.",
       "INTERNAL_ERROR": "The API failed unexpectedly. Try again in a moment.",
       "NETWORK_ERROR": "Cannot reach the API at {{url}}. Check that it is running and reachable."
     }

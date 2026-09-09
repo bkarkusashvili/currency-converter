@@ -4,7 +4,8 @@ import type { HistoryItem } from '../../../api';
 import { EmptyMark, InfoBadge, Skeleton, Timestamp, WarningIcon } from '../../../components';
 import { useApiErrorMessage, useFormatters } from '../../../lib';
 import { conversionKey } from '../lib/historyHighlight';
-import { sourceCopy, strategyCopy } from '../lib/provenance';
+import { ARCHIVE_SOURCE, sourceCopy, strategyCopy } from '../lib/provenance';
+import { ArchiveDate } from './ArchiveDate';
 
 export const HISTORY_LIMIT = 10;
 
@@ -120,9 +121,17 @@ function HistoryRow({ item, isLatest }: { item: HistoryItem; isLatest: boolean }
 
       {needsExplaining && (
         <p className="text-warn text-[0.6875rem]">
-          {/* The same sentence the result card uses for the same fact. */}
-          {t('converter.result.ratesFetched')}{' '}
-          <Timestamp value={item.ratesTimestamp} withPreposition />
+          {/* The same sentence the result card uses for the same fact — which
+              for an archived answer is a date, because that is all its rates
+              are dated to. */}
+          {item.source === ARCHIVE_SOURCE ? (
+            <ArchiveDate value={item.ratesTimestamp} />
+          ) : (
+            <>
+              {t('converter.result.ratesFetched')}{' '}
+              <Timestamp value={item.ratesTimestamp} withPreposition />
+            </>
+          )}
         </p>
       )}
     </li>

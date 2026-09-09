@@ -71,3 +71,33 @@ describe('timestamp formatting', () => {
     expect(formatters.timestamp('not-a-date', now)).toBeNull();
   });
 });
+
+describe('archived day formatting', () => {
+  it('writes the day first wherever the locale would have written the month first', () => {
+    // `en-US` would say `Sep 9, 2026`; the archive line reads the same
+    // everywhere, so the parts are put back in one order (§6.15).
+    expect(formatters.archivedDay('2026-09-09', 'dayMonthYear')).toBe('9 Sep 2026');
+    expect(formatters.archivedDay('2026-09-09')).toBe('9 Sep');
+    expect(formatters.archivedDay('2026-09-09', 'day')).toBe('9');
+    expect(formatters.archivedDay('2026-09-07', 'full')).toBe('Mon 7 Sep');
+  });
+
+  it('reads a day in UTC, which is the day the archive keyed it by', () => {
+    // Late enough in the day to be tomorrow anywhere east of Greenwich, and
+    // early enough to be yesterday anywhere west of it.
+    expect(formatters.archivedDay('2026-09-07T20:45:00.000Z', 'dayMonthYear')).toBe('7 Sep 2026');
+    expect(formatters.archivedDay('2026-09-07T02:15:00.000Z', 'dayMonthYear')).toBe('7 Sep 2026');
+  });
+
+  it('returns nothing for a value that is not a day', () => {
+    expect(formatters.archivedDay('not-a-day')).toBeNull();
+  });
+});
+
+describe('percentage formatting', () => {
+  it('reports a proportion to one place', () => {
+    expect(formatters.percent(0.003167)).toBe('0.3%');
+    expect(formatters.percent(0)).toBe('0.0%');
+    expect(formatters.percent(0.1234)).toBe('12.3%');
+  });
+});
