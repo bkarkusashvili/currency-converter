@@ -1,5 +1,6 @@
 export { AppError } from './app.error';
 export { ErrorCode } from './error-code.enum';
+export { ArchiveUnavailableError } from './archive-unavailable.error';
 export { CacheUnavailableError } from './cache-unavailable.error';
 export { HistoryUnavailableError } from './history-unavailable.error';
 export { RateNotAvailableError } from './rate-not-available.error';
