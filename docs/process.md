@@ -8,8 +8,11 @@ is weaker than it looks.
 
 ## Stages
 
-Each stage is a set of pull requests, and every one of them merged into `main`
-green. Nothing was pushed to `main` directly.
+Each stage is a set of pull requests. Every one that has merged, merged into
+`main` green, and nothing was pushed to `main` directly. Two of stage 9's three
+were still open when this was written — the pull request numbers below name them
+either way, so the table is a map of the work rather than a claim about what has
+landed.
 
 | # | Stage | Landed as |
 | - | ----- | --------- |
@@ -33,8 +36,8 @@ green. Nothing was pushed to `main` directly.
    concern. Reproduction, not suspicion: the findings quoted below each name
    what was measured.
 3. **Fix round** — commits answering the findings, one comment at a time, and a
-   second review pass confirming each on the head commit. Two pull requests took
-   three passes.
+   second review pass confirming each on the head commit. One pull request took
+   three.
 4. **CI green** — the three jobs on every pull request: `api` and `web` each run
    lint, format check, typecheck, build, unit tests with coverage gates, `npm
    audit` and a `docker build`; `orchestration` validates the shared fixtures and
