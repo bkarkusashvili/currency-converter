@@ -453,11 +453,21 @@
     min-height: 2.1875rem;
   }
 
-  /* The first answer taking the placeholder's place. Opacity only and 140ms:
-     no size, no offset, and nothing to replay when the figure it is on is
-     still standing and only its text changes. */
+  /* The first answer taking the placeholder's place. Opacity only and 140ms,
+     on the row itself — which mounts once and then stays, so this plays for
+     the first answer and never again. */
   .result-fade-in {
     animation: result-fade-in 140ms ease-out both;
+  }
+
+  /* Every answer after it. The spans holding the figure and the two rate lines
+     are keyed by the conversion, so a new answer remounts the text — and only
+     the text — and replays this: 4px up into place with a 1px overshoot, over
+     200ms. Transform and opacity only, on a box whose size nothing here
+     changes, so the rows around it do not move and nothing below is pushed
+     down. */
+  .result-rise {
+    animation: result-rise 200ms ease-out both;
   }
 
   .code-block {
@@ -1111,6 +1121,21 @@
   }
 }
 
+@keyframes result-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1118,5 +1143,12 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* The blanket rule above would still run the rise, for 0.01ms. A reader who
+     has asked for no motion gets none: no animation at all, and therefore no
+     offset frame to catch. */
+  .result-rise {
+    animation: none !important;
   }
 }

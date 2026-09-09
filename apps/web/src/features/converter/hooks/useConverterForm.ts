@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next';
 import type { ConvertRequest } from '../../../api';
 import { useFormatters } from '../../../lib';
 import { canonicalAmount } from '../lib/amount/formatAmountInput';
-import { MAX_AMOUNT, parseAmount, type AmountErrorCode } from '../lib/amount/parseAmount';
+import {
+  MAX_AMOUNT,
+  parseAmount,
+  type AmountErrorCode,
+  type ParsedAmount,
+} from '../lib/amount/parseAmount';
 import type { CurrencyPair } from '../lib/currencyPair';
 import type { FormField, FormFieldErrors } from '../lib/serverFieldErrors';
 
@@ -78,37 +83,71 @@ export function useConverterForm({
     markEdited('amount');
   }
 
+  /**
+   * The number the amount field stands for. It writes its value in the active
+   * locale, and Enter submits without blurring, so what is in it is neither the
+   * number nor necessarily finished: `canonicalAmount` is what turns one into
+   * the other.
+   */
+  function currentAmount(): ParsedAmount {
+    return parseAmount(canonicalAmount(amount, formatters.separators));
+  }
+
+  function submit(nextFrom: string, nextTo: string, value: number) {
+    setAmountErrorCode(null);
+    // The server's next answer describes these values, so nothing is
+    // outstanding to keep an error off a field any more.
+    setEditedFields(EMPTY_FIELDS);
+    onSubmit({ from: nextFrom.toUpperCase(), to: nextTo.toUpperCase(), amount: value });
+  }
+
+  /**
+   * Swapping and picking both change the question the answer on screen is
+   * answering, so it is asked again for the pair now selected rather than left
+   * standing beside controls that no longer describe it. The request goes out
+   * the same way Convert sends one, and supersedes one already in flight the
+   * same way a second press does.
+   *
+   * An amount that would not submit is left alone: the swap or the pick still
+   * happens, in silence, and Convert still says what is wrong with the amount
+   * when it is pressed.
+   */
+  function reconvert(nextFrom: string, nextTo: string) {
+    const parsed = currentAmount();
+    if (parsed.ok) {
+      submit(nextFrom, nextTo, parsed.value);
+    }
+  }
+
   function setFrom(value: string) {
     markEdited('from');
     onPairChange({ from: value, to });
+    reconvert(value, to);
   }
 
   function setTo(value: string) {
     markEdited('to');
     onPairChange({ from, to: value });
+    reconvert(from, value);
   }
 
   function swap() {
     markEdited('from', 'to');
     onPairChange({ from: to, to: from });
+    reconvert(to, from);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    // The field writes its value in the active locale, and Enter submits
-    // without blurring, so what is in it on submit is neither the number nor
-    // necessarily finished. `canonicalAmount` is what turns one into the other.
-    const parsed = parseAmount(canonicalAmount(amount, formatters.separators));
+    const parsed = currentAmount();
     if (!parsed.ok) {
       setAmountErrorCode(parsed.error);
       onAmountInvalid();
       return;
     }
 
-    setAmountErrorCode(null);
-    setEditedFields(EMPTY_FIELDS);
-    onSubmit({ from: from.toUpperCase(), to: to.toUpperCase(), amount: parsed.value });
+    submit(from, to, parsed.value);
   }
 
   function serverMessage(field: FormField): string | null {

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Skeleton } from '../../../components';
 import { useFormatters } from '../../../lib';
+import { conversionIdentity } from '../lib/conversionIdentity';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
 import { inverseRate } from '../lib/money';
 
@@ -24,6 +25,13 @@ export const RESULT_LABEL_ID = 'result-label';
  * an answer it stays on screen while the next is fetched: the Convert button
  * is what says a conversion is in flight, and the figure is what changes when
  * it lands.
+ *
+ * That change is what `result-rise` marks: the spans holding the figure and
+ * the two rate lines are keyed by `conversionIdentity`, so a new answer
+ * remounts the text — and only the text — and replays a 200ms rise of 4px
+ * with a slight overshoot. The panes, the rows and the card around them are
+ * not keyed and do not move, nothing changes size, and
+ * `prefers-reduced-motion` turns the animation off outright.
  */
 export function ResultDisplay({ outcome, isSubmitting }: ResultDisplayProps) {
   const { t } = useTranslation();
@@ -54,10 +62,15 @@ export function ResultDisplay({ outcome, isSubmitting }: ResultDisplayProps) {
         )}
 
         {!isPendingFirst && outcome !== undefined && (
-          <p className="figure result-fade-in flex items-baseline gap-2 sm:gap-2.5">
-            {formatters.money(outcome.result)}{' '}
-            <span className="text-muted font-mono text-sm font-medium tracking-[0.08em] sm:text-base">
-              {outcome.to}
+          <p className="figure result-fade-in flex">
+            <span
+              key={conversionIdentity(outcome)}
+              className="result-rise flex items-baseline gap-2 sm:gap-2.5"
+            >
+              {formatters.money(outcome.result)}{' '}
+              <span className="text-muted font-mono text-sm font-medium tracking-[0.08em] sm:text-base">
+                {outcome.to}
+              </span>
             </span>
           </p>
         )}
@@ -88,21 +101,29 @@ function RateLines({ outcome }: { outcome: ConversionOutcome }) {
   // Both directions of the same rate, except when they are the same sentence.
   const inverse = outcome.from === outcome.to ? null : inverseRate(outcome.rate);
 
+  const answer = conversionIdentity(outcome);
+
   return (
     <div className="numeric result-fade-in grid content-start gap-[3px] font-mono text-xs sm:text-[0.8125rem]">
       <p>
-        <span className="text-muted">{t('converter.result.rateLead', { from: outcome.from })}</span>
-        {rate.lead}
-        <span className="text-faint">{rate.tail}</span>
-        <span className="text-muted">{t('converter.result.rateTrail', { to: outcome.to })}</span>
+        <span key={answer} className="result-rise block">
+          <span className="text-muted">
+            {t('converter.result.rateLead', { from: outcome.from })}
+          </span>
+          {rate.lead}
+          <span className="text-faint">{rate.tail}</span>
+          <span className="text-muted">{t('converter.result.rateTrail', { to: outcome.to })}</span>
+        </span>
       </p>
       {inverse !== null && (
         <p className="text-faint">
-          {t('converter.result.inverseRate', {
-            from: outcome.to,
-            rate: formatters.rate(inverse),
-            to: outcome.from,
-          })}
+          <span key={answer} className="result-rise block">
+            {t('converter.result.inverseRate', {
+              from: outcome.to,
+              rate: formatters.rate(inverse),
+              to: outcome.from,
+            })}
+          </span>
         </p>
       )}
     </div>

@@ -2,6 +2,9 @@
 
 This document is the design contract for the project. Every module, endpoint and
 behaviour described here is implemented; deviations must be reflected here.
+[`process.md`](process.md) is the other half of the record — not what was
+built, but how: the stages, the review loop, the audits, and the honest limits
+of both.
 
 ## 1. Overview
 
@@ -20,6 +23,7 @@ Monorepo layout:
 | `docker-compose.yml`     | api, web, redis, mongo for local orchestration                                          |
 | `docker-compose.dev.yml` | overlay: the backing services alone, published on loopback                              |
 | `docs/architecture.md`   | this document; §3 is the written API contract, and the generated one is Swagger `/docs` |
+| `docs/process.md`        | how the project was built: the stages, the review loop every pull request went through, the audits, and what that loop caught |
 | `README.md`              | how to run it, the configuration surface, the API reference, requirements traceability  |
 | `.github/workflows`      | CI: per app lint, format, typecheck, build, unit tests with coverage, audit and image build (plus e2e for the api); one more job that boots the Compose stack and probes it |
 
@@ -1120,6 +1124,17 @@ rather than constrain it.
   rather than between them. The `grid-template-areas` that do it are in
   `index.css`; the component only names the areas. Recent conversions move to a
   320px aside beside the card, and below it when there is no room for one.
+- **Changing the pair re-asks the question.** Pressing Swap, or picking a
+  currency in either combobox, converts again immediately with the amount
+  already in the field, through the same `convert` path as the button — so the
+  answer on screen never describes a pair the controls no longer hold. An
+  amount that would not submit (empty, unparseable, not positive) sends
+  nothing and says nothing: the swap or the pick still happens, and Convert is
+  still what reports what is wrong with it. Typing the amount stays manual —
+  Convert or Enter — because a request per keystroke is not what any of them
+  meant, and a re-conversion supersedes one already in flight exactly as a
+  second press of Convert does, held outcome and all, so nothing on the card
+  moves around it.
 - **The rate-history panel** sits below the card and reads the archive for the
   pair the form is *selected* on, so it follows a pick and a swap rather than a
   conversion. `buildRateHistorySeries` (`features/converter/lib/`) turns the
@@ -1301,6 +1316,15 @@ rather than constrain it.
   `details.errors` entries are shown as returned, and the ones naming `amount`,
   `from` or `to` are routed onto that input, where they clear as soon as the
   user edits the field they describe.
+- **Motion.** The interface does not move on its own; the one exception is the
+  answer landing. The spans holding the figure and the two rate lines are keyed
+  by `conversionIdentity`, so a new answer remounts the text and replays
+  `result-rise` — 4px up with a 1px overshoot over 200ms, ease-out, transform
+  and opacity only. Nothing that carries layout is keyed, so the pane, the rows
+  and the card around them keep their nodes and nothing below is pushed down;
+  `prefers-reduced-motion` turns the animation off outright rather than running
+  it at the 0.01ms the blanket rule would leave. `result-fade-in` stays on the
+  two rows themselves, which mount once, so it is still the first answer alone.
 - Feature folders carry their own structure (`components/`, `hooks/`, `lib/`,
   `__tests__/`); shared test helpers and fakes live in `src/test/`.
 - Tests: Vitest + Testing Library, rendered through the i18n and services
@@ -1502,8 +1526,15 @@ forward. It lives there rather than here because it is what a reviewer reads
 first and because it cites test names, which drift faster than design does;
 duplicating it would give the project two versions of the same claim.
 
+The same table carries a second half — the work delivered beyond those eight
+sections, each row with a path that resolves: the daily snapshot archive and the
+series read off it, the client's service layer and offline estimate, the
+container-backed integration suites and the contract check, the naming and
+boundary work, the theme, and the reviewer page itself.
+
 This document is the other half of that answer: the table says *where* a
-requirement is met, and the sections above say *why* it is met that way.
+requirement is met, the sections above say *why* it is met that way, and
+[`process.md`](process.md) says how the work got done.
 
 ## 14. Known limitations and follow-ups
 
@@ -1571,6 +1602,14 @@ project were taken further.
   `test`. There is no per-caller auth on the read routes at all, which is the
   right scope for a public rate converter and the wrong one for anything with a
   user in it.
+- **The admin key is one shared secret, not an identity.** `DELETE
+  /rates/cache` is guarded by a single header key, so everyone who can clear
+  the cache is the same caller as far as the API is concerned: nothing to
+  revoke per person, nothing in the log that says which of them it was. It is
+  what makes the Operations page a demo convenience rather than an operator
+  console — the page holds the key in React state for the life of the tab and
+  never persists it, which limits where it can leak from but not what it can
+  do. A real console wants a per-operator credential and an audit line.
 - **Swagger is served in production, by design.** `/docs` and `/docs-json` are
   public on the deployment because the API is a portfolio surface a reviewer is
   meant to explore. A real service would gate them or publish the document out
@@ -1602,6 +1641,15 @@ project were taken further.
   so ⌘Z in that field does not restore what was typed. Fixing it means driving
   the edits through `document.execCommand('insertText')` or keeping an undo
   stack by hand.
+- **The Operations page derives what the API does not publish.** The two cache
+  windows are computed in the browser from `fetchedAt` plus the 300 s and
+  86 400 s §4 documents, and the breaker state is read back off the wording of
+  the Monobank indicator's `reason`. Both are correct for a deployment running
+  the documented defaults and both go quietly wrong for one that does not: a
+  changed `RATES_CACHE_TTL_SECONDS` moves the meter and not the number behind
+  it, and a reworded reason reads as an unknown state. The page says on its
+  face that the three are derived, which is the mitigation; publishing a
+  remaining TTL and a state name on `/health` would be the fix.
 - **The persister API is deprecated upstream.** `createSyncStoragePersister`
   from `@tanstack/query-sync-storage-persister` carries an `@deprecated` tag in
   the installed version pointing at `createAsyncStoragePersister`. It works and
@@ -1623,6 +1671,13 @@ project were taken further.
   `openapi-contract.e2e-spec.ts` fails when `docs/openapi.json` no longer
   matches what the decorators generate. Everything else here is prose a reviewer
   has to keep true.
+- **The process record's counts are a snapshot, not a live number.**
+  [`process.md`](process.md) and the reviewer page each carry one dated table of
+  counts — pull requests, review comments, tests, deploys — and nothing
+  recomputes them. Every other sentence in both is deliberately count-free so it
+  stays true as they move, but the tables themselves go stale the moment
+  anything lands after their date. Wiring them to a script that regenerates from
+  the GitHub API and a test run would fix it; the date is the mitigation.
 - **The web's types are checked against the contract, not generated from it.**
   `apps/web/src/api/types.ts` is still hand-written; what the ajv test proves is
   that the bodies the suite renders would be accepted by the published schemas,

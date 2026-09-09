@@ -16,6 +16,7 @@ comes up with one command locally and deploys from the same images.
 | ------------------- | ------------------------------------------------------------ |
 | Web app             | https://web-production-36ebc.up.railway.app                  |
 | Reviewer page       | https://web-production-36ebc.up.railway.app/about            |
+| Operations page     | https://web-production-36ebc.up.railway.app/ops              |
 | Swagger UI          | https://api-production-c5b65.up.railway.app/docs             |
 | OpenAPI JSON        | https://api-production-c5b65.up.railway.app/docs-json         |
 | Dependency report   | https://api-production-c5b65.up.railway.app/health            |
@@ -33,19 +34,40 @@ to `main` directly. Those pull requests built:
 
 - **API** (`apps/api`) — NestJS 11, TypeScript strict. `POST /api/v1/convert`
   through a strategy chain (identity, direct pair, cross via UAH),
-  `GET /api/v1/rates` over a Redis cache-aside with a long-lived stale fallback,
-  `GET /api/v1/currencies`, `GET /api/v1/history` over MongoDB, `GET /health`
-  with three indicators and `GET /health/live` for deploy gates. Retry with
-  jittered backoff, an in-house circuit breaker and per-call budgets around
-  Monobank; one error envelope for every failure; a `warnings` array that says
-  what degraded on a request that still succeeded.
-- **Web** (`apps/web`) — React 19, Vite, TanStack Query, i18next. Converter and
-  `/about` pages, a services layer mirroring the API's ports, and a persisted
-  rates snapshot that keeps the converter answering when the API is unreachable.
+  `GET /api/v1/rates` over a Redis cache-aside with a long-lived stale fallback
+  and a daily MongoDB snapshot archive behind both as a fourth tier,
+  `GET /api/v1/rates/history` reading that archive, `GET /api/v1/currencies`,
+  `GET /api/v1/history` over MongoDB, `DELETE /api/v1/rates/cache` behind an
+  admin key, `GET /health` with three indicators and `GET /health/live` for
+  deploy gates. Retry with jittered backoff, an in-house circuit breaker and
+  per-call budgets around Monobank; one error envelope for every failure; a
+  `warnings` array that says what degraded on a request that still succeeded.
+- **Web** (`apps/web`) — React 19, Vite, TanStack Query, i18next, Tailwind v4 on
+  a token palette with a light/dark/system switcher that persists and follows
+  the OS. The converter, the `/about` reviewer page and `/ops`, a services layer
+  mirroring the API's ports, and a persisted rates snapshot that keeps the
+  converter answering when the API is unreachable. The currency pickers are
+  searchable comboboxes — a popover under the trigger above 640px, a modal
+  bottom sheet below it — and swapping or picking a currency re-converts the
+  amount already in the field straight away, so the answer never describes a
+  pair the controls no longer hold. The archived series for the pair on screen is
+  drawn beside them as an inline SVG chart, with an `archive` badge on an answer
+  the API priced from that same archive. `/ops` is the operations surface: the
+  health report on a 30-second poll, the rate snapshot with the two cache
+  windows derived in the browser and labelled as derived, and
+  `DELETE /rates/cache` behind a confirmation, with the admin key held in the
+  tab's memory and never stored. Every screen was drawn on a design canvas
+  before it was built, and each pull request lists the boards it implements and
+  the deviations it took from them.
 - **Orchestration** — Docker Compose for `api`, `web`, `redis` and `mongo`; a
   dev overlay that runs the backing services alone; GitHub Actions running
   lint, format, typecheck, build, tests with coverage gates and an image build
   per app, plus a job that boots the whole Compose stack and probes it.
+
+How the work itself was done — the stages, the review loop every pull request
+went through, the audits, the counts as of a date, and the honest limits of a
+process reviewed by agents rather than by a second person — is
+[`docs/process.md`](docs/process.md).
 
 ## Quick start
 
@@ -254,6 +276,17 @@ number, not a string. `strategy` is `identity` | `direct` | `cross`, `source` is
 while `result` is computed from the **unrounded** rate, so on a large amount the
 two differ in the last cent — see
 [`docs/architecture.md` §5](docs/architecture.md#5-conversion-semantics).
+
+**On `from`/`to` rather than `source`/`target`.** The task statement names the
+three parameters `source`, `target` and `amount`; the request body here is
+`from`, `to` and `amount`, because `source` is already the provenance field on
+the *response* — `"source": "cache"` above — and one name meaning the currency
+you are converting from on the way in and where the rates came from on the way
+out is a contract that has to be read twice. The rename is the only deviation
+from the stated field names, and it is not silent: the DTO rejects unknown
+properties, so a body sent with `source` and `target` answers `400
+VALIDATION_ERROR` naming both, rather than converting something else or
+ignoring them.
 
 ### `GET /api/v1/rates`
 
@@ -576,12 +609,14 @@ apps/
 │   └── railway.json
 └── web/                React 19 + Vite + TypeScript, own package + lockfile
     ├── src/            api (http, services, persistence, hooks),
-    │                   components, features (converter, about), i18n, lib, test
+    │                   components, features (converter, about, ops), i18n,
+    │                   lib, theme, test
     ├── nginx/          config template + shared security-headers snippet
     ├── docker/         entrypoint that writes config.js from API_URL
     ├── Dockerfile      node build stage, nginx runtime
     └── railway.json
 docs/architecture.md    the design contract
+docs/process.md         how it was built: stages, the review loop, audits, counts
 docs/openapi.json       the published API contract, generated (`openapi:write`)
 fixtures/               the rates snapshot and golden conversions both suites price against
 scripts/check-fixtures.mjs  validates and re-prices them; `npm run check:fixtures`
@@ -600,9 +635,9 @@ Four suites, all green on this commit:
 | API unit        | `apps/api: npm run test:cov`             | 74 suites, **767** tests  | stmts 98.99% · branches 87.84% · funcs 98.67% · lines 98.93%              | 85% lines + branches       |
 | API e2e         | `apps/api: npm run test:e2e`             | 9 suites, **163** tests   | not instrumented — see below                                             | none                       |
 | API integration | `apps/api: npm run test:integration`     | 3 suites, **25** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
-| Web             | `apps/web: npm run test:coverage`        | 51 files, **467** tests   | stmts 98.93% (1398/1413) · branches 95.43% (1151/1206) · funcs 99.53% (426/428) · lines 98.98% (1364/1378) | 90% on all four            |
+| Web             | `apps/web: npm run test:coverage`        | 52 files, **478** tests   | stmts 98.95% (1414/1429) · branches 95.44% (1153/1208) · funcs 99.53% (432/434) · lines 98.99% (1380/1394) | 90% on all four            |
 
-**1422 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
+**1433 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
 `npm run typecheck`, `npm run format:check` and `npm run build` run the same
 checks across both apps and let both report, so a failure in one does not hide
 the other. Coverage gates and the e2e suite stay per-app.
@@ -747,7 +782,7 @@ test name, or a live URL; every row was re-verified against this commit.
 | #  | Requirement                        | Status | Evidence                                                                                                                        |
 | -- | ---------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | 2a | POST route                         | met    | `conversion.controller.ts` `@Post()` + `@HttpCode(200)`, prefix from `common/http/paths.constants.ts`. Test: “answers 200, not 201, with exactly the fields §3 lists” |
-| 2b | Accepts source, target, amount     | met    | `modules/conversion/dto/convert-request.dto.ts`. Tests: “takes a well formed body as it was sent”, “normalises the codes to upper case”, “reports every missing field at once”, “rejects a property the request has no business sending” |
+| 2b | Accepts source, target, amount     | met    | `modules/conversion/dto/convert-request.dto.ts`, as `from`, `to` and `amount`: `source` is already the provenance field on the response, so the two request codes are named for the direction instead — the only deviation from the task's field names, documented in the API reference above and in the `from` property's own OpenAPI description. It is not a silent one, because the DTO rejects unknown properties: a body sent with `source` and `target` answers `400 VALIDATION_ERROR` naming both. Tests: “takes a well formed body as it was sent”, “normalises the codes to upper case”, “reports every missing field at once”, “rejects a property the request has no business sending” |
 
 ### 3. Data fetching from Monobank
 
@@ -822,7 +857,14 @@ is implemented and covered:
 | Strict typing | `tsc --noEmit` / `tsc -b` clean, `no-unsafe-*` on, `ConfigService<AppConfig, true>` so an unknown config key is a compile error |
 | Multi-commit history through PRs | Conventional-commit subjects, a branch per feature, and every change merged into `main` through a reviewed pull request with CI green |
 | Railway hosting | `apps/api/railway.json`, `apps/web/railway.json`, both services live at the URLs above |
-| Reviewer page | `/about` in the web app — status, traceability, how to run, decisions, live health check |
+| Reviewer page | `/about` in the web app — status, traceability, how to run, decisions, the process record, live health check. `apps/web/src/features/about/`, `apps/web/src/features/about/__tests__/AboutPage.test.tsx` |
+| Operations page | `/ops` in the web app — `GET /health` on a 30-second poll, the rate snapshot with the two cache windows derived in the browser from §4's TTLs and labelled as derived, and `DELETE /rates/cache` behind a confirmation dialog. The admin key lives in React state for the life of the tab: never `localStorage`, never a query key. `apps/web/src/features/ops/` |
+| Searchable currency picker | `apps/web/src/features/converter/components/CurrencyCombobox.tsx` — a `role="combobox"` trigger over a searchable listbox, a popover under it above 640px and a modal bottom sheet below. `apps/web/src/features/converter/lib/currencyFilter.ts` is the whole matching rule and is tested on its own |
+| Rate history in the client | `apps/web/src/features/converter/` — `GET /api/v1/rates/history` for the pair the form is on, drawn as an inline SVG chart with no charting dependency and the same series as a table beside it, plus an `archive` source badge on an answer the API priced from that archive |
+| Light, dark and system theme | `apps/web/src/components/ThemeSwitcher.tsx` over the token palette in `apps/web/src/index.css`; the choice persists and `system` follows the OS. Tokens are defined once and redefined per theme, so no component names a colour |
+| Naming conventions and enforced boundaries | NestJS suffixes across `apps/api/src`, an `index.ts` public surface per API module, per `common/` package and per top-level web folder, and `no-restricted-imports` in both ESLint configs failing the build on an import that reaches inside one. `apps/api/eslint.config.mjs`, `apps/web/eslint.config.js` |
+| Designed before it was built | Every screen and state was drawn on a design canvas first — both themes, 1280 and 360 — and implemented as three stacked redesign pull requests, each listing the boards it implements and the deviations it took from them, with the reason |
+| A written process record | [`docs/process.md`](docs/process.md) — the stages, the loop every pull request went through, the audits, the counts as of a date, five things the loop caught, and the limits of the process itself |
 
 ## Design decisions
 
@@ -850,6 +892,9 @@ Known limitations and follow-ups are listed honestly in
 - [`docs/architecture.md`](docs/architecture.md) — the design contract: module
   layout, API contract, caching and resilience, error envelope, configuration,
   testing strategy, requirements mapping, known limitations.
+- [`docs/process.md`](docs/process.md) — how it was built: the stages, the loop
+  every pull request went through, the audits, what that loop caught, and where
+  the process is weaker than it looks.
 - [Swagger UI](https://api-production-c5b65.up.railway.app/docs) — generated
   from the code; OpenAPI JSON at
   [`/docs-json`](https://api-production-c5b65.up.railway.app/docs-json).

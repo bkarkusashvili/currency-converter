@@ -189,7 +189,7 @@ describe('the About page index', () => {
       'two-layer-fallback',
       'why-these-decisions',
       'how-to-run-it',
-      'how-this-was-built',
+      'process',
     ]);
     for (const id of targets) {
       expect(document.getElementById(id as string), `no section for #${id ?? ''}`).not.toBeNull();

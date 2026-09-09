@@ -27,7 +27,11 @@ export class ConvertRequestDto implements ConversionRequest {
   @ApiProperty({
     description:
       'ISO 4217 alpha-3 code to convert from. Case-insensitive; the response ' +
-      'echoes it upper-cased.',
+      'echoes it upper-cased. The task names this field and its pair `source` ' +
+      'and `target`; they are `from` and `to` here because `source` is ' +
+      'already the provenance field on the response, and the DTO rejects ' +
+      'unknown properties, so a body sent with `source` and `target` is a ' +
+      'validation error rather than a silent no-op.',
     example: 'EUR',
     minLength: CURRENCY_CODE_LENGTH,
     maxLength: CURRENCY_CODE_LENGTH,

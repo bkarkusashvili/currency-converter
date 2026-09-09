@@ -120,7 +120,7 @@ describe('AboutPage', () => {
     expect(screen.getByRole('heading', { name: 'Two-layer fallback' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Why these decisions' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How to run it' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'How this was built' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Process' })).toBeInTheDocument();
   });
 
   // The page a reviewer is pointed at said modules were still to come long after
@@ -131,6 +131,9 @@ describe('AboutPage', () => {
     expect(screen.getByText(/merged on main and deployed/i)).toBeInTheDocument();
     expect(screen.queryByText(/subsequent pull requests/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/in review/i)).not.toBeInTheDocument();
+    // The status describes what is deployed now, not what was deployed when it
+    // was written: the archive tier is part of the answer this API gives.
+    expect(screen.getByText(/daily snapshot archive/i)).toBeInTheDocument();
   });
 
   it('traces each numbered requirement to where it is met', () => {
@@ -153,6 +156,42 @@ describe('AboutPage', () => {
     expect(screen.getByText(/Co-Authored-By trailer/i)).toBeInTheDocument();
   });
 
+  it('describes the process in stages and links the full record', () => {
+    renderAbout();
+
+    expect(screen.getByRole('heading', { name: 'In stages' })).toBeInTheDocument();
+    expect(
+      screen.getByText(/architecture contract, written and committed before any implementation/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Read the full process record/i })).toHaveAttribute(
+      'href',
+      'https://github.com/bkarkusashvili/currency-converter/blob/main/docs/process.md',
+    );
+  });
+
+  // Counts rot. The page keeps them in one table with a date on it, and nowhere
+  // else, so a stale number is visible as a stale date rather than as prose.
+  it('carries its counts in one dated table', () => {
+    renderAbout();
+
+    const table = screen.getByRole('table');
+    expect(table).toHaveAccessibleName(expect.stringMatching(/As of 9 September 2026/));
+    expect(
+      screen.getByRole('rowheader', { name: 'Line-anchored review comments' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Count' })).toBeInTheDocument();
+  });
+
+  it('names what the review loop caught, not only that there was one', () => {
+    renderAbout();
+
+    expect(
+      screen.getByRole('heading', { name: 'Five things the review caught' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Redis rejected its own first command')).toBeInTheDocument();
+    expect(screen.getByText('A test that could not fail')).toBeInTheDocument();
+  });
+
   it('names the decisions a reviewer is most likely to ask about', () => {
     renderAbout();
 
@@ -160,6 +199,11 @@ describe('AboutPage', () => {
     expect(screen.getByText('Two layers of fallback, not one')).toBeInTheDocument();
     expect(screen.getByText('A warning is not an error')).toBeInTheDocument();
     expect(screen.getByText('Liveness and readiness are different questions')).toBeInTheDocument();
+    // The decisions taken after the first pass are decisions too, and a
+    // reviewer reading the deployed page should not have to find them in a
+    // changelog.
+    expect(screen.getByText('A fourth tier behind the cache')).toBeInTheDocument();
+    expect(screen.getByText('A theme the reader chooses')).toBeInTheDocument();
   });
 
   // "What manages state?" is asked of every React submission, and the answer
