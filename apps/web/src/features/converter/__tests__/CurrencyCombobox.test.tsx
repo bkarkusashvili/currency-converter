@@ -464,6 +464,18 @@ describe('CurrencyCombobox under 640px', () => {
     expect(trigger).toHaveFocus();
   });
 
+  it('holds the page still behind it', async () => {
+    setCompactViewport(true);
+    const user = userEvent.setup();
+    const trigger = renderCombobox();
+
+    await user.click(trigger);
+    expect(document.body.style.overflow).toBe('hidden');
+
+    await user.keyboard('{Escape}');
+    expect(document.body.style.overflow).toBe('');
+  });
+
   it('picks a row from the sheet and closes it', async () => {
     setCompactViewport(true);
     const user = userEvent.setup();

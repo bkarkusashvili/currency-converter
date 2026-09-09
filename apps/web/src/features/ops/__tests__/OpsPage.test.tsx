@@ -233,6 +233,45 @@ describe('OpsPage clear-cache dialog', () => {
     expect(fake.clearCacheKeys).toEqual([]);
   });
 
+  it('hands focus back to the button that opened it, whichever way it closes', async () => {
+    const user = userEvent.setup();
+    renderOps();
+
+    await user.type(screen.getByLabelText('Admin API key'), SECRET);
+    const open = await screen.findByRole('button', { name: /Clear cache…/ });
+
+    // Cancel, Escape and the answer that settles it are three exits from the
+    // same surface, and all three used to drop the caret on the document.
+    await user.click(open);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(open).toHaveFocus();
+
+    await user.click(open);
+    await user.keyboard('{Escape}');
+    expect(open).toHaveFocus();
+
+    await user.click(open);
+    await user.click(screen.getByRole('button', { name: 'Clear cache' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(open).toHaveFocus();
+  });
+
+  it('holds the page still while it is open, and gives it back afterwards', async () => {
+    const user = userEvent.setup();
+    renderOps();
+
+    await user.type(screen.getByLabelText('Admin API key'), SECRET);
+    await user.click(await screen.findByRole('button', { name: /Clear cache…/ }));
+
+    expect(document.body.style.overflow).toBe('hidden');
+
+    await user.keyboard('{Escape}');
+
+    expect(document.body.style.overflow).toBe('');
+  });
+
   it('keeps Tab inside the dialog', async () => {
     const user = userEvent.setup();
     renderOps();

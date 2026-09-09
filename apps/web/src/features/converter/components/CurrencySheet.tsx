@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFocusTrap } from '../../../lib';
+import { useFocusTrap, useScrollLock } from '../../../lib';
 import { CurrencyListbox, type CurrencyListboxProps } from './CurrencyListbox';
 import { SearchIcon } from './SearchIcon';
 
@@ -38,6 +38,7 @@ export function CurrencySheet({
   const filtered = query.trim() !== '';
 
   useFocusTrap(sheetRef, true);
+  useScrollLock(true);
 
   return (
     <>

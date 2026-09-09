@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCurrencies, useRatesSnapshot } from '../../../api';
 import type { RateSource } from '../../../api';
@@ -10,6 +11,8 @@ interface SnapshotCardProps {
   upstreamDown: boolean;
   /** Nothing has been pasted into the key field, so the command cannot be sent. */
   hasKey: boolean;
+  /** The dialog this button opens hands focus back to it when it closes. */
+  clearRef: Ref<HTMLButtonElement>;
   onClear: () => void;
 }
 
@@ -39,7 +42,7 @@ function toneOf(source: RateSource): BadgeTone {
   return source === 'provider' ? 'accent' : 'warn';
 }
 
-export function SnapshotCard({ upstreamDown, hasKey, onClear }: SnapshotCardProps) {
+export function SnapshotCard({ upstreamDown, hasKey, clearRef, onClear }: SnapshotCardProps) {
   const { t } = useTranslation();
   const formatters = useFormatters();
   const messageOf = useApiErrorMessage();
@@ -143,6 +146,7 @@ export function SnapshotCard({ upstreamDown, hasKey, onClear }: SnapshotCardProp
 
         <button
           type="button"
+          ref={clearRef}
           className="button button-danger-outline h-11 shrink-0 px-4 text-sm"
           disabled={!hasKey}
           onClick={onClear}

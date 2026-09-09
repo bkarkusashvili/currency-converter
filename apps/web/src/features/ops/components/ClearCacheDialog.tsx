@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '../../../components';
-import { useFocusTrap } from '../../../lib';
+import { useFocusTrap, useScrollLock } from '../../../lib';
 
 interface ClearCacheDialogProps {
   open: boolean;
@@ -36,6 +36,7 @@ export function ClearCacheDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useFocusTrap(dialogRef, open);
+  useScrollLock(open);
 
   useEffect(() => {
     if (open) {

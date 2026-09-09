@@ -26,6 +26,7 @@ export function OpsPage() {
   const health = useHealth();
   const clearCache = useClearRatesCache();
   const keyRef = useRef<HTMLInputElement>(null);
+  const clearRef = useRef<HTMLButtonElement>(null);
 
   const [apiKey, setApiKey] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -50,22 +51,35 @@ export function OpsPage() {
     ]);
   }
 
+  /**
+   * Every way out of the dialog goes through here, so the caret comes back to
+   * the button that opened it rather than to the top of the document: Cancel,
+   * Escape, the scrim, and the answer that settles it.
+   */
+  function dismiss() {
+    setConfirming(false);
+    clearRef.current?.focus();
+  }
+
   function confirm() {
     clearCache.mutate(apiKey, {
       onSuccess: (outcome) => {
-        setConfirming(false);
+        dismiss();
         setAnswer({ status: outcome.status, requestId: outcome.requestId, error: null });
         record(outcome.status, outcome.requestId);
       },
       onError: (error: ApiError) => {
-        setConfirming(false);
         setAnswer({ status: error.statusCode, requestId: error.requestId, error });
         record(error.statusCode, error.requestId);
 
         // The key is what a 401 is about, so it is where the caret goes and
-        // what wears `aria-invalid` until it is edited.
+        // what wears `aria-invalid` until it is edited. Any other failure has
+        // nothing to say about the key, so the button gets focus back.
         if (error.statusCode === UNAUTHORIZED) {
+          setConfirming(false);
           keyRef.current?.focus();
+        } else {
+          dismiss();
         }
       },
     });
@@ -102,6 +116,7 @@ export function OpsPage() {
           <SnapshotCard
             upstreamDown={upstreamDown}
             hasKey={apiKey !== ''}
+            clearRef={clearRef}
             onClear={() => {
               setAnswer(null);
               setConfirming(true);
@@ -117,9 +132,7 @@ export function OpsPage() {
         open={confirming}
         keyLength={apiKey.length}
         isPending={clearCache.isPending}
-        onCancel={() => {
-          setConfirming(false);
-        }}
+        onCancel={dismiss}
         onConfirm={confirm}
       />
     </div>
