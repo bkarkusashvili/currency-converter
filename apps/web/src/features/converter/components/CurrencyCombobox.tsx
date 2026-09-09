@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { WarningIcon } from '../../../components';
@@ -111,7 +111,7 @@ export function CurrencyCombobox({
     setActiveIndex((index) => (index + delta + matches.length) % matches.length);
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
@@ -140,15 +140,14 @@ export function CurrencyCombobox({
         }
         break;
       }
-      case 'Escape':
-        event.preventDefault();
-        close();
-        break;
       case 'Tab':
         // The popover is not modal: Tab leaves it, the way it leaves any
-        // control. The sheet is, and its trap keeps Tab inside instead.
+        // control. Focus goes back to the trigger first, so the browser's own
+        // Tab carries on from there — closing without it left the caret on a
+        // node being unmounted, and the next Tab started again at `<body>`.
+        // The sheet is modal, and its trap keeps Tab inside instead.
         if (!compact) {
-          close(false);
+          close();
         }
         break;
       default:
@@ -195,6 +194,28 @@ export function CurrencyCombobox({
       inputRef.current?.focus();
     }
   }, [open]);
+
+  // Escape belongs to the surface, not to the search field. In the sheet the
+  // Cancel button and the clear button are both Tab stops, and Escape from
+  // either of them was reaching nothing at all.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open, close]);
 
   // Keeps the active row in view when the list is longer than the five rows
   // the popover shows. jsdom has no layout and no `scrollIntoView`.

@@ -60,7 +60,14 @@ function Harness({
 }
 
 function renderCombobox(props: HarnessProps = {}) {
-  renderWithProviders(<Harness {...props} />);
+  renderWithProviders(
+    <>
+      <Harness {...props} />
+      {/* What the page has after the picker, so Tab out of it has somewhere
+          real to land. */}
+      <button type="button">Convert</button>
+    </>,
+  );
   return screen.getByRole('combobox', { name: /^From/ });
 }
 
@@ -268,6 +275,19 @@ describe('CurrencyCombobox', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('leaves the popover on Tab and carries on from the trigger', async () => {
+    const user = userEvent.setup();
+    const trigger = renderCombobox();
+
+    await user.click(trigger);
+    await user.tab();
+
+    // Closing without handing focus back left the caret on a node that was
+    // being unmounted, and the next Tab started over at `<body>`.
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Convert' })).toHaveFocus();
+  });
+
   it('forgets the query between openings', async () => {
     const user = userEvent.setup();
     const trigger = renderCombobox();
@@ -426,6 +446,22 @@ describe('CurrencyCombobox under 640px', () => {
       await user.tab();
       expect(sheet.contains(document.activeElement)).toBe(true);
     }
+  });
+
+  it('closes on Escape from anywhere inside the sheet, not only the search field', async () => {
+    setCompactViewport(true);
+    const user = userEvent.setup();
+    const trigger = renderCombobox();
+
+    await user.click(trigger);
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    cancel.focus();
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(trigger).toHaveFocus();
   });
 
   it('picks a row from the sheet and closes it', async () => {
