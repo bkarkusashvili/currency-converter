@@ -6,12 +6,12 @@ export interface CommandBlockContent {
 export function CommandBlock({ caption, commands }: CommandBlockContent) {
   return (
     // A grid item defaults to min-width:auto, which would let the block widen
-    // the whole page instead of scrolling inside itself.
-    <div className="min-w-0">
-      <p className="eyebrow">{caption}</p>
-      <pre className="bg-sunken border-line mt-2 overflow-x-auto rounded-lg border p-4 font-mono text-xs leading-6">
-        {commands.join('\n')}
-      </pre>
-    </div>
+    // the whole page instead of wrapping inside itself.
+    <figure className="m-0 grid min-w-0 gap-2">
+      <figcaption className="text-faint font-mono text-[0.6875rem] font-medium tracking-[0.12em] uppercase">
+        {caption}
+      </figcaption>
+      <pre className="code-block m-0">{commands.join('\n')}</pre>
+    </figure>
   );
 }

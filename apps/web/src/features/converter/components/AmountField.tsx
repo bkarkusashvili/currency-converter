@@ -25,6 +25,10 @@ interface AmountFieldProps {
  * drop — goes through `formatAmountInput`, so the field can only ever hold
  * something an amount could be, and the caret stays where the user left it
  * rather than jumping to the end when a separator appears in front of it.
+ *
+ * A conversion in flight changes nothing here: the field keeps its size, its
+ * hint and the description that names it, so pressing Convert moves no part of
+ * the form.
  */
 export function AmountField({
   id,
@@ -83,7 +87,7 @@ export function AmountField({
   }
 
   return (
-    <div>
+    <div className="grid gap-2">
       <label className="field-label" htmlFor={id}>
         {label}
       </label>
@@ -104,11 +108,11 @@ export function AmountField({
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
       />
-      <p id={hintId} className="text-faint numeric mt-2 text-xs">
+      <p id={hintId} className="text-faint numeric text-xs">
         {hint}
       </p>
       {error !== null && (
-        <p id={errorId} role="alert" className="text-danger mt-2 flex items-start gap-1.5 text-sm">
+        <p id={errorId} role="alert" className="text-danger flex items-start gap-1.5 text-sm">
           <WarningIcon className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </p>

@@ -33,7 +33,7 @@ export function ConversionPath({ from, to, strategy }: ConversionPathProps) {
           {index > 0 && (
             <li
               aria-hidden="true"
-              className="text-line-strong flex min-w-6 flex-1 items-center gap-1 px-2 sm:max-w-20"
+              className="text-line-strong flex w-10 shrink-0 items-center gap-1 px-1.5 sm:w-16 sm:px-2"
             >
               <span className="h-px flex-1 bg-current" />
               <svg viewBox="0 0 8 8" focusable="false" className="h-2 w-2 shrink-0">
@@ -50,8 +50,8 @@ export function ConversionPath({ from, to, strategy }: ConversionPathProps) {
           )}
           <li
             className={[
-              'numeric font-mono text-xs tracking-[0.1em] uppercase',
-              'rounded-md border px-2.5 py-1.5',
+              'numeric font-mono text-[0.6875rem] tracking-[0.1em] uppercase sm:text-xs',
+              'rounded-md border px-2 py-[0.3125rem] sm:px-2.5 sm:py-1.5',
               index === nodes.length - 1 && nodes.length > 1
                 ? 'bg-accent-soft text-accent border-transparent font-medium'
                 : 'border-line text-muted',

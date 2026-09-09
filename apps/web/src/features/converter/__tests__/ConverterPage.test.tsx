@@ -30,6 +30,16 @@ const currencies = FAKE_RESPONSES.currencies;
 const conversion: ConvertResponse = { ...FAKE_RESPONSES.convert };
 delete conversion.warnings;
 
+/**
+ * The two-pane card once it holds an answer. The provenance terms render only
+ * with one, so waiting for them is waiting for the conversion to land — and
+ * the card is the `<form>` around them, input pane and all.
+ */
+async function findAnsweredCard(): Promise<HTMLElement> {
+  const term = await screen.findByText('Strategy');
+  return term.closest('form')!;
+}
+
 function renderPage(options: FakeServicesOptions = {}) {
   const fake = createFakeServices({ currencies, convert: conversion, ...options });
   renderWithProviders(<ConverterPage />, { services: fake.services });
@@ -115,7 +125,7 @@ describe('ConverterPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
-    const card = await screen.findByRole('region', { name: 'Result' });
+    const card = await findAnsweredCard();
     expect(card).toHaveTextContent('425.71 PLN');
     expect(card).toHaveTextContent('1 EUR = 4.257112 PLN');
     expect(within(card).getByText('cross')).toBeInTheDocument();
@@ -137,11 +147,11 @@ describe('ConverterPage', () => {
 
     const announcement = await screen.findByText('100.00 EUR is 425.71 PLN');
     expect(announcement).toHaveAttribute('aria-live', 'polite');
-    // The card is a sibling, not a child: it stays there to be read, and is
-    // not what gets read out.
-    const card = screen.getByRole('region', { name: 'Result' });
-    expect(announcement).not.toContainElement(card);
-    expect(card.closest('[aria-live]')).toBeNull();
+    // The result pane is a sibling, not a child: it stays there to be read,
+    // and is not what gets read out.
+    const result = screen.getByRole('group', { name: 'Result' });
+    expect(announcement).not.toContainElement(result);
+    expect(result.closest('[aria-live]')).toBeNull();
   });
 
   it('does not throw on a strategy or source it has never heard of', async () => {
@@ -156,7 +166,7 @@ describe('ConverterPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
-    const card = await screen.findByRole('region', { name: 'Result' });
+    const card = await findAnsweredCard();
     expect(within(card).getByText('triangular')).toBeInTheDocument();
     expect(within(card).getByText('mirror')).toBeInTheDocument();
     expect(
@@ -175,7 +185,7 @@ describe('ConverterPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
-    const card = await screen.findByRole('region', { name: 'Result' });
+    const card = await findAnsweredCard();
     expect(within(card).queryByRole('list', { name: /Conversion path/ })).not.toBeInTheDocument();
     // The provenance note still says why there is nothing to draw.
     expect(within(card).getByText(/nothing was converted/i)).toBeInTheDocument();
@@ -413,7 +423,7 @@ describe('warnings on a successful answer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
-    const card = await screen.findByRole('region', { name: 'Result' });
+    const card = await findAnsweredCard();
     // The answer still stands; the note is what it cost.
     expect(card).toHaveTextContent('425.71 PLN');
     expect(
@@ -450,7 +460,7 @@ describe('warnings on a successful answer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
-    const card = await screen.findByRole('region', { name: 'Result' });
+    const card = await findAnsweredCard();
     expect(within(card).queryByText(/could not be reached/i)).toBeNull();
   });
 

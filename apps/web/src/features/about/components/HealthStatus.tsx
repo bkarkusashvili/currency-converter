@@ -14,9 +14,9 @@ export function HealthStatus() {
 
   if (error !== null) {
     return (
-      <div>
+      <div className="grid gap-1">
         <p className="text-danger text-sm font-semibold">{t('health.unreachable')}</p>
-        <p className="text-faint mt-1 font-mono text-xs">{error.message}</p>
+        <p className="text-faint font-mono text-xs break-words">{error.message}</p>
       </div>
     );
   }
@@ -28,13 +28,13 @@ export function HealthStatus() {
   const degraded = data.status !== 'ok';
 
   return (
-    <div>
-      <p className={degraded ? 'text-warn text-sm font-semibold' : 'text-sm'}>
+    <div className="grid gap-3">
+      <p className={degraded ? 'text-warn text-sm font-semibold' : 'text-sm font-semibold'}>
         {degraded ? t('health.degraded') : t('health.ok')}
       </p>
-      <ul className="mt-3 grid gap-2">
+      <ul className="grid gap-2 font-mono text-xs">
         {Object.entries(data.details).map(([name, indicator]) => (
-          <li key={name} className="flex items-center gap-2.5 font-mono text-xs">
+          <li key={name} className="flex items-center gap-2.5">
             <span
               aria-hidden="true"
               className={[
@@ -51,6 +51,11 @@ export function HealthStatus() {
           </li>
         ))}
       </ul>
+      {/* The interval `useHealth` actually polls on, said once rather than
+          implied by numbers that change on their own. */}
+      <p className="text-faint font-mono text-[0.625rem] tracking-[0.1em] uppercase">
+        {t('health.rechecked')}
+      </p>
     </div>
   );
 }

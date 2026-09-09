@@ -13,7 +13,7 @@ import tseslint from 'typescript-eslint';
 // is the number of `../` it takes to climb back to `src/`: at that depth
 // `components` is the shared folder, and one level shallower it is the
 // feature's own. Hence a config per depth rather than one pattern.
-const SHARED_FOLDERS = ['api', 'components', 'i18n', 'lib'];
+const SHARED_FOLDERS = ['api', 'components', 'i18n', 'lib', 'theme'];
 const FEATURES = ['about', 'converter'];
 
 const BOUNDARY_MESSAGE =

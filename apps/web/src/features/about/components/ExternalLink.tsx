@@ -14,12 +14,15 @@ export function ExternalLink({ href, label, hint }: ExternalLinkProps) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="group inline-flex min-h-11 flex-col justify-center"
+      className="group inline-grid min-h-11 content-center gap-px no-underline"
     >
       <span className="group-hover:text-accent font-semibold underline decoration-transparent underline-offset-4 transition group-hover:decoration-current">
-        {label} <span aria-hidden="true">↗</span>
+        {label}{' '}
+        <span aria-hidden="true" className="text-faint">
+          ↗
+        </span>
       </span>
-      {hint !== undefined && <span className="text-faint font-mono text-xs">{hint}</span>}
+      {hint !== undefined && <span className="text-faint font-mono text-xs break-all">{hint}</span>}
     </a>
   );
 }

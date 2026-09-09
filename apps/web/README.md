@@ -154,9 +154,37 @@ listening on `PORT` (default `80`), with SPA fallback, gzip, long-lived caching
 for hashed assets and no caching for `index.html` and `config.js`. Every
 location includes `nginx/security-headers.conf`, which sends
 `X-Content-Type-Options: nosniff`, `Referrer-Policy:
-strict-origin-when-cross-origin` and `X-Frame-Options: DENY`; nginx replaces
-inherited `add_header` directives instead of merging them, so the set lives in
-one file that each location includes.
+strict-origin-when-cross-origin`, `X-Frame-Options: DENY` and the policy
+below; nginx replaces inherited `add_header` directives instead of merging
+them, so the set lives in one file that each location includes.
 
 The image declares no `EXPOSE`: the listening port is whatever `PORT` is set
 to, so publish that port (`-p 8080:8080` above).
+
+### Content-Security-Policy
+
+Strict enough that everything the page loads has to be named:
+
+| Directive                                                  | Value                                  | What it is                                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `default-src`                                              | `'self'`                               | the floor for anything no later directive names                                                                                                                                                                                                                    |
+| `script-src`                                               | `'self' 'sha256-…'`                    | the bundle and `config.js`, both same-origin, plus one hash: the theme script `index.html` runs before the first paint. There is no `unsafe-inline`, so that script runs only while its hash matches its own bytes.                                                |
+| `style-src`                                                | `'self' https://fonts.googleapis.com`  | the built stylesheet and the Google Fonts sheet the page links. Tailwind ships a file rather than a runtime, so no `unsafe-inline` is needed; the one style the app sets at runtime (the swap glyph's rotation) goes through the CSSOM, which CSP does not police. |
+| `font-src`                                                 | `'self' https://fonts.gstatic.com`     | the font files that sheet pulls                                                                                                                                                                                                                                    |
+| `img-src`                                                  | `'self' data:`                         | the favicon, and data URIs for anything inlined                                                                                                                                                                                                                    |
+| `connect-src`                                              | `'self'` and the API's origin          | the one host this client talks to                                                                                                                                                                                                                                  |
+| `object-src`, `base-uri`, `form-action`, `frame-ancestors` | `'none'`, `'self'`, `'self'`, `'none'` | no plugins, no rewritten base URL, no cross-origin form post, and no framing at all — the last is `X-Frame-Options` again for browsers that predate it                                                                                                             |
+
+`connect-src` is why the file is a template rather than a static snippet:
+`docker/40-write-app-config.sh` renders `${CSP_API_ORIGIN}` into it at
+container start from the same `API_URL` it writes `config.js` from, so
+pointing the image at another API moves the policy with it. Only the origin
+survives — everything from the third slash on is dropped, along with every
+character an origin cannot contain, so `API_URL` cannot end the header early
+and append a directive of its own.
+
+The `script-src` hash covers the theme script byte for byte (Vite copies the
+tag through untouched, so the served bytes are the repository's bytes).
+`src/theme/__tests__/prePaintScript.test.ts` recomputes it from `index.html`
+and fails when the two part company, which is what stops an edit to the script
+from silently turning the theme's first paint off in the container.

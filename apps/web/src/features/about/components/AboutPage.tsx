@@ -1,22 +1,35 @@
 import { useTranslation } from 'react-i18next';
-import {
-  README_URL,
-  REPO_URL,
-  TRACEABILITY_URL,
-  healthUrl,
-  livenessUrl,
-  swaggerUrl,
-} from '../../../lib';
+import { README_URL, TRACEABILITY_URL } from '../../../lib';
+import { useActiveSection } from '../hooks/useActiveSection';
 import { BulletList } from './BulletList';
 import { CommandBlock } from './CommandBlock';
 import { ContentSection } from './ContentSection';
 import { ExternalLink } from './ExternalLink';
-import { HealthStatus } from './HealthStatus';
+import { LiveCard } from './LiveCard';
 import { ParagraphList } from './ParagraphList';
 import { PointList } from './PointList';
+import { SectionIndex, type IndexEntry } from './SectionIndex';
+
+/**
+ * The page in reading order, and the index that names it. One list, so a
+ * section added without an entry is a missing chip rather than a silent gap.
+ */
+const SECTIONS = [
+  { id: 'live', titleKey: 'about.live.heading' },
+  { id: 'where-it-stands', titleKey: 'about.status.title' },
+  { id: 'what-was-built', titleKey: 'about.whatWasBuilt.title' },
+  { id: 'requirements', titleKey: 'about.traceability.navTitle' },
+  { id: 'two-layer-fallback', titleKey: 'about.fallback.title' },
+  { id: 'why-these-decisions', titleKey: 'about.whyTheseDecisions.title' },
+  { id: 'how-to-run-it', titleKey: 'about.howToRun.title' },
+  { id: 'how-this-was-built', titleKey: 'about.howItWasBuilt.title' },
+] as const satisfies readonly IndexEntry[];
+
+const SECTION_IDS = SECTIONS.map((section) => section.id);
 
 export function AboutPage() {
   const { t } = useTranslation();
+  const active = useActiveSection(SECTION_IDS);
 
   const purpose = t('about.purpose', { returnObjects: true });
   const statusItems = t('about.status.items', { returnObjects: true });
@@ -29,94 +42,65 @@ export function AboutPage() {
   const builtParagraphs = t('about.howItWasBuilt.paragraphs', { returnObjects: true });
 
   return (
-    <div className="shell pt-10 pb-4 sm:pt-16">
-      <p className="eyebrow">{t('about.eyebrow')}</p>
-      <h1 className="mt-3 max-w-2xl text-[clamp(1.9rem,5.5vw,2.75rem)] text-balance">
-        {t('about.heading')}
-      </h1>
-      <ParagraphList paragraphs={purpose} />
+    <div className="shell lg:grid lg:grid-cols-[12.5rem_minmax(0,1fr)] lg:items-start lg:gap-16">
+      <SectionIndex entries={SECTIONS} active={active} />
 
-      <section aria-labelledby="live-heading" className="card mt-10 p-5 sm:p-7">
-        <h2 id="live-heading" className="eyebrow">
-          {t('about.live.heading')}
-        </h2>
-        <div className="mt-4 grid gap-6 sm:grid-cols-[1fr_auto] sm:gap-10">
-          <ul className="grid gap-2.5">
-            <li>
-              <ExternalLink
-                href={REPO_URL}
-                label={t('about.live.repository')}
-                hint={t('about.live.repositoryHint')}
-              />
-            </li>
-            <li>
-              <ExternalLink
-                href={swaggerUrl()}
-                label={t('about.live.apiDocs')}
-                hint={swaggerUrl()}
-              />
-            </li>
-            <li>
-              <ExternalLink href={healthUrl()} label={t('about.live.health')} hint={healthUrl()} />
-            </li>
-            <li>
-              <ExternalLink
-                href={livenessUrl()}
-                label={t('about.live.liveness')}
-                hint={livenessUrl()}
-              />
-            </li>
-          </ul>
-          <div className="border-line border-t pt-5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-10">
-            <HealthStatus />
-          </div>
+      <div className="mt-6 grid max-w-[45rem] gap-8 lg:mt-0 lg:gap-12">
+        <div className="grid gap-3 sm:gap-4">
+          <p className="eyebrow">{t('about.eyebrow')}</p>
+          <h1 className="page-title">{t('about.heading')}</h1>
+          <ParagraphList paragraphs={purpose} />
         </div>
-      </section>
 
-      <ContentSection id="where-it-stands" title={t('about.status.title')}>
-        <BulletList items={statusItems} />
-      </ContentSection>
+        <LiveCard />
 
-      <ContentSection id="what-was-built" title={t('about.whatWasBuilt.title')}>
-        <PointList points={builtPoints} />
-      </ContentSection>
+        <ContentSection id="where-it-stands" title={t('about.status.title')}>
+          <BulletList items={statusItems} />
+        </ContentSection>
 
-      <ContentSection id="requirements" title={t('about.traceability.title')}>
-        <p className="text-muted mt-5 max-w-2xl text-sm">
-          {t('about.traceability.intro')}{' '}
-          <ExternalLink href={TRACEABILITY_URL} label={t('about.traceability.readmeLabel')} />
-        </p>
-        <PointList points={tracePoints} />
-      </ContentSection>
+        <ContentSection id="what-was-built" title={t('about.whatWasBuilt.title')}>
+          <PointList points={builtPoints} />
+        </ContentSection>
 
-      <ContentSection id="two-layer-fallback" title={t('about.fallback.title')}>
-        <ParagraphList paragraphs={fallback} />
-      </ContentSection>
-
-      <ContentSection id="why-these-decisions" title={t('about.whyTheseDecisions.title')}>
-        <PointList points={whyPoints} />
-      </ContentSection>
-
-      <ContentSection id="how-to-run-it" title={t('about.howToRun.title')}>
-        <p className="text-muted mt-5 max-w-2xl text-sm">
-          {t('about.howToRun.intro')}{' '}
-          <ExternalLink href={README_URL} label={t('about.howToRun.readmeLabel')} />
-        </p>
-        <div className="mt-5 grid gap-5">
-          {runBlocks.map((block) => (
-            <CommandBlock key={block.caption} caption={block.caption} commands={block.commands} />
-          ))}
-        </div>
-        {runNotes.map((note) => (
-          <p key={note} className="text-muted mt-3 text-sm">
-            {note}
+        <ContentSection id="requirements" title={t('about.traceability.title')}>
+          <p className="text-muted text-sm text-pretty">
+            {t('about.traceability.intro')}{' '}
+            <ExternalLink href={TRACEABILITY_URL} label={t('about.traceability.readmeLabel')} />
           </p>
-        ))}
-      </ContentSection>
+          <PointList points={tracePoints} />
+        </ContentSection>
 
-      <ContentSection id="how-this-was-built" title={t('about.howItWasBuilt.title')}>
-        <ParagraphList paragraphs={builtParagraphs} />
-      </ContentSection>
+        <ContentSection id="two-layer-fallback" title={t('about.fallback.title')}>
+          <ParagraphList paragraphs={fallback} />
+        </ContentSection>
+
+        <ContentSection id="why-these-decisions" title={t('about.whyTheseDecisions.title')}>
+          <PointList points={whyPoints} />
+        </ContentSection>
+
+        <ContentSection id="how-to-run-it" title={t('about.howToRun.title')}>
+          <p className="text-muted text-sm text-pretty">
+            {t('about.howToRun.intro')}{' '}
+            <ExternalLink href={README_URL} label={t('about.howToRun.readmeLabel')} />
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {runBlocks.map((block) => (
+              <CommandBlock key={block.caption} caption={block.caption} commands={block.commands} />
+            ))}
+          </div>
+          <div className="grid gap-2">
+            {runNotes.map((note) => (
+              <p key={note} className="text-muted text-sm text-pretty">
+                {note}
+              </p>
+            ))}
+          </div>
+        </ContentSection>
+
+        <ContentSection id="how-this-was-built" title={t('about.howItWasBuilt.title')}>
+          <ParagraphList paragraphs={builtParagraphs} />
+        </ContentSection>
+      </div>
     </div>
   );
 }
