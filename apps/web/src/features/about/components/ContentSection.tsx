@@ -8,8 +8,8 @@ interface ContentSectionProps {
 
 export function ContentSection({ id, title, children }: ContentSectionProps) {
   return (
-    <section aria-labelledby={id} className="mt-14">
-      <h2 id={id} className="border-line border-b pb-3 text-lg">
+    <section id={id} aria-labelledby={`${id}-heading`} className="grid scroll-mt-20 gap-4">
+      <h2 id={`${id}-heading`} className="section-title">
         {title}
       </h2>
       {children}

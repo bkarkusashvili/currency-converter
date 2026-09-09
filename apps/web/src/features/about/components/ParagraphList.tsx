@@ -1,8 +1,8 @@
 export function ParagraphList({ paragraphs }: { paragraphs: readonly string[] }) {
   return (
-    <div className="mt-5 grid max-w-2xl gap-3">
+    <div className="grid gap-4">
       {paragraphs.map((paragraph) => (
-        <p key={paragraph} className="text-muted text-base text-pretty">
+        <p key={paragraph} className="text-muted text-pretty">
           {paragraph}
         </p>
       ))}
