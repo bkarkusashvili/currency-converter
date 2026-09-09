@@ -13,15 +13,42 @@ export interface ArchivedSnapshot {
   rates: ExchangeRate[];
 }
 
-// One day of one pair, in the orientation the upstream publishes it: a point
-// carries `buy` and `sell` when the bank quotes a spread and `cross` when it
-// quotes a mid rate, exactly as the snapshot did (§5).
-export interface RateHistoryPoint {
-  // 'YYYY-MM-DD', UTC.
-  date: string;
+// What the upstream published for one pair on one day: a spread, or a mid
+// rate, never both (§5).
+export interface PublishedRate {
   buy?: number;
   sell?: number;
   cross?: number;
+}
+
+// One archived day as /rates/history reads it — the pair projected out of the
+// day rather than the day itself. A day document is the whole published board,
+// several kilobytes of it, and this route answers three numbers per day from
+// it: the store filters `rates` down to the one pair asked for and answers two
+// flags for the codes, so the bytes that cross the wire are the ones the answer
+// is made of.
+//
+// The flags are what keep §3's three outcomes decidable from a single read:
+// whether each code was quoted at all in the window (`UNSUPPORTED_CURRENCY`),
+// and then whether this pair was (`RATE_NOT_AVAILABLE`). Projecting the pair
+// alone would make an unquoted code and an unpublished pair the same empty
+// answer.
+export interface ArchivedPairDay {
+  // 'YYYY-MM-DD', UTC.
+  date: string;
+  // Absent on a day that archived rates but not this pair.
+  rate?: PublishedRate;
+  // Whether the day quoted the code on either side of any pair it published.
+  quotesBase: boolean;
+  quotesQuote: boolean;
+}
+
+// One day of one pair, in the orientation the upstream publishes it: a point
+// carries `buy` and `sell` when the bank quotes a spread and `cross` when it
+// quotes a mid rate, exactly as the snapshot did (§5).
+export interface RateHistoryPoint extends PublishedRate {
+  // 'YYYY-MM-DD', UTC.
+  date: string;
 }
 
 // What /rates/history is asked for, after validation: the codes upper-cased and

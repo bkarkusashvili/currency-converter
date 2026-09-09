@@ -1,5 +1,9 @@
 import { RatesSnapshot } from './exchange-rate.types';
-import { ArchivedSnapshot } from './rate-history.types';
+import {
+  ArchivedPairDay,
+  ArchivedSnapshot,
+  RateHistoryQuery,
+} from './rate-history.types';
 
 // The archive seam: one document per UTC day, always that day's latest
 // snapshot. Writing and reading have opposite contracts on purpose, because §2
@@ -17,10 +21,17 @@ export interface RatesArchive {
   // the fourth tier of the lookup (§4), reached only after the upstream failed
   // and both cache keys missed. Rejects when the store cannot be read.
   findLatest(): Promise<ArchivedSnapshot | null>;
-  // Every archived day inside a window of `days` ending today, oldest first,
-  // and never more than MAX_RATE_HISTORY_DAYS of them whatever the caller
-  // asks for. Rejects when the store cannot be read.
-  findWindow(days: number): Promise<ArchivedSnapshot[]>;
+  // Every archived day inside the window ending today, oldest first, with the
+  // pair projected out of each day and a flag per code (§3's three outcomes are
+  // decided from those three fields alone). Never more than
+  // MAX_RATE_HISTORY_DAYS days whatever the caller asks for, and never a day
+  // dated after today. Rejects when the store cannot be read.
+  //
+  // The projection is the store's job rather than the caller's: a day document
+  // is the whole published board and the answer is three numbers of it, so
+  // reading days whole would move kilobytes per point across the wire to throw
+  // almost all of them away.
+  findPairWindow(query: RateHistoryQuery): Promise<ArchivedPairDay[]>;
 }
 
 export const RATES_ARCHIVE = Symbol('RATES_ARCHIVE');

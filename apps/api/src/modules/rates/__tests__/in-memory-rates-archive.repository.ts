@@ -1,5 +1,14 @@
-import type { RatesSnapshot } from '../domain/exchange-rate.types';
-import type { ArchivedSnapshot } from '../domain/rate-history.types';
+import type { CurrencyCode } from '../../../common/currency';
+import type {
+  ExchangeRate,
+  RatesSnapshot,
+} from '../domain/exchange-rate.types';
+import { MAX_RATE_HISTORY_DAYS } from '../domain/rate-history-window.constants';
+import type {
+  ArchivedPairDay,
+  ArchivedSnapshot,
+  RateHistoryQuery,
+} from '../domain/rate-history.types';
 import type { RatesArchive } from '../domain/rates-archive.interface';
 import { toUtcDay, utcWindowStart } from '../domain/utc-day.util';
 
@@ -15,9 +24,10 @@ interface InMemoryArchiveOptions {
 }
 
 // Stands in for the Mongo adapter wherever the store itself is not what is
-// under test. It keeps the two behaviours the contract rests on: one document
-// per UTC day, replaced by the last write of that day, and a window read back
-// oldest first.
+// under test. It keeps the three behaviours the contract rests on: one document
+// per UTC day, replaced by the last write of that day; a window read back
+// oldest first; and a window read projected to one pair, which is what the
+// aggregation answers with.
 export class InMemoryRatesArchive implements RatesArchive {
   private readonly days = new Map<string, ArchivedSnapshot>();
 
@@ -52,15 +62,23 @@ export class InMemoryRatesArchive implements RatesArchive {
     return Promise.resolve(newest ?? null);
   }
 
-  findWindow(days: number): Promise<ArchivedSnapshot[]> {
+  findPairWindow({
+    base,
+    quote,
+    days,
+  }: RateHistoryQuery): Promise<ArchivedPairDay[]> {
     if (this.options.failsWith) {
       return Promise.reject(this.options.failsWith);
     }
 
-    const from = utcWindowStart(days, new Date());
+    const now = new Date();
+    const from = utcWindowStart(Math.min(days, MAX_RATE_HISTORY_DAYS), now);
+    const today = toUtcDay(now);
 
     return Promise.resolve(
-      this.ordered().filter((snapshot) => snapshot.date >= from),
+      this.ordered()
+        .filter((snapshot) => snapshot.date >= from && snapshot.date <= today)
+        .map((snapshot) => projectPair(snapshot, base, quote)),
     );
   }
 
@@ -71,4 +89,40 @@ export class InMemoryRatesArchive implements RatesArchive {
       first.date.localeCompare(second.date),
     );
   }
+}
+
+// What the aggregation's `$filter`, `$map` and two `$anyElementTrue` stages do,
+// in the process: the pair in exactly the orientation it was published in,
+// narrowed to the three numbers, and one flag per code.
+function projectPair(
+  snapshot: ArchivedSnapshot,
+  base: CurrencyCode,
+  quote: CurrencyCode,
+): ArchivedPairDay {
+  const published = snapshot.rates.find(
+    (rate) => rate.base === base && rate.quote === quote,
+  );
+
+  return {
+    date: snapshot.date,
+    ...(published === undefined ? {} : { rate: numbersOf(published) }),
+    quotesBase: quotes(snapshot, base),
+    quotesQuote: quotes(snapshot, quote),
+  };
+}
+
+// A missing field resolves to nothing in an aggregation rather than to null, so
+// the projected rate carries only the numbers the day published.
+function numbersOf(rate: ExchangeRate): ArchivedPairDay['rate'] {
+  return {
+    ...(rate.buy === undefined ? {} : { buy: rate.buy }),
+    ...(rate.sell === undefined ? {} : { sell: rate.sell }),
+    ...(rate.cross === undefined ? {} : { cross: rate.cross }),
+  };
+}
+
+function quotes(snapshot: ArchivedSnapshot, code: CurrencyCode): boolean {
+  return snapshot.rates.some(
+    (rate) => rate.base === code || rate.quote === code,
+  );
 }

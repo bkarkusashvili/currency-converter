@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { ArchiveUnavailableError } from '../../../common/errors';
 import {
-  ArchivedSnapshot,
+  ArchivedPairDay,
   RateHistory,
   RateHistoryQuery,
 } from '../domain/rate-history.types';
@@ -21,24 +21,27 @@ export class RateHistoryService {
 
   // The window is read once and every decision is made from that one read: the
   // codes the archive quoted, the days the pair was published on, and the two
-  // 422s between them (§3).
-  async series({ base, quote, days }: RateHistoryQuery): Promise<RateHistory> {
-    const snapshots = await this.read(days);
+  // 422s between them (§3). The read is projected to the pair, so a day arrives
+  // as the three numbers this answers with plus the two flags those 422s are
+  // decided from, rather than as the whole published board.
+  async series(query: RateHistoryQuery): Promise<RateHistory> {
+    const { base, quote, days } = query;
+    const archived = await this.read(query);
 
     return {
       base,
       quote,
       days,
-      points: collectRatePoints(snapshots, base, quote),
+      points: collectRatePoints(archived, base, quote),
     };
   }
 
   // The read has nothing to answer with when the store is unreachable, and a
   // driver message would carry the connection string to the client, so every
   // failure becomes the one documented outage.
-  private async read(days: number): Promise<ArchivedSnapshot[]> {
+  private async read(query: RateHistoryQuery): Promise<ArchivedPairDay[]> {
     try {
-      return await this.archive.findWindow(days);
+      return await this.archive.findPairWindow(query);
     } catch (error) {
       if (error instanceof ArchiveUnavailableError) {
         throw error;

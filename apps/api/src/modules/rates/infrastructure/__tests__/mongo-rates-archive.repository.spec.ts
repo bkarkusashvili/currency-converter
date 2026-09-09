@@ -8,6 +8,7 @@ import { fakeConfig } from '../../../../config/__tests__/fake-config';
 import { FakeMongoConnection } from '../../../../infrastructure/mongo/__tests__/fake-mongo-connection';
 import { RatesSnapshot } from '../../domain/exchange-rate.types';
 import { MAX_RATE_HISTORY_DAYS } from '../../domain/rate-history-window.constants';
+import { RateHistoryQuery } from '../../domain/rate-history.types';
 import { RateSnapshotDocument } from '../../schemas/rate-snapshot.schema';
 import { MongoRatesArchiveRepository } from '../mongo-rates-archive.repository';
 
@@ -44,6 +45,9 @@ const STORED = {
   ],
 };
 
+// The window the reads below ask for, unless they are about the window itself.
+const WEEK: RateHistoryQuery = { base: 'USD', quote: 'UAH', days: 7 };
+
 // Short enough that the suite waits it out in real time rather than mocking the
 // clock the helper reads, and long enough that a machine under load does not
 // expire it on a path meant to resolve first.
@@ -70,6 +74,7 @@ interface QueryDouble {
 interface ModelDouble {
   updateOne: jest.Mock;
   find: jest.Mock;
+  aggregate: jest.Mock;
 }
 
 function createQuery(result: Promise<unknown>): QueryDouble {
@@ -83,20 +88,56 @@ function createQuery(result: Promise<unknown>): QueryDouble {
   return query;
 }
 
+// What the window read answers with: the day key, the pair projected out of it
+// and the two membership flags. Nothing else leaves the server.
+const PROJECTED = {
+  _id: '2026-09-08',
+  rate: { buy: 44.35, sell: 44.831 },
+  quotesBase: true,
+  quotesQuote: true,
+};
+
+// The stages the adapter builds, in order.
+function pipelineOf(model: ModelDouble): Record<string, unknown>[] {
+  const [pipeline] = model.aggregate.mock.calls[0] as [
+    Record<string, unknown>[],
+  ];
+
+  return pipeline;
+}
+
+// Frozen at a fixed UTC instant: both ends of the window are dated from the
+// clock, and the assertions below name the days they resolve to.
+async function onTheEighth(read: () => Promise<unknown>): Promise<void> {
+  jest.useFakeTimers().setSystemTime(new Date('2026-09-08T06:00:00.000Z'));
+
+  try {
+    await read();
+  } finally {
+    jest.useRealTimers();
+  }
+}
+
 describe('MongoRatesArchiveRepository', () => {
   let connection: FakeMongoConnection;
   let logger: FakePinoLogger;
   let model: ModelDouble;
   let query: QueryDouble;
+  let aggregation: QueryDouble;
   let write: QueryDouble;
   let repository: MongoRatesArchiveRepository;
 
-  function build(documents: unknown[] = [STORED]): void {
+  function build(
+    documents: unknown[] = [STORED],
+    projected: unknown[] = [PROJECTED],
+  ): void {
     query = createQuery(Promise.resolve(documents));
+    aggregation = createQuery(Promise.resolve(projected));
     write = createQuery(Promise.resolve({ upsertedCount: 1 }));
     model = {
       updateOne: jest.fn(() => write),
       find: jest.fn(() => query),
+      aggregate: jest.fn(() => aggregation),
     };
     repository = new MongoRatesArchiveRepository(
       model as unknown as Model<RateSnapshotDocument>,
@@ -159,49 +200,139 @@ describe('MongoRatesArchiveRepository', () => {
     });
 
     // A UTC day key sorts lexicographically in date order, which is why the
-    // window is a range on `_id` and needs no second index.
-    it('reads a window as a range on the day key, oldest first', async () => {
-      jest.useFakeTimers().setSystemTime(new Date('2026-09-08T06:00:00.000Z'));
+    // window is a range on `_id` and needs no second index. The upper bound is
+    // today: a document dated ahead of the clock is not part of a window that
+    // ends now.
+    it('reads a window as a bounded range on the day key, oldest first', async () => {
+      await onTheEighth(() => repository.findPairWindow(WEEK));
 
-      try {
-        await repository.findWindow(7);
-      } finally {
-        jest.useRealTimers();
-      }
+      const [match, sort] = pipelineOf(model);
 
-      expect(model.find).toHaveBeenCalledWith({ _id: { $gte: '2026-09-02' } });
-      expect(query.sort).toHaveBeenCalledWith({ _id: 1 });
+      expect(match).toStrictEqual({
+        $match: { _id: { $gte: '2026-09-02', $lte: '2026-09-08' } },
+      });
+      expect(sort).toStrictEqual({ $sort: { _id: 1 } });
     });
 
     // A window of one is today alone, which is what "the last day" means to
     // whoever asked for it.
     it('counts today as the first day of the window', async () => {
-      jest.useFakeTimers().setSystemTime(new Date('2026-09-08T06:00:00.000Z'));
+      await onTheEighth(() => repository.findPairWindow({ ...WEEK, days: 1 }));
 
-      try {
-        await repository.findWindow(1);
-      } finally {
-        jest.useRealTimers();
-      }
-
-      expect(model.find).toHaveBeenCalledWith({ _id: { $gte: '2026-09-08' } });
+      expect(pipelineOf(model)[0]).toStrictEqual({
+        $match: { _id: { $gte: '2026-09-08', $lte: '2026-09-08' } },
+      });
     });
 
     // The DTO bounds what a request can ask for; the port is reachable without
-    // one, and an unbounded window is a scan of the whole collection.
+    // one, and an unbounded window is a scan of the whole collection. The
+    // `$limit` bounds what the range can return even so: at most one document
+    // per day exists, so it can only bite if the collection is not what the
+    // contract says it is.
     it('never reads past the window ceiling, whatever it is asked for', async () => {
-      jest.useFakeTimers().setSystemTime(new Date('2026-09-08T06:00:00.000Z'));
+      await onTheEighth(async () => {
+        await repository.findPairWindow({
+          ...WEEK,
+          days: MAX_RATE_HISTORY_DAYS * 100,
+        });
+        await repository.findPairWindow({
+          ...WEEK,
+          days: MAX_RATE_HISTORY_DAYS,
+        });
+      });
 
-      try {
-        await repository.findWindow(MAX_RATE_HISTORY_DAYS * 100);
-        await repository.findWindow(MAX_RATE_HISTORY_DAYS);
-      } finally {
-        jest.useRealTimers();
-      }
-
-      const calls = model.find.mock.calls as unknown[][];
+      const calls = model.aggregate.mock.calls as unknown[][];
 
       expect(calls[0]).toStrictEqual(calls[1]);
+      expect(pipelineOf(model)[2]).toStrictEqual({
+        $limit: MAX_RATE_HISTORY_DAYS,
+      });
+    });
+
+    // The whole point of the read: a day document is the published board and
+    // the answer is three numbers of it, so the filter runs in the server and
+    // `base`, `quote` and the upstream `date` never cross the wire.
+    it('projects the pair in exactly the orientation it was asked for', async () => {
+      await repository.findPairWindow(WEEK);
+
+      expect(pipelineOf(model)[3]).toMatchObject({
+        $project: {
+          rate: {
+            $first: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$rates',
+                    cond: {
+                      $and: [
+                        { $eq: ['$$rate.base', 'USD'] },
+                        { $eq: ['$$rate.quote', 'UAH'] },
+                      ],
+                    },
+                  },
+                },
+                in: {
+                  buy: '$$rate.buy',
+                  sell: '$$rate.sell',
+                  cross: '$$rate.cross',
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // What is left of the day that the answer depends on: whether each code was
+    // quoted anywhere in it, which is the UNSUPPORTED_CURRENCY decision and one
+    // boolean rather than the day's code list.
+    it('answers a membership flag per code beside the pair', async () => {
+      await repository.findPairWindow(WEEK);
+
+      const { $project } = pipelineOf(model)[3] as {
+        $project: Record<string, unknown>;
+      };
+
+      expect(JSON.stringify($project.quotesBase)).toContain(
+        '["$$rate.base","USD"]',
+      );
+      expect(JSON.stringify($project.quotesQuote)).toContain(
+        '["$$rate.quote","UAH"]',
+      );
+      expect(Object.keys($project).sort()).toStrictEqual([
+        '_id',
+        'quotesBase',
+        'quotesQuote',
+        'rate',
+      ]);
+    });
+
+    it('publishes the projected day as the domain shape', async () => {
+      await expect(repository.findPairWindow(WEEK)).resolves.toStrictEqual([
+        {
+          date: '2026-09-08',
+          rate: { buy: 44.35, sell: 44.831 },
+          quotesBase: true,
+          quotesQuote: true,
+        },
+      ]);
+    });
+
+    // A day that archived rates but not this pair carries no `rate` key at all,
+    // which is what the service reads as a gap rather than as a zero.
+    it('carries no rate for a day that did not publish the pair', async () => {
+      build(
+        [STORED],
+        [{ _id: '2026-09-08', quotesBase: true, quotesQuote: false }],
+      );
+
+      const [day] = await repository.findPairWindow(WEEK);
+
+      expect(day).toStrictEqual({
+        date: '2026-09-08',
+        quotesBase: true,
+        quotesQuote: false,
+      });
     });
 
     // The archive is not part of the answer: a write that fails costs a log
@@ -221,11 +352,11 @@ describe('MongoRatesArchiveRepository', () => {
     // The read is the opposite: the service turns this into the documented 503
     // rather than an empty series, which reads as "never published".
     it('lets a failing read through', async () => {
-      query.exec.mockReturnValue(
+      aggregation.exec.mockReturnValue(
         Promise.reject(new Error('connection timed out')),
       );
 
-      await expect(repository.findWindow(7)).rejects.toThrow(
+      await expect(repository.findPairWindow(WEEK)).rejects.toThrow(
         'connection timed out',
       );
     });
@@ -262,9 +393,9 @@ describe('MongoRatesArchiveRepository', () => {
     });
 
     it('answers a read with the documented outage', async () => {
-      query.exec.mockReturnValue(NEVER_ANSWERS);
+      aggregation.exec.mockReturnValue(NEVER_ANSWERS);
 
-      await expect(repository.findWindow(7)).rejects.toBeInstanceOf(
+      await expect(repository.findPairWindow(WEEK)).rejects.toBeInstanceOf(
         ArchiveUnavailableError,
       );
     });
@@ -301,11 +432,11 @@ describe('MongoRatesArchiveRepository', () => {
     // An empty series would say the pair was never published; the store being
     // unreadable is a different answer and §3 gives it a different code.
     it('refuses to read rather than answering an empty window', async () => {
-      await expect(repository.findWindow(7)).rejects.toMatchObject({
+      await expect(repository.findPairWindow(WEEK)).rejects.toMatchObject({
         details: { reason: 'connection not ready' },
       });
 
-      expect(model.find).not.toHaveBeenCalled();
+      expect(model.aggregate).not.toHaveBeenCalled();
     });
 
     it('refuses the fallback read on the same terms', async () => {

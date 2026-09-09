@@ -4,7 +4,7 @@ import {
 } from '../../../common/errors';
 import { CurrencyCode } from '../../../common/currency';
 import {
-  ArchivedSnapshot,
+  ArchivedPairDay,
   RateHistoryPoint,
 } from '../domain/rate-history.types';
 
@@ -17,25 +17,34 @@ import {
 // a reversed `buy` is, and composing a cross means pricing a pair from two
 // days-old legs — both are §5's job on a live snapshot, where the client can
 // see the strategy that priced them, and neither belongs in a chart of
-// published quotes.
+// published quotes. The store applies that orientation in the `$filter` it
+// projects each day with; what arrives here is either the pair or nothing.
 //
 // The two 422s the route can answer with are decided here because they are one
 // question asked of the same set of days: whether a code was quoted at all in
 // the window, and then whether this pair was. Split across two passes at two
-// layers they would answer from two different reads of the archive.
+// layers they would answer from two different reads of the archive. This stays
+// the pure decision over the projected shape — three fields per day, no
+// document — so what the store hands over can shrink without the rule moving.
 export function collectRatePoints(
-  snapshots: ArchivedSnapshot[],
+  days: ArchivedPairDay[],
   base: CurrencyCode,
   quote: CurrencyCode,
 ): RateHistoryPoint[] {
-  requireQuoted(snapshots, base);
-  requireQuoted(snapshots, quote);
+  // A code the window never mentions on either side of a pair is not a currency
+  // this API can chart, whether it is misspelt, delisted or simply never quoted
+  // by the upstream. An empty archive therefore answers this rather than an
+  // empty series, which is the honest reading: nothing in the window says the
+  // code exists.
+  if (!days.some((day) => day.quotesBase)) {
+    throw new UnsupportedCurrencyError(base);
+  }
 
-  const points = snapshots.flatMap((snapshot) => {
-    const rate = snapshot.rates.find(
-      (entry) => entry.base === base && entry.quote === quote,
-    );
+  if (!days.some((day) => day.quotesQuote)) {
+    throw new UnsupportedCurrencyError(quote);
+  }
 
+  const points = days.flatMap(({ date, rate }) => {
     if (rate === undefined) {
       return [];
     }
@@ -45,7 +54,7 @@ export function collectRatePoints(
     // every client has to look past.
     return [
       {
-        date: snapshot.date,
+        date,
         ...(rate.buy === undefined ? {} : { buy: rate.buy }),
         ...(rate.sell === undefined ? {} : { sell: rate.sell }),
         ...(rate.cross === undefined ? {} : { cross: rate.cross }),
@@ -61,22 +70,4 @@ export function collectRatePoints(
   }
 
   return points;
-}
-
-// A code the window never mentions on either side of a pair is not a currency
-// this API can chart, whether it is misspelt, delisted or simply never quoted
-// by the upstream. An empty archive therefore answers this rather than an empty
-// series, which is the honest reading: nothing in the window says the code
-// exists.
-function requireQuoted(
-  snapshots: ArchivedSnapshot[],
-  code: CurrencyCode,
-): void {
-  const quoted = snapshots.some((snapshot) =>
-    snapshot.rates.some((rate) => rate.base === code || rate.quote === code),
-  );
-
-  if (!quoted) {
-    throw new UnsupportedCurrencyError(code);
-  }
 }

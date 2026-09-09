@@ -460,16 +460,39 @@ const RATES_ARCHIVE = Symbol('RATES_ARCHIVE');
 // is what makes the collection hold at most one document per day.
 interface ArchivedSnapshot { date: string; fetchedAt: string; rates: ExchangeRate[]; }
 
+// The same day projected to one pair, which is all /rates/history reads: the
+// numbers that day published for it, and whether each code was quoted at all.
+interface PublishedRate { buy?: number; sell?: number; cross?: number; }
+interface ArchivedPairDay {
+  date: string;
+  rate?: PublishedRate;     // absent on a day that did not publish the pair
+  quotesBase: boolean;      // the code appears on either side of some pair
+  quotesQuote: boolean;
+}
+
 interface RatesArchive {
   save(snapshot: RatesSnapshot): Promise<boolean>;   // never rejects; false = not archived
   findLatest(): Promise<ArchivedSnapshot | null>;    // rejects: ArchiveUnavailableError
-  findWindow(days: number): Promise<ArchivedSnapshot[]>;  // oldest first; same rejection
+  findPairWindow(query: RateHistoryQuery): Promise<ArchivedPairDay[]>;  // oldest first; same rejection
 }
 ```
 
 The archive's two contracts are opposite for the reason the history's are: a
 fetch is answered whether or not the day is stored, while `/rates/history` has
 nothing to answer with and says so.
+
+The two reads answer different shapes because they are answering different
+questions. `findLatest` is the fallback tier and every pair in the day it
+returns is about to be priced against, so it reads the day whole — one
+document. `findPairWindow` is a chart of one pair: a day document is the whole
+published board and the answer is three numbers of it, so the projection runs
+in the server. `$filter` keeps the entry published in exactly the asked-for
+orientation and `$map` narrows it to `buy`/`sell`/`cross`; two
+`$anyElementTrue` flags carry the only other thing the answer depends on —
+whether each code was quoted anywhere that day — so §3's three outcomes
+(points, `UNSUPPORTED_CURRENCY`, `RATE_NOT_AVAILABLE`) are still decided from
+one read. `collectRatePoints` stays the pure decision over that projected
+shape.
 
 ### `RatesService.getSnapshot()` (cache-aside)
 
@@ -870,7 +893,8 @@ apps/api
 │       │   │                    rates-provider.interface.ts, rates-repository.interface.ts and
 │       │   │                    rates-archive.interface.ts — the three seams with their tokens
 │       │   │                    and CachedSnapshot / CacheWrite; rate-history.types.ts —
-│       │   │                    ArchivedSnapshot, RateHistoryQuery, RateHistoryPoint, RateHistory;
+│       │   │                    ArchivedSnapshot, ArchivedPairDay, PublishedRate,
+│       │   │                    RateHistoryQuery, RateHistoryPoint, RateHistory;
 │       │   │                    rate-history-window.constants.ts and utc-day.util.ts, the day
 │       │   │                    keying both the adapter and the window are built on
 │       │   ├── dto/             ExchangeRateDto, RatesSnapshotResponseDto,

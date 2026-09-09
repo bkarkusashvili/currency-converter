@@ -27,6 +27,23 @@ function daysAgo(days: number): Date {
   return new Date(Date.now() - days * 86_400_000);
 }
 
+// Read once, so a suite that starts at 23:59:59 seeds and asserts the same day
+// rather than two.
+const TODAY = daysAgo(0);
+
+function utcDay(instant: Date): string {
+  return instant.toISOString().slice(0, 10);
+}
+
+function atUtcHour(day: Date, hour: number): Date {
+  const instant = new Date(day);
+  instant.setUTCHours(hour, 0, 0, 0);
+
+  return instant;
+}
+
+// Both shapes §5 allows, in one snapshot: a spread pair and a mid rate. The
+// window read projects each of them, and a point carries one or the other.
 function snapshotAt(instant: Date, buy: number): RatesSnapshot {
   return {
     fetchedAt: instant.toISOString(),
@@ -38,9 +55,17 @@ function snapshotAt(instant: Date, buy: number): RatesSnapshot {
         sell: buy + 0.5,
         date: instant.toISOString(),
       },
+      {
+        base: 'EUR',
+        quote: 'USD',
+        cross: 1.16,
+        date: instant.toISOString(),
+      },
     ],
   };
 }
+
+const USD_UAH = { base: 'USD', quote: 'UAH' } as const;
 
 interface StoredIndex {
   key: Record<string, number>;
@@ -117,7 +142,7 @@ describeAgainst(
     });
 
     it('archives a snapshot and reads it back in the domain shape', async () => {
-      const snapshot = snapshotAt(daysAgo(0), 44.35);
+      const snapshot = snapshotAt(TODAY, 44.35);
 
       await expect(repository.save(snapshot)).resolves.toBe(true);
 
@@ -132,27 +157,28 @@ describeAgainst(
     // second fetch of a day replaces the first rather than adding to it, and
     // what the day holds is the latest snapshot of it.
     it('replaces the same day rather than adding a second document', async () => {
-      const morning = new Date(daysAgo(0).setUTCHours(6, 0, 0, 0));
-      const evening = new Date(daysAgo(0).setUTCHours(18, 0, 0, 0));
+      const morning = atUtcHour(TODAY, 6);
+      const evening = atUtcHour(TODAY, 18);
 
       await repository.save(snapshotAt(morning, 44.1));
       await repository.save(snapshotAt(evening, 44.35));
 
       await expect(model.countDocuments({})).resolves.toBe(1);
-      await expect(repository.findLatest()).resolves.toMatchObject({
-        fetchedAt: evening.toISOString(),
-        rates: [expect.objectContaining({ buy: 44.35 }) as unknown],
-      });
+
+      const latest = await repository.findLatest();
+
+      expect(latest).toMatchObject({ fetchedAt: evening.toISOString() });
+      expect(latest?.rates[0]).toMatchObject({ buy: 44.35 });
     });
 
-    it('answers one day per archived day, oldest first', async () => {
+    it('answers one projected day per archived day, oldest first', async () => {
       await repository.save(snapshotAt(daysAgo(1), 44.2));
       await repository.save(snapshotAt(daysAgo(3), 43.9));
-      await repository.save(snapshotAt(daysAgo(0), 44.35));
+      await repository.save(snapshotAt(TODAY, 44.35));
 
-      const window = await repository.findWindow(7);
+      const window = await repository.findPairWindow({ ...USD_UAH, days: 7 });
 
-      expect(window.map((day) => day.rates[0]?.buy)).toStrictEqual([
+      expect(window.map((day) => day.rate?.buy)).toStrictEqual([
         43.9, 44.2, 44.35,
       ]);
     });
@@ -162,22 +188,88 @@ describeAgainst(
     it('honours the window it was asked for', async () => {
       await repository.save(snapshotAt(daysAgo(3), 43.9));
       await repository.save(snapshotAt(daysAgo(1), 44.2));
-      await repository.save(snapshotAt(daysAgo(0), 44.35));
+      await repository.save(snapshotAt(TODAY, 44.35));
 
-      const window = await repository.findWindow(2);
+      const window = await repository.findPairWindow({ ...USD_UAH, days: 2 });
 
       expect(window.map((day) => day.date)).toStrictEqual([
-        daysAgo(1).toISOString().slice(0, 10),
-        daysAgo(0).toISOString().slice(0, 10),
+        utcDay(daysAgo(1)),
+        utcDay(TODAY),
       ]);
     });
 
+    // The read the route is built on: what leaves the server is the pair's own
+    // numbers, not the day. `base`, `quote` and the upstream `date` are in the
+    // document and in none of the answers below — a fake could only ever
+    // confirm that the adapter asked for that, which is why this suite exists.
+    it('projects the pair out of the day and nothing else', async () => {
+      await repository.save(snapshotAt(TODAY, 44.35));
+
+      const [day] = await repository.findPairWindow({ ...USD_UAH, days: 7 });
+
+      expect(day).toStrictEqual({
+        date: utcDay(TODAY),
+        rate: { buy: 44.35, sell: 44.85 },
+        quotesBase: true,
+        quotesQuote: true,
+      });
+    });
+
+    // A missing field resolves to nothing rather than to null in an
+    // aggregation, which is what keeps a mid rate free of the two spread keys
+    // (§5) without the mapper having to strip them.
+    it('projects a mid rate without the spread keys', async () => {
+      await repository.save(snapshotAt(TODAY, 44.35));
+
+      const [day] = await repository.findPairWindow({
+        base: 'EUR',
+        quote: 'USD',
+        days: 7,
+      });
+
+      expect(day?.rate).toStrictEqual({ cross: 1.16 });
+    });
+
+    // The two flags are what the UNSUPPORTED_CURRENCY decision is made from, so
+    // they have to answer for a code the day quoted on either side of a pair
+    // and for one it never mentions.
+    it('flags each code the day quoted, on either side of a pair', async () => {
+      await repository.save(snapshotAt(TODAY, 44.35));
+
+      const [quoted] = await repository.findPairWindow({
+        base: 'UAH',
+        quote: 'USD',
+        days: 7,
+      });
+      const [unquoted] = await repository.findPairWindow({
+        base: 'XYZ',
+        quote: 'UAH',
+        days: 7,
+      });
+
+      // Both codes are archived; the pair in this orientation is not, which is
+      // the RATE_NOT_AVAILABLE case rather than the unsupported one.
+      expect(quoted).toMatchObject({ quotesBase: true, quotesQuote: true });
+      expect(quoted?.rate).toBeUndefined();
+      expect(unquoted).toMatchObject({ quotesBase: false, quotesQuote: true });
+    });
+
+    // A day dated ahead of the clock — a clock that ran fast, a document
+    // written by hand — is not part of a window that ends today.
+    it('never reads past today', async () => {
+      await repository.save(snapshotAt(daysAgo(-1), 99));
+
+      await expect(
+        repository.findPairWindow({ ...USD_UAH, days: 7 }),
+      ).resolves.toStrictEqual([]);
+    });
+
     it('reads the newest day for the fallback, whatever order it was written in', async () => {
-      await repository.save(snapshotAt(daysAgo(0), 44.35));
+      await repository.save(snapshotAt(TODAY, 44.35));
       await repository.save(snapshotAt(daysAgo(4), 43.5));
 
       await expect(repository.findLatest()).resolves.toMatchObject({
-        date: daysAgo(0).toISOString().slice(0, 10),
+        date: utcDay(TODAY),
       });
     });
 
@@ -188,7 +280,7 @@ describeAgainst(
     it('refuses a value the schema does not allow into the collection', async () => {
       await expect(
         repository.save({
-          fetchedAt: daysAgo(0).toISOString(),
+          fetchedAt: TODAY.toISOString(),
           rates: [
             { base: 'USD', date: '2026-09-08T11:00:00.000Z' },
           ] as unknown as RatesSnapshot['rates'],

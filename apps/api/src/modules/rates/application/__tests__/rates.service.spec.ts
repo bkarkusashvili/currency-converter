@@ -49,7 +49,7 @@ interface RepositoryDouble {
 interface ArchiveDouble {
   save: jest.Mock;
   findLatest: jest.Mock;
-  findWindow: jest.Mock;
+  findPairWindow: jest.Mock;
 }
 
 // Days older than the stale key by construction: the archive is what is left
@@ -80,7 +80,7 @@ describe('RatesService', () => {
     archive = {
       save: jest.fn().mockResolvedValue(true),
       findLatest: jest.fn().mockResolvedValue(null),
-      findWindow: jest.fn().mockResolvedValue([]),
+      findPairWindow: jest.fn().mockResolvedValue([]),
     };
     logger = createFakePinoLogger();
     service = new RatesService(

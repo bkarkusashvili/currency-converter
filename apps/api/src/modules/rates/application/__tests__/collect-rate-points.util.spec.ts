@@ -1,31 +1,39 @@
 import { RateNotAvailableError } from '../../../../common/errors/rate-not-available.error';
 import { UnsupportedCurrencyError } from '../../../../common/errors/unsupported-currency.error';
-import { ArchivedSnapshot } from '../../domain/rate-history.types';
+import {
+  ArchivedPairDay,
+  PublishedRate,
+} from '../../domain/rate-history.types';
 import { collectRatePoints } from '../collect-rate-points.util';
 
-function day(date: string, buy: number): ArchivedSnapshot {
+interface ProjectedDay {
+  // Absent on a day that archived rates but did not publish this pair, which
+  // is what the store's `$filter` answers for a gap, for the reversed
+  // orientation and for a currency against itself alike.
+  rate?: PublishedRate;
+  quotesBase?: boolean;
+  quotesQuote?: boolean;
+}
+
+// One day in the shape the archive projects it: the pair's own numbers, and one
+// flag per code saying whether the day quoted it anywhere. Both flags default
+// to true, so a case only states the field it is about.
+function day(
+  date: string,
+  { rate, quotesBase = true, quotesQuote = true }: ProjectedDay = {},
+): ArchivedPairDay {
   return {
     date,
-    fetchedAt: `${date}T23:00:00.000Z`,
-    rates: [
-      {
-        base: 'USD',
-        quote: 'UAH',
-        buy,
-        sell: buy + 0.5,
-        date: `${date}T22:00:00.000Z`,
-      },
-      {
-        base: 'BTC',
-        quote: 'USD',
-        cross: 60756.2,
-        date: `${date}T22:00:00.000Z`,
-      },
-    ],
+    ...(rate === undefined ? {} : { rate }),
+    quotesBase,
+    quotesQuote,
   };
 }
 
-const WINDOW = [day('2026-09-06', 44.1), day('2026-09-07', 44.2)];
+const WINDOW = [
+  day('2026-09-06', { rate: { buy: 44.1, sell: 44.6 } }),
+  day('2026-09-07', { rate: { buy: 44.2, sell: 44.7 } }),
+];
 
 describe('collectRatePoints', () => {
   it('answers one point per archived day, in the order it was given', () => {
@@ -38,27 +46,18 @@ describe('collectRatePoints', () => {
   // A pair carries either a spread or a mid rate (§5), and a key set to
   // undefined is one every client has to look past.
   it('publishes a mid rate without the spread keys', () => {
-    expect(collectRatePoints(WINDOW, 'BTC', 'USD')[0]).toStrictEqual({
-      date: '2026-09-06',
-      cross: 60756.2,
-    });
+    const mid = [day('2026-09-06', { rate: { cross: 60756.2 } })];
+
+    expect(collectRatePoints(mid, 'BTC', 'USD')).toStrictEqual([
+      { date: '2026-09-06', cross: 60756.2 },
+    ]);
   });
 
-  // A day the archive has no snapshot for is absent rather than null, so a gap
-  // is visible as a gap and the series is shorter than the window.
+  // A day the archive has no snapshot of the pair for is absent rather than
+  // null, so a gap is visible as a gap and the series is shorter than the
+  // window.
   it('skips a day that did not publish the pair', () => {
-    const gap: ArchivedSnapshot = {
-      date: '2026-09-05',
-      fetchedAt: '2026-09-05T23:00:00.000Z',
-      rates: [
-        {
-          base: 'BTC',
-          quote: 'USD',
-          cross: 59000,
-          date: '2026-09-05T22:00:00.000Z',
-        },
-      ],
-    };
+    const gap = day('2026-09-05');
 
     expect(
       collectRatePoints([gap, ...WINDOW], 'USD', 'UAH').map(
@@ -67,12 +66,29 @@ describe('collectRatePoints', () => {
     ).toStrictEqual(['2026-09-06', '2026-09-07']);
   });
 
-  it('rejects a code the window never quoted', () => {
-    expect(() => collectRatePoints(WINDOW, 'XYZ', 'UAH')).toThrow(
+  it('rejects a code no day in the window quoted', () => {
+    const unquotedBase = WINDOW.map((archived) => ({
+      ...archived,
+      quotesBase: false,
+    }));
+
+    expect(() => collectRatePoints(unquotedBase, 'XYZ', 'UAH')).toThrow(
       UnsupportedCurrencyError,
     );
-    expect(() => collectRatePoints(WINDOW, 'USD', 'XYZ')).toThrow(
-      UnsupportedCurrencyError,
+  });
+
+  // Which of the two codes was never quoted is what the client is told, so the
+  // flags are read one at a time rather than as one "either is missing".
+  it('names the unquoted code rather than the pair', () => {
+    const unquotedQuote = WINDOW.map((archived) => ({
+      ...archived,
+      quotesQuote: false,
+    }));
+
+    expect(() => collectRatePoints(unquotedQuote, 'USD', 'XYZ')).toThrow(
+      expect.objectContaining({
+        details: { currency: 'XYZ' },
+      }) as Error,
     );
   });
 
@@ -85,24 +101,14 @@ describe('collectRatePoints', () => {
   });
 
   // Both codes are quoted and there is still no series: this is the same
-  // distinction §3 draws between the two 422s on /convert.
-  it('rejects a pair neither day published', () => {
-    expect(() => collectRatePoints(WINDOW, 'BTC', 'UAH')).toThrow(
-      RateNotAvailableError,
-    );
-  });
+  // distinction §3 draws between the two 422s on /convert. The reversed
+  // orientation of a pair the archive can serve, and a currency against itself,
+  // both arrive here as exactly this — the store filters on the orientation, so
+  // what is left is a window of days with no rate in them.
+  it('rejects a pair no day published, both codes being quoted', () => {
+    const quotedButUnpaired = [day('2026-09-06'), day('2026-09-07')];
 
-  // The route reports what the upstream published rather than what could be
-  // derived from it: inverting a spread means choosing which side a reversed
-  // buy is, which is a pricing decision and belongs on a live snapshot (§5).
-  it('rejects the reversed orientation of a pair it can serve', () => {
-    expect(() => collectRatePoints(WINDOW, 'UAH', 'USD')).toThrow(
-      RateNotAvailableError,
-    );
-  });
-
-  it('rejects a currency against itself, which nothing publishes', () => {
-    expect(() => collectRatePoints(WINDOW, 'USD', 'USD')).toThrow(
+    expect(() => collectRatePoints(quotedButUnpaired, 'BTC', 'UAH')).toThrow(
       RateNotAvailableError,
     );
   });
