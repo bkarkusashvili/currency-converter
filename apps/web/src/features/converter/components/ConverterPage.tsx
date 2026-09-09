@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCurrencies, useRatesSnapshot } from '../../../api';
 import type { ResponseWarning } from '../../../api';
@@ -8,6 +8,7 @@ import { useConvertWithFallback } from '../hooks/useConvertWithFallback';
 import { splitServerFieldErrors } from '../lib/serverFieldErrors';
 import { historyHighlightKey } from '../lib/historyHighlight';
 import { DEFAULT_FROM, DEFAULT_TO } from '../lib/currencyOptions';
+import type { CurrencyPair } from '../lib/currencyPair';
 import { ConverterCard } from './ConverterCard';
 import { HistoryPanel } from './HistoryPanel';
 import { RateHistoryPanel } from './RateHistoryPanel';
@@ -20,13 +21,12 @@ export function ConverterPage() {
   // here it is read for what it says about itself.
   const snapshot = useRatesSnapshot();
   const conversion = useConvertWithFallback();
-  // The pair the card is on, which the rate-history panel below it follows.
-  // The card owns the form; this is the one thing about it the page needs, and
-  // it arrives on a pick or a swap rather than on a conversion (§5.2).
-  const [pair, setPair] = useState({ from: DEFAULT_FROM, to: DEFAULT_TO });
-  const onPairChange = useCallback((next: { from: string; to: string }) => {
-    setPair(next);
-  }, []);
+  // The pair, owned here because two things on this page are on it: the card's
+  // two selects and the rate-history panel under them. Held one level above
+  // both, they cannot drift; mirrored into this state by a callback out of the
+  // form, they could — a `setFrom` that forgot to report would leave the chart
+  // on the pair before last (§5.2).
+  const [pair, setPair] = useState<CurrencyPair>({ from: DEFAULT_FROM, to: DEFAULT_TO });
 
   const serverErrors = splitServerFieldErrors(conversion.error);
   const formWarnings = distinctWarnings(currencies.data?.warnings, snapshot.data?.warnings);
@@ -54,7 +54,8 @@ export function ConverterPage() {
             onSubmit={(request) => {
               conversion.convert(request);
             }}
-            onPairChange={onPairChange}
+            pair={pair}
+            onPairChange={setPair}
           />
 
           {conversion.error !== null && (

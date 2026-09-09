@@ -99,6 +99,64 @@ describe('RateHistoryPanel', () => {
     expect(screen.queryByText('Showing 7 of 30 days')).toBeNull();
   });
 
+  it('says a week that did not move is unchanged, and offers no detail behind it', async () => {
+    renderPanel({
+      rateHistory: {
+        base: 'USD',
+        quote: 'UAH',
+        days: 7,
+        points: week.points.map((point) => ({ ...point, buy: 44.3, sell: 44.8 })),
+      },
+    });
+
+    const chart = await screen.findByRole('img', { name: 'Buy and sell rate, last 7 days' });
+
+    // Not `Unchanged over 7 days · buy 44.30 → 44.30`, which offers the same
+    // number twice as the evidence for the word in front of it.
+    expect(chart).toHaveAccessibleDescription('Unchanged over 7 days');
+    expect(screen.queryByText(/44\.30 → 44\.30/)).toBeNull();
+    // And nothing is called the low or the high of a line that held one rate.
+    expect(screen.queryByText(/^min /)).toBeNull();
+    expect(screen.queryByText(/^max /)).toBeNull();
+  });
+
+  it('calls one archived day neither a low nor a high', async () => {
+    renderPanel({
+      rateHistory: {
+        base: 'USD',
+        quote: 'EUR',
+        days: 7,
+        points: [{ date: '2026-09-09', cross: 0.850512 }],
+      },
+    });
+
+    // What the live archive answers today. It read `0.850512 · min` with
+    // `max 0.850512` beside it, which describes a week rather than a day.
+    expect(await screen.findByRole('img', { name: 'Cross rate, last 7 days' })).toBeVisible();
+    expect(screen.getAllByText('0.850512').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/· min$/)).toBeNull();
+    expect(screen.queryByText(/^max /)).toBeNull();
+    expect(screen.getByText(/Unchanged over 7 days/)).toBeVisible();
+  });
+
+  it('draws both readings of a single archived day, neither of them a marker', async () => {
+    renderPanel({
+      rateHistory: {
+        base: 'USD',
+        quote: 'UAH',
+        days: 7,
+        // The live archive's own answer today.
+        points: [{ date: '2026-09-09', buy: 44.43, sell: 44.831 }],
+      },
+    });
+
+    const chart = await screen.findByRole('img', { name: 'Buy and sell rate, last 7 days' });
+    // The buy point, and the sell point that has no line of its own to sit on.
+    expect(chart.querySelectorAll('circle')).toHaveLength(2);
+    expect(screen.queryByText(/^max /)).toBeNull();
+    expect(chart).toHaveAccessibleDescription('Unchanged over 7 days');
+  });
+
   it('charts a pair with no spread as one line and no legend', async () => {
     renderPanel({
       rateHistory: {
@@ -128,17 +186,20 @@ describe('RateHistoryPanel', () => {
 
     await user.click(oldest);
     expect(oldest).toHaveFocus();
-    expect(screen.getByText('buy 44.21 · sell 44.70')).toBeVisible();
-    // The tooltip is the focused day's description, not a second reading of it.
+    // Drawn at both sizes, with one of the two hidden at any width; the one
+    // that is read out is the description, which exists once.
+    expect(screen.getAllByText('buy 44.21 · sell 44.70').length).toBeGreaterThan(0);
     expect(oldest).toHaveAccessibleDescription('buy 44.21 · sell 44.70');
 
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('button', { name: 'Fri 4 Sep' })).toHaveFocus();
-    expect(screen.getByText('buy 44.28 · sell 44.76')).toBeVisible();
+    const second = screen.getByRole('button', { name: 'Fri 4 Sep' });
+    expect(second).toHaveFocus();
+    expect(second).toHaveAccessibleDescription('buy 44.28 · sell 44.76');
 
     await user.keyboard('{End}');
-    expect(screen.getByRole('button', { name: 'Wed 9 Sep' })).toHaveFocus();
-    expect(screen.getByText('buy 44.35 · sell 44.83')).toBeVisible();
+    const newest = screen.getByRole('button', { name: 'Wed 9 Sep' });
+    expect(newest).toHaveFocus();
+    expect(newest).toHaveAccessibleDescription('buy 44.35 · sell 44.83');
 
     await user.keyboard('{Home}');
     expect(oldest).toHaveFocus();
@@ -146,9 +207,26 @@ describe('RateHistoryPanel', () => {
     // The far end of the series is as far as an arrow key goes.
     await user.keyboard('{ArrowLeft}');
     expect(oldest).toHaveFocus();
+  });
 
+  it('dismisses the tooltip on Escape and leaves the reader where they were', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const oldest = await screen.findByRole('button', { name: 'Thu 3 Sep' });
+
+    await user.click(oldest);
     await user.keyboard('{Escape}');
+
     expect(screen.queryByText('buy 44.21 · sell 44.70')).toBeNull();
+    // Escape asked for the tooltip to go, not for the series to be left: the
+    // focus stays on the day, and it keeps the strip's one tab stop.
+    expect(oldest).toHaveFocus();
+    expect(oldest).toHaveAttribute('tabindex', '0');
+    expect(oldest).not.toHaveAccessibleDescription();
+
+    // And an arrow key picks up from the day that still has the focus.
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('button', { name: 'Fri 4 Sep' })).toHaveFocus();
   });
 
   it('shades the table row for the day the chart cursor is on', async () => {
@@ -159,6 +237,63 @@ describe('RateHistoryPanel', () => {
 
     const row = screen.getByRole('row', { name: /7 Sep/ });
     expect(row.className).toContain('bg-sunken');
+  });
+
+  it('calls the day out on the chart when the pointer is on its table row', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const row = await screen.findByRole('row', { name: /7 Sep/ });
+
+    await user.hover(row);
+
+    // The other direction of the same link: the table row names the day and
+    // the chart answers with its tooltip and its dashed rule.
+    expect(screen.getAllByText('buy 44.33 · sell 44.81').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Mon 7 Sep' })).toHaveAccessibleDescription(
+      'buy 44.33 · sell 44.81',
+    );
+  });
+
+  it('forgets the day it was on and closes the table again when the window changes', async () => {
+    const user = userEvent.setup();
+    const month: RateHistoryResponse = {
+      base: 'USD',
+      quote: 'UAH',
+      days: 30,
+      points: Array.from({ length: 30 }, (_, index) => ({
+        date: new Date(Date.UTC(2026, 7, 11 + index)).toISOString().slice(0, 10),
+        cross: 0.85 + index / 10_000,
+      })),
+    };
+    const fake = createFakeServices({ rateHistory: week });
+    renderWithProviders(<RateHistoryPanel base="USD" quote="UAH" />, {
+      services: {
+        ...fake.services,
+        rates: {
+          ...fake.services.rates,
+          getHistory: (query) => Promise.resolve(query.days === 7 ? week : month),
+        },
+      },
+    });
+
+    await user.hover(await screen.findByRole('button', { name: 'Mon 7 Sep' }));
+    expect(screen.getByRole('row', { name: /7 Sep/ }).className).toContain('bg-sunken');
+
+    await user.click(screen.getByRole('radio', { name: '30D' }));
+    await screen.findByText('Showing 7 of 30 days');
+    await user.click(screen.getByRole('button', { name: 'Show all 30' }));
+    expect(await screen.findAllByRole('row')).toHaveLength(31);
+
+    // Back to the week: a row shaded because day 7 of a month was hovered, and
+    // a table still open to thirty rows, would both belong to the other window.
+    await user.click(screen.getByRole('radio', { name: '7D' }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('row')).toHaveLength(8);
+    });
+    expect(
+      screen.getAllByRole('row').filter((row) => row.className.includes('bg-sunken')),
+    ).toHaveLength(0);
   });
 
   it('asks for the window the reader picked', async () => {

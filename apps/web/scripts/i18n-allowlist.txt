@@ -1,0 +1,17 @@
+# Keys `check-i18n.mjs` cannot see, each with the reason it is invisible.
+# Anything listed here that becomes referenced fails the check too, so the
+# list cannot rot into a way of keeping dead sentences alive.
+
+# Assembled from a direction at run time: `t(`rateHistory.delta.${direction}`)`
+# in RateHistoryTable's `Delta`, which is `up` or `down`.
+rateHistory.delta.up
+rateHistory.delta.down
+rateHistory.delta.upLabel
+rateHistory.delta.downLabel
+
+# Landed by PR 1 for PR 2 to render: the Operations nav item and the combobox's
+# Cancel. Both go live with #17 (`feat/web-redesign-combobox-ops`) and come off
+# this list with it — the check itself fails if they are still listed once
+# something references them.
+app.nav.ops
+common.cancel

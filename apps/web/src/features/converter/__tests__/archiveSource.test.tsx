@@ -21,7 +21,11 @@ const archived: ConvertResponse = {
   rate: 44.33,
   strategy: 'direct',
   source: 'archive',
-  ratesTimestamp: '2026-09-07T20:45:00.000Z',
+  // Late enough in the UTC day that anywhere east of Greenwich is already on
+  // the 8th: an implementation that read the local day would say `8 Sep 2026`
+  // for the snapshot the archive filed under the 7th, and this fixture is what
+  // makes the difference show up rather than hide behind the runner's clock.
+  ratesTimestamp: '2026-09-07T23:30:00.000Z',
 };
 
 const archivedRow: HistoryItem = {
@@ -56,7 +60,7 @@ describe('an answer served from the archive', () => {
     // under Source.
     expect(stamps).toHaveLength(2);
     expect(stamps[0]?.tagName).toBe('TIME');
-    expect(stamps[0]).toHaveAttribute('dateTime', '2026-09-07T20:45:00.000Z');
+    expect(stamps[0]).toHaveAttribute('dateTime', '2026-09-07T23:30:00.000Z');
     expect(within(card).queryByText(/Rates fetched/)).toBeNull();
   });
 

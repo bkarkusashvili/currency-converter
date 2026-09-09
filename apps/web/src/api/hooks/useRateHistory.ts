@@ -15,6 +15,17 @@ import type { RateHistoryResponse } from '../types';
  * stored series would be restored a day stale and the panel it feeds is not
  * what an offline browser needs, unlike the snapshot the estimate is priced
  * from.
+ *
+ * **Retries.** It inherits the client's one, and that is the right number
+ * rather than an oversight it has not been rescued from. The failure worth
+ * asking twice about is a 503 or a connection that dropped, where a second ask
+ * costs a second and often answers; the 422 that a swap of a published pair
+ * produces is the archive saying "not this pair", which no number of asks
+ * changes — and the panel reads it as its empty state, so it never reaches the
+ * retry at all. Beyond the one, the reader has a `Try again` button, which is
+ * a better third attempt than a silent one. Overriding it here would also take
+ * the choice away from the test client, which turns retries off so a failing
+ * case fails at once instead of after a backoff.
  */
 export function useRateHistory(
   query: RateHistoryQuery,

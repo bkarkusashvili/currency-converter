@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { ConvertRequest } from '../../../api';
 import { useFormatters } from '../../../lib';
 import { canonicalAmount } from '../lib/amount/formatAmountInput';
-import { DEFAULT_FROM, DEFAULT_TO } from '../lib/currencyOptions';
 import { MAX_AMOUNT, parseAmount, type AmountErrorCode } from '../lib/amount/parseAmount';
+import type { CurrencyPair } from '../lib/currencyPair';
 import type { FormField, FormFieldErrors } from '../lib/serverFieldErrors';
 
 const DEFAULT_AMOUNT = '100';
@@ -15,11 +15,13 @@ interface UseConverterFormOptions {
   /** Called instead of submitting, so the form can put the caret on what needs fixing. */
   onAmountInvalid: () => void;
   /**
-   * The pair, whenever it changes. The rate-history panel below the card reads
+   * The pair, owned by the page. The rate-history panel under the card is on
    * the *selected* pair rather than the converted one, so it follows a pick
-   * and a swap without waiting for a conversion (§5.2).
+   * and a swap without waiting for a conversion (§5.2) — and it reads the same
+   * state the selects render, not a copy of it kept in step by a callback.
    */
-  onPairChange?: (pair: { from: string; to: string }) => void;
+  pair: CurrencyPair;
+  onPairChange: (pair: CurrencyPair) => void;
 }
 
 export interface ConverterFormState {
@@ -38,13 +40,13 @@ export function useConverterForm({
   serverErrors,
   onSubmit,
   onAmountInvalid,
+  pair,
   onPairChange,
 }: UseConverterFormOptions): ConverterFormState {
   const { t } = useTranslation();
   const formatters = useFormatters();
+  const { from, to } = pair;
   const [amount, setAmountValue] = useState(DEFAULT_AMOUNT);
-  const [from, setFromValue] = useState(DEFAULT_FROM);
-  const [to, setToValue] = useState(DEFAULT_TO);
   const [amountErrorCode, setAmountErrorCode] = useState<AmountErrorCode | null>(null);
   /**
    * Fields edited since the last submit. The server's answer describes the values
@@ -77,22 +79,18 @@ export function useConverterForm({
   }
 
   function setFrom(value: string) {
-    setFromValue(value);
     markEdited('from');
-    onPairChange?.({ from: value, to });
+    onPairChange({ from: value, to });
   }
 
   function setTo(value: string) {
-    setToValue(value);
     markEdited('to');
-    onPairChange?.({ from, to: value });
+    onPairChange({ from, to: value });
   }
 
   function swap() {
-    setFromValue(to);
-    setToValue(from);
     markEdited('from', 'to');
-    onPairChange?.({ from: to, to: from });
+    onPairChange({ from: to, to: from });
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

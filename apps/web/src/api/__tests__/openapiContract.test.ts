@@ -58,32 +58,13 @@ type Route = keyof typeof SCHEMA_REFS;
 const document: unknown = JSON.parse(readFileSync(DOCUMENT_PATH, 'utf8'));
 
 /**
- * Whether the committed contract describes this route yet. `/rates/history` is
- * published by the API half of this change, and until that lands the document
- * has nothing to validate its fixture against — a case failing for *that*
- * would say nothing about this client, and one silently missing would let the
- * fixture drift. So the fixture is written now and checked the moment the
- * document grows the schema, with no edit here.
+ * Every route, unconditionally. An earlier draft skipped a schema the document
+ * did not carry yet, while `/rates/history` was still on its own branch — but
+ * a check that can silently decide not to run is one nobody notices going
+ * quiet, and a schema that disappears from the contract should fail here
+ * loudly rather than shrink the suite by one case.
  */
-function isPublished(ref: string): boolean {
-  return (
-    ref
-      .replace('contract#/', '')
-      .split('/')
-      .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'))
-      .reduce<unknown>(
-        (node, segment) =>
-          typeof node === 'object' && node !== null
-            ? (node as Record<string, unknown>)[segment]
-            : undefined,
-        document,
-      ) !== undefined
-  );
-}
-
-const CHECKED_ROUTES = (Object.keys(SCHEMA_REFS) as Route[]).filter((route) =>
-  isPublished(SCHEMA_REFS[route]),
-);
+const CHECKED_ROUTES = Object.keys(SCHEMA_REFS) as Route[];
 
 let validators: Record<Route, ValidateFunction>;
 
@@ -130,9 +111,7 @@ describe('the fixtures the component suites render, against the published contra
 
     check('currencies', await services.currencies.list());
     check('rates', await services.rates.getSnapshot());
-    if (CHECKED_ROUTES.includes('rateHistory')) {
-      check('rateHistory', await services.rates.getHistory({ base: 'USD', quote: 'UAH', days: 7 }));
-    }
+    check('rateHistory', await services.rates.getHistory({ base: 'USD', quote: 'UAH', days: 7 }));
     check('history', await services.history.recent(10));
     check('health', await services.health.report());
   });

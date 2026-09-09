@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { RateHistoryPoint } from '../../../api';
 import { FAKE_RESPONSES } from '../../../test/fakes/createFakeServices';
-import { buildRateHistorySeries, CHART } from '../lib/rateHistorySeries';
+import {
+  buildRateHistorySeries,
+  CHART,
+  labelWidth,
+  placeLabel,
+  placeLabelY,
+} from '../lib/rateHistorySeries';
 
 /**
  * The seven archived days board 3a is drawn from, which is also the fixture
@@ -45,14 +51,14 @@ describe('buildRateHistorySeries', () => {
     expect(series.latest).toMatchObject({ value: 44.35, x: 388, y: 144, note: null });
     // The high is the sell of the latest day, which is not the latest point:
     // both circles are drawn, on their own lines.
-    expect([series.min.absorbed, series.max.absorbed]).toEqual([false, false]);
+    expect([series.min?.absorbed, series.max?.absorbed]).toEqual([false, false]);
   });
 
   it('lets the latest point absorb the marker when it is itself the low', () => {
     const falling = week.map((point, index) => ({ ...point, buy: 44.4 - index / 100 }));
     const series = build(falling);
 
-    expect(series.min.index).toBe(falling.length - 1);
+    expect(series.min?.index).toBe(falling.length - 1);
     expect(series.latest.note).toBe('min');
   });
 
@@ -76,6 +82,31 @@ describe('buildRateHistorySeries', () => {
     expect(series.days[0]?.y).toBeGreaterThan(series.days[0]?.sellY ?? 0);
   });
 
+  it('has no low and no high where every day carries the same rate', () => {
+    const flat = week.map((point) => ({ ...point, buy: 44.3, sell: 44.8 }));
+    const series = build(flat);
+
+    // Seven days at one rate: the fourth is not lower than the third, and
+    // pointing at one of them as the low says a shape the archive never had.
+    expect(series.min).toBeNull();
+    expect(series.max).toBeNull();
+    expect(series.latest.note).toBeNull();
+  });
+
+  it('marks the line that moved and leaves the one that did not alone', () => {
+    // Buy walks; sell is pinned. The low of the buy line is real, the high of
+    // the sell line is every day of it at once.
+    const oneSided = week.map((point, index) => ({
+      ...point,
+      buy: 44.2 + index / 100,
+      sell: 44.8,
+    }));
+    const series = build(oneSided);
+
+    expect(series.min).toMatchObject({ value: 44.2, series: 'value' });
+    expect(series.max).toBeNull();
+  });
+
   it('reports a falling series as down', () => {
     const series = build(
       [...week]
@@ -94,21 +125,25 @@ describe('buildRateHistorySeries', () => {
     expect(series.line).toBe('');
     expect(series.sellLine).toBe('');
     expect(series.spread).toBe('');
-    // The one day it has is its first, its last, its low, its high and its
-    // latest, and one point is drawn once — with its label under it rather
-    // than hanging off an edge it is nowhere near.
     expect(series.change).toMatchObject({ direction: 'flat', first: 44.35, last: 44.35 });
-    expect(series.latest.note).toBe('min');
-    // Its buy is the latest point and is drawn as it; its sell is the high of
-    // the other line, which still gets a circle of its own.
-    expect([series.min.absorbed, series.max.absorbed]).toEqual([true, false]);
     expect(series.labels).toEqual([
       expect.objectContaining({ anchor: 'middle', x: (CHART.left + CHART.right) / 2 }),
     ]);
+  });
 
-    // One day of a pair with no spread is one point, and one circle.
+  it('calls one archived day neither a low nor a high, and says nothing beside it', () => {
+    // What the live archive holds today. A single day is not lower or higher
+    // than anything: it was drawn `44.35 · min` with `max 44.83` above it,
+    // which reads as a week that happened to be flat rather than as one day.
+    const series = build([{ date: '2026-09-09', buy: 44.35, sell: 44.83 }]);
+
+    expect(series.min).toBeNull();
+    expect(series.max).toBeNull();
+    expect(series.latest).toMatchObject({ value: 44.35, note: null });
+
+    // The same for a pair quoted as one cross rate.
     const cross = build([{ date: '2026-09-09', cross: 0.850512 }]);
-    expect([cross.min.absorbed, cross.max.absorbed]).toEqual([true, true]);
+    expect([cross.min, cross.max, cross.latest.note]).toEqual([null, null, null]);
   });
 
   it('draws two days as a line between the two edges of the plot', () => {
@@ -166,6 +201,7 @@ describe('buildRateHistorySeries', () => {
     expect(series.kind).toBe('cross');
     expect(series.min).toMatchObject({ value: 0.850512, series: 'value' });
     expect(series.max).toMatchObject({ value: 0.85143, series: 'value' });
+    expect(series.min?.absorbed).toBe(true);
     expect(series.latest.note).toBe('min');
   });
 
@@ -216,15 +252,78 @@ describe('buildRateHistorySeries', () => {
     expect(covered).toBeCloseTo(((CHART.right - CHART.left) / CHART.width) * 100, 6);
   });
 
-  it('flips the latest label to the other side of a point at the left edge', () => {
-    const series = build([{ date: '2026-09-09', buy: 44.35, sell: 44.83 }]);
-    const atEdge = buildRateHistorySeries([
-      { date: '2026-09-08', buy: 44.35, sell: 44.83 },
-      { date: '2026-09-09', buy: 44.35, sell: 44.83 },
-    ]);
+  it('names one day a month over a quarter, without a two-month hole in it', () => {
+    const quarter = Array.from({ length: 90 }, (_, index) => ({
+      date: new Date(Date.UTC(2026, 5, 12 + index)).toISOString().slice(0, 10),
+      cross: 0.85 + index / 10_000,
+    }));
+    const series = build(quarter);
 
-    expect(series.latest.anchor).toBe('end');
-    expect(atEdge?.latest.anchor).toBe('end');
-    expect(series.latest.labelX).toBeLessThan(series.latest.x);
+    // Counting days dropped index 60 for being 29 short of a 30-day cadence,
+    // and left `12 Jun · 12 Jul · 9 Sep`. It is 113 units clear of the last
+    // label, which is what the guard now measures.
+    expect(series.labels.map((label) => label.index)).toEqual([0, 30, 60, 89]);
+    expect(series.labels.map((label) => label.date)).toEqual([
+      '2026-06-12',
+      '2026-07-12',
+      '2026-08-11',
+      '2026-09-09',
+    ]);
+  });
+});
+
+describe('placeLabel', () => {
+  it('leaves a label alone when it fits where the design puts it', () => {
+    expect(placeLabel(CHART.right, labelWidth('44.35', 11), 'end', 8)).toEqual({
+      x: 380,
+      anchor: 'end',
+    });
+    expect(placeLabel(200, labelWidth('min 44.19', 10), 'middle')).toEqual({
+      x: 200,
+      anchor: 'middle',
+    });
+  });
+
+  it('flips a label that would run off the left of the picture', () => {
+    // The high of a series whose high is its first day: anchored `end` at the
+    // left-hand edge of the plot, `max 44.83` starts at x = -14.
+    const width = labelWidth('max 44.83', 10);
+    expect(placeLabel(CHART.left, width, 'end')).toEqual({ x: CHART.left, anchor: 'start' });
+    expect(CHART.left - width).toBeLessThan(0);
+  });
+
+  it('flips a centred label that would run off the right', () => {
+    expect(placeLabel(CHART.right, labelWidth('min 44.19', 13), 'middle')).toEqual({
+      x: CHART.right,
+      anchor: 'end',
+    });
+  });
+
+  it('pins a label too wide for the picture to its left edge rather than off it', () => {
+    const width = CHART.width + 40;
+    const placed = placeLabel(CHART.right, width, 'end', 8);
+
+    // Nothing this wide fits either way; what it must not do is start off the
+    // left of the picture, where the first characters would be the ones lost.
+    expect(placed.anchor).toBe('end');
+    expect(placed.x - width).toBe(0);
+  });
+});
+
+describe('placeLabelY', () => {
+  it('sets the low of board 3a above its point rather than over the day labels', () => {
+    // 169.6 + 16 puts the baseline 2.4 units inside the row the dates are set
+    // on, which is the overlap that was shipped.
+    expect(169.6 + 16).toBeGreaterThan(CHART.labelBaseline - 8.5 - 2.5);
+    expect(placeLabelY(169.6, 'below', 10)).toBeLessThan(169.6);
+  });
+
+  it('keeps a low well clear of the axis below its point, where the board puts it', () => {
+    expect(placeLabelY(120, 'below', 10)).toBe(136);
+  });
+
+  it('drops a label under a point too close to the top to sit above it', () => {
+    expect(placeLabelY(4, 'above', 10)).toBe(20);
+    expect(placeLabelY(67.2, 'above', 10)).toBe(60.2);
   });
 });

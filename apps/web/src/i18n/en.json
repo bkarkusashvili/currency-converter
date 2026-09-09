@@ -145,7 +145,7 @@
     },
     "chartLabelSpread": "Buy and sell rate, last {{days}} days",
     "chartLabelCross": "Cross rate, last {{days}} days",
-    "day": "{{date}}, {{values}}",
+    "dayStrip": "Archived days",
     "legend": {
       "buy": "buy",
       "sell": "sell",
@@ -210,7 +210,7 @@
         "Every module the architecture describes is in: rates, conversion through three strategies, currencies, history, the health endpoints and this client.",
         "The API and this client are two independent images, built by one CI workflow that runs lint, formatting, typecheck, tests with coverage thresholds, the build and the image build per app — plus a job that validates the shared conversion fixtures, boots the whole Docker Compose stack, probes it, and runs the integration suites against the Redis and MongoDB it started.",
         "Both run on Railway behind the platform edge, each on its own hostname; the panel above reads the live health endpoint every 30 seconds.",
-        "1032 tests pass: 661 API unit, 124 API end-to-end, 12 integration against a real Redis and MongoDB, and 235 in this client, with coverage gates of 85% on the API and 90% here."
+        "More than a thousand automated tests pass, across four layers: unit suites on both sides, end-to-end suites that boot the whole API, integration suites against a real Redis and MongoDB, and a contract check that validates this client\u2019s fixtures against the API\u2019s published OpenAPI document. Coverage gates are 85% on the API and 90% here; the README\u2019s testing table carries the exact counts, which is the one place they can be kept true."
       ]
     },
     "whatWasBuilt": {

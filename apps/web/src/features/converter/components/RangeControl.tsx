@@ -24,6 +24,16 @@ interface RangeControlProps {
  * the range is how a reader finds out whether a wider window has anything in
  * it, and a disabled control would be the panel's failure spreading to the one
  * thing that could answer it.
+ *
+ * What dims is the chrome, not the type. Fading the whole group to 0.6 put its
+ * unselected labels at 2.62:1 in light, and a control a reader is being invited
+ * to use has to stay readable while it is being invited: instead the selected
+ * segment's fill drops to half strength and the labels move to `--ink-faint`,
+ * which measure 16.29:1 and 5.50:1 in light and 15.65:1 and 5.88:1 in dark —
+ * every one of them past 4.5:1 in both themes. Nothing at all now happens to
+ * the border, which is the header's theme switcher's (`--line` in light,
+ * `--line-strong` in dark), so the group's own edge does not move when the
+ * panel has nothing to range over.
  */
 export function RangeControl({ value, onChange, dimmed = false }: RangeControlProps) {
   const { t } = useTranslation();
@@ -32,12 +42,7 @@ export function RangeControl({ value, onChange, dimmed = false }: RangeControlPr
     <div
       role="radiogroup"
       aria-label={t('rateHistory.range.label')}
-      className={[
-        'border-line bg-raised dark:border-line-strong grid grid-cols-3 gap-0.5 rounded-lg border p-0.5 sm:flex',
-        dimmed ? 'opacity-60' : '',
-      ]
-        .join(' ')
-        .trim()}
+      className="border-line bg-raised dark:border-line-strong grid grid-cols-3 gap-0.5 rounded-lg border p-0.5 sm:flex"
     >
       {RANGE_DAYS.map((days) => (
         <label
@@ -46,8 +51,10 @@ export function RangeControl({ value, onChange, dimmed = false }: RangeControlPr
             'inline-flex h-10 cursor-pointer items-center justify-center rounded-md font-mono text-xs tracking-[0.08em] transition-colors sm:min-w-14 sm:px-3',
             'has-[:focus-visible]:outline-accent has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-2',
             value === days
-              ? 'bg-sunken text-ink font-semibold'
-              : 'text-muted hover:bg-surface hover:text-ink',
+              ? `text-ink font-semibold ${dimmed ? 'bg-sunken/50' : 'bg-sunken'}`
+              : dimmed
+                ? 'text-faint hover:bg-surface hover:text-ink'
+                : 'text-muted hover:bg-surface hover:text-ink',
           ].join(' ')}
         >
           <input

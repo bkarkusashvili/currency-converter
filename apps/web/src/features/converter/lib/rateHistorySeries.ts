@@ -46,6 +46,17 @@ const LABEL_CADENCE = [
 
 const MONTHLY_CADENCE = 30;
 
+/**
+ * How close to the last label another one may come, in the chart's own x units.
+ * The guard has to be a distance and not a number of days: over 90 days the
+ * monthly cadence puts a label on index 60, twenty-nine days from the last one
+ * and 113 units away from it — miles of room — and counting days dropped it,
+ * which left `12 Jun · 12 Jul · 9 Sep` and a two-month hole. 60 units is about
+ * two half-widths of a `11 Aug` label at the largest the day labels are drawn
+ * (13 units, on a phone), plus air.
+ */
+const MIN_LABEL_GAP = 60;
+
 export type SeriesKind = 'spread' | 'cross';
 
 export interface ChartDay {
@@ -87,9 +98,6 @@ export interface ChartLatest {
   value: number;
   /** Set when the last day is also the series' low or high, whose marker it then absorbs. */
   note: 'min' | 'max' | null;
-  anchor: 'start' | 'end';
-  labelX: number;
-  labelY: number;
 }
 
 export interface ChartLabel {
@@ -118,8 +126,14 @@ export interface RateHistorySeries {
   /** `points` for the band between the two lines; empty unless the pair has a spread. */
   spread: string;
   ticks: ChartTick[];
-  min: ChartMarker;
-  max: ChartMarker;
+  /**
+   * The low and the high — or null where neither exists. A line whose lowest
+   * and highest day carry the same rate has no low and no high to point at,
+   * and a one-day series has nothing to be lower or higher *than*: marking
+   * either is the chart asserting a shape the archive never showed.
+   */
+  min: ChartMarker | null;
+  max: ChartMarker | null;
   latest: ChartLatest;
   labels: ChartLabel[];
   change: SeriesChange;
@@ -185,9 +199,13 @@ export function buildRateHistorySeries(
   });
 
   const last = days.length - 1;
-  const min = extreme(days, 'value', 'min', last);
-  const max =
-    kind === 'spread' ? extreme(days, 'sell', 'max', last) : extreme(days, 'value', 'max', last);
+  // A day is only low or high relative to another one. One archived day has no
+  // other, and a line that never moved has no day the others are below: in
+  // both cases the extremes are the series itself, and pointing at them says
+  // there is a shape here to read when there is not (§3.20).
+  const highSeries = kind === 'spread' ? 'sell' : 'value';
+  const min = varies(days, 'value') ? extreme(days, 'value', 'min', last) : null;
+  const max = varies(days, highSeries) ? extreme(days, highSeries, 'max', last) : null;
   const latest = latestOf(days, min, max);
 
   return {
@@ -324,6 +342,20 @@ function spreadBand(days: readonly ChartDay[]): string {
 }
 
 /**
+ * Whether one of the two lines moved at all across the window. Two days at the
+ * same rate are not a low and a high, and one day is not either — which is the
+ * shape the live archive has today, holding a single snapshot.
+ */
+function varies(days: readonly ChartDay[], series: 'value' | 'sell'): boolean {
+  const drawn = days.flatMap((day) => {
+    const value = series === 'sell' ? day.sell : day.value;
+    return value === null ? [] : [value];
+  });
+
+  return drawn.length > 1 && Math.min(...drawn) !== Math.max(...drawn);
+}
+
+/**
  * The lowest or highest day of one series. Ties resolve to the later day, so a
  * low that runs into the last day is reported as the last day — which is what
  * lets the latest marker absorb it instead of drawing two circles on one point.
@@ -363,31 +395,26 @@ function extreme(
   return best ?? { index: 0, x: CHART.left, y: CHART.midY, value: 0, series, absorbed: false };
 }
 
-const LABEL_OFFSET = 8;
-const LABEL_BELOW = 16;
-
-function latestOf(days: readonly ChartDay[], min: ChartMarker, max: ChartMarker): ChartLatest {
+function latestOf(
+  days: readonly ChartDay[],
+  min: ChartMarker | null,
+  max: ChartMarker | null,
+): ChartLatest {
   const last = days[days.length - 1] ?? {
     x: CHART.right,
     y: CHART.midY,
     value: 0,
     index: 0,
   };
-  // At the left edge the label would run off the chart, so it flips to the
-  // other side of the point; against the top it drops below it.
-  const anchor = last.x - LABEL_OFFSET < CHART.left + LABEL_OFFSET ? 'start' : 'end';
-  const labelY = last.y - LABEL_OFFSET;
 
   return {
     x: last.x,
     y: last.y,
     value: last.value,
     // Only a marker on the same line can be the same point: board 3a's high
-    // is the sell of the latest day, and the latest buy is not it.
-    note: min.absorbed ? 'min' : max.absorbed ? 'max' : null,
-    anchor,
-    labelX: anchor === 'end' ? last.x - LABEL_OFFSET : last.x + LABEL_OFFSET,
-    labelY: labelY < CHART.top ? last.y + LABEL_BELOW : labelY,
+    // is the sell of the latest day, and the latest buy is not it. A marker
+    // the series does not have is not one the latest value can be.
+    note: min?.absorbed === true ? 'min' : max?.absorbed === true ? 'max' : null,
   };
 }
 
@@ -402,8 +429,14 @@ function labelsOf(days: readonly ChartDay[]): ChartLabel[] {
   const last = count - 1;
   let previousMonth: string | null = null;
 
+  const lastX = xOf(last, count);
+
   return days
-    .filter((day) => day.index === last || (day.index % every === 0 && last - day.index >= every))
+    .filter(
+      (day) =>
+        day.index === last ||
+        (day.index % every === 0 && lastX - xOf(day.index, count) >= MIN_LABEL_GAP),
+    )
     .map((day) => {
       const month = day.date.slice(0, 7);
       // A label that opens a new month says which, so a run of bare day
@@ -445,4 +478,105 @@ function round(value: number, decimals: number): number {
 
 function round2(value: number): number {
   return round(value, 2);
+}
+
+export type LabelAnchor = 'start' | 'middle' | 'end';
+
+export interface LabelPlacement {
+  x: number;
+  anchor: LabelAnchor;
+}
+
+/**
+ * One monospace character's advance, as a fraction of the font's size. IBM Plex
+ * Mono is 0.6em, and so is every fallback the chart's stack names — which is
+ * what lets a label's width be known here, without a DOM to measure it in.
+ */
+const MONO_ADVANCE = 0.6;
+
+/** How wide `text` draws at `fontSize`, in the chart's own units. */
+export function labelWidth(text: string, fontSize: number): number {
+  return round2(text.length * fontSize * MONO_ADVANCE);
+}
+
+/** Where a label's box starts, given where it is anchored. */
+const BOX_START: Record<LabelAnchor, number> = { start: 0, middle: 0.5, end: 1 };
+
+function boxFits({ x, anchor }: LabelPlacement, width: number): boolean {
+  const left = x - BOX_START[anchor] * width;
+
+  return left >= 0 && left + width <= CHART.width;
+}
+
+/**
+ * One rule for every label that hangs off a point — the latest value, the low
+ * and the high. Each sits where the design puts it while there is room, takes
+ * the other side of its point when there is not, and is pushed back inside as
+ * a last resort. Without it the high of a series whose high is the first day
+ * is drawn anchored `end` at x = 40 and runs off the left of the viewBox, and
+ * the flip the latest label carried was unreachable — the last day is always
+ * at the right-hand edge, never at the left one.
+ *
+ * `gap` is how far off its point a side-anchored label is set; a `middle` one
+ * sits over its point and flips to whichever side it overflowed.
+ */
+export function placeLabel(
+  point: number,
+  width: number,
+  prefer: LabelAnchor,
+  gap = 0,
+): LabelPlacement {
+  const toLeft: LabelPlacement = { x: round2(point - gap), anchor: 'end' };
+  const toRight: LabelPlacement = { x: round2(point + gap), anchor: 'start' };
+  const candidates: LabelPlacement[] =
+    prefer === 'middle'
+      ? [{ x: round2(point), anchor: 'middle' }, toLeft, toRight]
+      : prefer === 'end'
+        ? [toLeft, toRight]
+        : [toRight, toLeft];
+  const placed = candidates.find((candidate) => boxFits(candidate, width));
+
+  if (placed !== undefined) {
+    return placed;
+  }
+
+  // Wider than the chart, or as good as: keep the side the design asked for
+  // and slide the box to the edge it overflowed.
+  const fallback = candidates[0] ?? { x: point, anchor: prefer };
+  const left = Math.min(
+    Math.max(fallback.x - BOX_START[fallback.anchor] * width, 0),
+    Math.max(CHART.width - width, 0),
+  );
+
+  return { x: round2(left + BOX_START[fallback.anchor] * width), anchor: fallback.anchor };
+}
+
+/** How far a label's baseline sits from its point, in multiples of its size. */
+const BASELINE_ABOVE = 0.7;
+const BASELINE_BELOW = 1.6;
+/** A line of text reaches about this far above and below its own baseline. */
+const CAP = 0.8;
+const DESCENDER = 0.25;
+
+/**
+ * Which side of its point a value label's baseline goes: the side the design
+ * asks for while it stays clear of both edges of the picture, and the other
+ * side when it does not. Board 3a sets the low's label 16 below its point,
+ * which at the last grid line puts it 2.4 units into the day labels under the
+ * axis; there it goes above the point instead, inside the spread band, where
+ * `--ink-faint` still reads at 4.61:1 (light) and 4.75:1 (dark).
+ */
+export function placeLabelY(y: number, prefer: 'above' | 'below', fontSize: number): number {
+  const above = round2(y - fontSize * BASELINE_ABOVE);
+  const below = round2(y + fontSize * BASELINE_BELOW);
+  // Above, the picture's own top edge; below, the row the day labels are set
+  // on, whose own capital letters start a little above their baseline.
+  const fitsAbove = above - fontSize * CAP >= 0;
+  const fitsBelow = below + fontSize * DESCENDER <= CHART.labelBaseline - fontSize * CAP;
+
+  if (prefer === 'above') {
+    return fitsAbove || !fitsBelow ? above : below;
+  }
+
+  return fitsBelow || !fitsAbove ? below : above;
 }

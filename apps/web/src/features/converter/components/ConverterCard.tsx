@@ -6,6 +6,7 @@ import { useApiErrorMessage, useFormatters } from '../../../lib';
 import { useConverterForm } from '../hooks/useConverterForm';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
 import { currencyOptions } from '../lib/currencyOptions';
+import type { CurrencyPair } from '../lib/currencyPair';
 import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../lib/amount/formatAmountInput';
 import type { FormFieldErrors } from '../lib/serverFieldErrors';
 import { AmountField } from './AmountField';
@@ -29,8 +30,9 @@ interface ConverterCardProps {
   /** The answer, which the output pane holds until the next one replaces it. */
   outcome: ConversionOutcome | undefined;
   onSubmit: (request: ConvertRequest) => void;
-  /** The selected pair, reported upward so the rate-history panel can follow it. */
-  onPairChange?: (pair: { from: string; to: string }) => void;
+  /** The selected pair, owned by the page so the panel under the card reads the same state. */
+  pair: CurrencyPair;
+  onPairChange: (pair: CurrencyPair) => void;
 }
 
 /**
@@ -52,6 +54,7 @@ export function ConverterCard({
   isSubmitting,
   outcome,
   onSubmit,
+  pair,
   onPairChange,
 }: ConverterCardProps) {
   const { t } = useTranslation();
@@ -62,6 +65,7 @@ export function ConverterCard({
     serverErrors,
     onSubmit,
     onAmountInvalid: () => amountRef.current?.focus(),
+    pair,
     onPairChange,
   });
   const options = currencyOptions(currencies);

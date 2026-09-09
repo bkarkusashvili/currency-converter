@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFormatters } from '../../../lib';
 import type { ChartDay, RateHistorySeries } from '../lib/rateHistorySeries';
@@ -13,6 +12,13 @@ interface RateHistoryTableProps {
   /** The day the chart cursor is on, whose row is shaded to match. */
   activeIndex: number | null;
   onActivate: (index: number | null) => void;
+  /**
+   * Whether the window is open to its full height. Held by the panel, because
+   * it belongs to the pair and the window rather than to this table: switching
+   * either is a different series, and it opens closed again.
+   */
+  showAll: boolean;
+  onShowAll: () => void;
 }
 
 /**
@@ -29,9 +35,10 @@ export function RateHistoryTable({
   quote,
   activeIndex,
   onActivate,
+  showAll,
+  onShowAll,
 }: RateHistoryTableProps) {
   const { t } = useTranslation();
-  const [showAll, setShowAll] = useState(false);
   const hasSpread = series.kind === 'spread';
   const newestFirst = [...series.days].reverse();
   const rows = showAll ? newestFirst : newestFirst.slice(0, VISIBLE_DAYS);
@@ -65,13 +72,16 @@ export function RateHistoryTable({
           </tr>
         </thead>
         <tbody className="text-right">
-          {rows.map((day) => (
+          {rows.map((day, position) => (
             <Row
               key={day.date}
               day={day}
               hasSpread={hasSpread}
               isLatest={day.index === latest}
               isActive={day.index === activeIndex}
+              // The rule under the last row would be the table underlining
+              // nothing (board 3a and board 3d both stop at the row above).
+              isLast={position === rows.length - 1}
               onActivate={onActivate}
             />
           ))}
@@ -83,12 +93,13 @@ export function RateHistoryTable({
           <p className="eyebrow tracking-[0.12em]">
             {t('rateHistory.showing', { shown: rows.length, total: newestFirst.length })}
           </p>
+          {/* Flat, as the board draws it — but a 44px target with a ring of
+              its own, because a control with no box of its own still has to be
+              hittable and still has to show where the focus is (§3.19). */}
           <button
             type="button"
-            className="text-muted hover:text-ink -my-2 py-2 text-[0.8125rem] font-semibold"
-            onClick={() => {
-              setShowAll(true);
-            }}
+            className="text-muted hover:text-ink focus-visible:outline-accent -my-3 inline-flex h-11 items-center rounded-md px-1 text-[0.8125rem] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2"
+            onClick={onShowAll}
           >
             {t('rateHistory.showAll', { total: newestFirst.length })}
           </button>
@@ -103,12 +114,16 @@ interface RowProps {
   hasSpread: boolean;
   isLatest: boolean;
   isActive: boolean;
+  /** The bottom row of what is shown, which carries no rule under it. */
+  isLast: boolean;
   onActivate: (index: number | null) => void;
 }
 
-function Row({ day, hasSpread, isLatest, isActive, onActivate }: RowProps) {
+function Row({ day, hasSpread, isLatest, isActive, isLast, onActivate }: RowProps) {
   const formatters = useFormatters();
-  const cell = 'border-line border-b py-[0.4375rem] sm:py-[0.4375rem]';
+  // 9px a row on a phone, 7px above it: board 3d gives the rows the extra two
+  // pixels a thumb wants, and board 3a does not need them (§3.18).
+  const cell = `py-[0.5625rem] sm:py-[0.4375rem] ${isLast ? '' : 'border-line border-b'}`;
   const muted = isLatest ? '' : 'text-muted';
 
   return (

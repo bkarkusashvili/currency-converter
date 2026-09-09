@@ -54,7 +54,23 @@ export function RateHistoryPanel({ base, quote }: RateHistoryPanelProps) {
   const [days, setDays] = useState<RangeDays>(DEFAULT_RANGE);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const query = useRateHistory({ base, quote, days });
+
+  // A day called out and a table opened to its full height both belong to the
+  // series that was on screen. A different pair or a different window is a
+  // different series, and carrying either across would leave the seventh row
+  // of a week shaded because the reader had hovered day 7 of a quarter. Reset
+  // while rendering rather than in an effect: this is state derived from a
+  // change of props, and an effect would paint the stale one first.
+  const identity = `${base}/${quote}/${String(days)}`;
+  const [shown, setShown] = useState(identity);
+
+  if (shown !== identity) {
+    setShown(identity);
+    setActiveIndex(null);
+    setShowAll(false);
+  }
   const series = query.data === undefined ? null : buildRateHistorySeries(query.data.points);
   const pair = t('rateHistory.pair', { base, quote });
   /**
@@ -109,18 +125,14 @@ export function RateHistoryPanel({ base, quote }: RateHistoryPanelProps) {
         </button>
 
         <div className={open ? 'w-full sm:w-auto' : 'hidden sm:block'}>
-          <RangeControl
-            value={days}
-            dimmed={query.isPending || isEmpty}
-            onChange={(next) => {
-              setActiveIndex(null);
-              setDays(next);
-            }}
-          />
+          <RangeControl value={days} dimmed={query.isPending || isEmpty} onChange={setDays} />
         </div>
       </div>
 
-      <div id={BODY_ID} className={open ? 'grid gap-4' : 'hidden sm:grid sm:gap-5'}>
+      <div
+        id={BODY_ID}
+        className={`history-body ${open ? 'grid gap-4' : 'hidden sm:grid sm:gap-5'}`}
+      >
         {query.isPending && <PanelSkeleton />}
 
         {failed && query.error !== null && (
@@ -154,7 +166,7 @@ export function RateHistoryPanel({ base, quote }: RateHistoryPanelProps) {
             keep drawing it: the summary says when it was last shown and the
             note above says why it is not being redrawn. */}
         {!failed && series !== null && (
-          <div className="grid items-start gap-5 min-[56rem]:grid-cols-[minmax(0,1fr)_17rem] min-[56rem]:gap-6">
+          <div className="history-layout">
             <div className="grid gap-2.5">
               <RateHistoryChart
                 series={series}
@@ -171,6 +183,10 @@ export function RateHistoryPanel({ base, quote }: RateHistoryPanelProps) {
               quote={quote}
               activeIndex={activeIndex}
               onActivate={setActiveIndex}
+              showAll={showAll}
+              onShowAll={() => {
+                setShowAll(true);
+              }}
             />
           </div>
         )}
@@ -232,22 +248,33 @@ function Summary({ id, series, days, isPending, isEmpty, failed, lastShown }: Su
     percent: formatters.percent(series.change.magnitude),
     days,
   });
+  // The spread tail says where the buy rate started and where it ended, which
+  // on a series that did not move is `buy 44.35 → 44.35`: the same number
+  // twice, offered as the detail behind the word `Unchanged`. The cross tail
+  // says what the line *is* rather than how it moved, so it stays.
   const detail =
     series.kind === 'spread'
-      ? t('rateHistory.detailSpread', {
-          first: formatters.rate(series.change.first),
-          last: formatters.rate(series.change.last),
-        })
+      ? series.change.direction === 'flat'
+        ? null
+        : t('rateHistory.detailSpread', {
+            first: formatters.rate(series.change.first),
+            last: formatters.rate(series.change.last),
+          })
       : t('rateHistory.detailCross', { hub: HUB_CURRENCY });
 
   return (
     <p id={id} className={line}>
-      {change}{' '}
+      {change}
       {/* What the two lines are. Under 640 there is room for the move and
           nothing else, which is what boards 3c and 3d show — and the tail is
           dropped rather than written twice, because this line is also what
           describes the chart. */}
-      <span className="hidden sm:inline">{t('rateHistory.summaryTail', { detail })}</span>
+      {detail !== null && (
+        <>
+          {' '}
+          <span className="hidden sm:inline">{t('rateHistory.summaryTail', { detail })}</span>
+        </>
+      )}
     </p>
   );
 }

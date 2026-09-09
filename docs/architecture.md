@@ -1135,6 +1135,26 @@ rather than constrain it.
   all panel-local: nothing here can disable Convert, and a 422 from the route is
   read as a pair with no archived day rather than as a failure, because that is
   what it means.
+- **What the chart refuses to claim.** A low and a high are relative to
+  something. One archived day has nothing to be lower than, and a line that
+  held one rate all week has no day the others sit below: in both cases the
+  markers are dropped and the latest value loses the `· min` it would otherwise
+  wear, because pointing at them draws a shape the archive never showed — the
+  live archive, holding a single snapshot, was labelled `44.35 · min` with
+  `max 44.83` above it. The two lines are judged one at a time, so a buy that
+  moved under a sell that did not still gets its low, and the summary drops its
+  `buy 44.35 → 44.35` tail when the week did not move at all.
+- **The panel splits on its own width, not the page's.** Whether the daily
+  table sits beside the chart or under it is a container query on the panel,
+  because a viewport one gets it wrong exactly where it matters: at 1024px the
+  recent-conversions aside takes 320px out of the page, the panel is 600px
+  wide, and a media query would still be splitting it — leaving the chart 254px
+  to draw a 400-unit viewBox in, at which the labels render at 6.4 CSS pixels.
+  Under the threshold the chart takes the panel's full width. The two sizes the
+  labels themselves are drawn at are in the component, one per breakpoint, and
+  both are rendered with one of them `display: none` — the tooltip's box and
+  every label's placement are computed from the size, and nothing here measures
+  the DOM.
 - Runtime configuration: `public/config.js` sets `window.__APP_CONFIG__.apiUrl`;
   the Docker image regenerates it from `API_URL` at container start so the same
   image runs locally and on Railway. The value is JSON-escaped as it is written,
@@ -1419,7 +1439,13 @@ extends it:
 - Every user-visible string lives in `src/i18n/en.json` and is read through
   i18next (`useTranslation`). The key type is derived from that file, so a
   missing or misspelled key is a compile error. No copy is written inline in a
-  component.
+  component. The other direction — a sentence in the file that nothing renders
+  — the type-checker cannot see, because `t()` accepts the whole key space, so
+  `scripts/check-i18n.mjs` runs as part of `npm run lint` and fails on a key no
+  file under `src` names. Keys assembled at run time never appear whole, and
+  those are listed in `scripts/i18n-allowlist.txt` with the reason each is
+  there; a key on that list that becomes referenced fails the check too, so the
+  list cannot quietly become a place to keep dead copy alive.
 - Data access is layered and each layer is the only one that knows its concern:
   `src/api/http` is the fetch client (base url, headers, decoding the error
   envelope), `src/api/services` holds one interface per resource
