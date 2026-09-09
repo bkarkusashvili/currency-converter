@@ -21,10 +21,18 @@
   --warn-soft: #f8ebd4;
   --danger: #a12c2c;
   --danger-soft: #f9e5e5;
+  /* Elevation. --shadow is the popover/sheet/dialog lift; --shadow-sm is the
+     swap button standing off the seam it sits on. */
+  --shadow: 0 16px 40px rgba(20, 25, 27, 0.14);
+  --shadow-sm: 0 2px 8px rgba(20, 25, 27, 0.08);
 }
 
+/* The dark palette, written twice on purpose. `System` is the default and has
+   to follow the OS, and an explicit pick has to override the OS — and CSS has
+   no way to share one declaration block between a media query and a selector.
+   `themeTokens.test.ts` asserts the two copies stay identical. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     color-scheme: dark;
 
     --surface: #0d1113;
@@ -43,6 +51,46 @@
     --warn-soft: #33280f;
     --danger: #f08a8a;
     --danger-soft: #3a1d1d;
+    --shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --surface: #0d1113;
+  --surface-raised: #151a1c;
+  --surface-sunken: #0a0e0f;
+  --ink: #e8edeb;
+  --ink-muted: #9aa5a4;
+  --ink-faint: #8b9897;
+  --line: #242b2d;
+  --line-strong: #5a6b64;
+  --accent: #2ecfb2;
+  --accent-hover: #52e0c6;
+  --accent-contrast: #06211c;
+  --accent-soft: #123029;
+  --warn: #eab551;
+  --warn-soft: #33280f;
+  --danger: #f08a8a;
+  --danger-soft: #3a1d1d;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* `dark:` has to mean what the palette means: the OS preference unless an
+   explicit choice overrides it, and the explicit choice either way. Tailwind's
+   built-in variant only knows the first half. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) & {
+      @slot;
+    }
+  }
+
+  :root[data-theme='dark'] & {
+    @slot;
   }
 }
 
@@ -133,9 +181,20 @@
 @layer components {
   .shell {
     width: 100%;
-    max-width: 60rem;
+    max-width: 70rem;
     margin-inline: auto;
-    padding-inline: 1.25rem;
+    padding-inline: 1rem;
+  }
+
+  /* The design's two type steps, fixed rather than fluid: a clamp() between
+     them lands on sizes neither board ever draws. */
+  .page-title {
+    font-size: 1.875rem;
+    text-wrap: balance;
+  }
+
+  .section-title {
+    font-size: 1.375rem;
   }
 
   .eyebrow {
@@ -161,7 +220,6 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--ink-muted);
-    margin-bottom: 0.5rem;
   }
 
   .control {
@@ -171,8 +229,6 @@
     border-radius: 0.625rem;
     color: var(--ink);
     font-family: var(--font-sans);
-    font-size: 1rem;
-    padding: 0.75rem 0.875rem;
     transition: border-color 120ms ease;
   }
 
@@ -188,7 +244,10 @@
      the palette; the chevron next to it is drawn by CurrencySelect. */
   .control-select {
     appearance: none;
-    padding-right: 2.5rem;
+    height: 3rem;
+    padding: 0 2.5rem 0 0.875rem;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
   }
 
   .control[aria-invalid='true'] {
@@ -196,8 +255,10 @@
   }
 
   .control-amount {
+    height: 3.75rem;
+    padding: 0 0.875rem;
     font-family: var(--font-mono);
-    font-size: 1.375rem;
+    font-size: 1.75rem;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
   }
@@ -213,7 +274,8 @@
     font-size: 0.9375rem;
     font-weight: 600;
     letter-spacing: 0.01em;
-    padding: 0.8125rem 1.25rem;
+    min-height: 3rem;
+    padding: 0.625rem 1.25rem;
     cursor: pointer;
     transition:
       background-color 120ms ease,
@@ -277,6 +339,30 @@
     transition: transform 320ms cubic-bezier(0.2, 0.7, 0.3, 1);
   }
 
+  /* A circle standing off the seam it sits on, in both layouts. */
+  .swap-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background-color: var(--surface-raised);
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+    transition:
+      color 120ms ease,
+      border-color 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .swap-button:hover {
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+    color: var(--accent);
+  }
+
   .badge {
     display: inline-flex;
     align-items: center;
@@ -290,7 +376,7 @@
     font-weight: 500;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    padding: 0.25rem 0.625rem;
+    padding: 0.3125rem 0.625rem;
   }
 
   .badge-accent {
@@ -305,21 +391,102 @@
     color: var(--warn);
   }
 
+  /* A neutral badge on the sunken output pane needs the opposite ground to
+     read as a chip at all (§6.4). The warn pill in a warn-soft history row
+     takes the same treatment (§6.5). */
+  .badge-on-sunken {
+    background-color: var(--surface-raised);
+  }
+
   .numeric {
     font-variant-numeric: tabular-nums;
   }
 
   .figure {
-    font-size: clamp(2.25rem, 7vw, 3.25rem);
+    font-size: 2.25rem;
     font-weight: 600;
     font-stretch: 118%;
     letter-spacing: -0.03em;
     line-height: 1;
     font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  /* Four stacked blocks under 640: input, the seam the swap sits on, output,
+     and the action block Convert moves into. Above it, two panes side by side
+     with the action under the input one and the provenance footer across both. */
+  .converter-card {
+    position: relative;
+    display: grid;
+    overflow: hidden;
   }
 
   .rise-in {
     animation: rise-in 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  }
+
+  .code-block {
+    background-color: var(--surface-sunken);
+    border: 1px solid var(--line);
+    border-radius: 0.625rem;
+    padding: 0.875rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.78125rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  @media (min-width: 40rem) {
+    .shell {
+      padding-inline: 1.5rem;
+    }
+
+    .page-title {
+      font-size: 2.5rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+    }
+
+    .control-select {
+      height: 2.75rem;
+    }
+
+    .control-amount {
+      height: 4rem;
+      padding: 0 1rem;
+      font-size: 1.875rem;
+    }
+
+    .figure {
+      font-size: 2.5rem;
+    }
+
+    .converter-card {
+      grid-template-columns: 1fr 1fr;
+      grid-template-areas:
+        'input output'
+        'action output'
+        'footer footer';
+    }
+
+    .converter-card > .pane-input {
+      grid-area: input;
+    }
+
+    .converter-card > .pane-action {
+      grid-area: action;
+    }
+
+    .converter-card > .pane-output {
+      grid-area: output;
+    }
+
+    .converter-card > .pane-footer {
+      grid-area: footer;
+    }
   }
 }
 
