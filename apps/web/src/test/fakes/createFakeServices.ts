@@ -5,6 +5,8 @@ import type {
   CurrenciesResponse,
   HealthResponse,
   HistoryResponse,
+  RateHistoryQuery,
+  RateHistoryResponse,
   RatesSnapshotResponse,
   Services,
 } from '../../api';
@@ -16,6 +18,7 @@ export interface FakeServicesOptions {
   convert?: Answer<ConvertResponse>;
   currencies?: Answer<CurrenciesResponse>;
   rates?: Answer<RatesSnapshotResponse>;
+  rateHistory?: Answer<RateHistoryResponse>;
   history?: Answer<HistoryResponse>;
   health?: Answer<HealthResponse>;
 }
@@ -24,6 +27,8 @@ export interface FakeServices {
   services: Services;
   convertCalls: ConvertRequest[];
   historyLimits: number[];
+  /** Every window the rate-history panel asked for, in order, so a suite can check the range it sent. */
+  rateHistoryQueries: RateHistoryQuery[];
 }
 
 /**
@@ -69,6 +74,20 @@ export const FAKE_RESPONSES = {
       { base: 'GBP', quote: 'UAH', cross: 60.7562, date: '2026-09-08T11:00:00.000Z' },
     ],
   } satisfies RatesSnapshotResponse,
+  rateHistory: {
+    base: 'USD',
+    quote: 'UAH',
+    days: 7,
+    points: [
+      { date: '2026-09-03', buy: 44.21, sell: 44.7 },
+      { date: '2026-09-04', buy: 44.28, sell: 44.76 },
+      { date: '2026-09-05', buy: 44.19, sell: 44.68 },
+      { date: '2026-09-06', buy: 44.25, sell: 44.74 },
+      { date: '2026-09-07', buy: 44.33, sell: 44.81 },
+      { date: '2026-09-08', buy: 44.3, sell: 44.79 },
+      { date: '2026-09-09', buy: 44.35, sell: 44.83 },
+    ],
+  } satisfies RateHistoryResponse,
   history: {
     items: [
       {
@@ -101,6 +120,13 @@ const EMPTY_SNAPSHOT: RatesSnapshotResponse = {
   fetchedAt: '2026-09-08T12:00:00.000Z',
   rates: [],
 };
+/** No day recorded for the pair, which is the panel's empty state. */
+const EMPTY_RATE_HISTORY: RateHistoryResponse = {
+  base: 'USD',
+  quote: 'UAH',
+  days: 7,
+  points: [],
+};
 
 /**
  * In-memory stand-in for the service layer. Tests inject it through
@@ -109,6 +135,7 @@ const EMPTY_SNAPSHOT: RatesSnapshotResponse = {
 export function createFakeServices(options: FakeServicesOptions = {}): FakeServices {
   const convertCalls: ConvertRequest[] = [];
   const historyLimits: number[] = [];
+  const rateHistoryQueries: RateHistoryQuery[] = [];
 
   const services: Services = {
     conversion: {
@@ -122,6 +149,10 @@ export function createFakeServices(options: FakeServicesOptions = {}): FakeServi
     },
     rates: {
       getSnapshot: () => answer(options.rates ?? EMPTY_SNAPSHOT),
+      getHistory(query) {
+        rateHistoryQueries.push(query);
+        return answer(options.rateHistory ?? EMPTY_RATE_HISTORY);
+      },
     },
     history: {
       recent(limit) {
@@ -134,7 +165,7 @@ export function createFakeServices(options: FakeServicesOptions = {}): FakeServi
     },
   };
 
-  return { services, convertCalls, historyLimits };
+  return { services, convertCalls, historyLimits, rateHistoryQueries };
 }
 
 function answer<T>(value: Answer<T>): Promise<T> {

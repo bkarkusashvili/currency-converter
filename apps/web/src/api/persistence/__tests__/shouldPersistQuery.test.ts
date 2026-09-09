@@ -17,6 +17,9 @@ describe('shouldPersistQuery', () => {
     expect(shouldPersistQuery(query(queryKeys.history.all))).toBe(false);
     expect(shouldPersistQuery(query(queryKeys.history.list(10)))).toBe(false);
     expect(shouldPersistQuery(query(queryKeys.health))).toBe(false);
+    // A day-old series restored from storage would be a day older still.
+    expect(shouldPersistQuery(query(queryKeys.rateHistory.all))).toBe(false);
+    expect(shouldPersistQuery(query(queryKeys.rateHistory.pair('USD', 'UAH', 7)))).toBe(false);
   });
 
   it('keeps the data a failed refetch left behind, which is when it is needed', () => {

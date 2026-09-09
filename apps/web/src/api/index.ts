@@ -8,6 +8,7 @@ export { useConvert } from './hooks/useConvert';
 export { useCurrencies } from './hooks/useCurrencies';
 export { useHealth } from './hooks/useHealth';
 export { useHistory } from './hooks/useHistory';
+export { useRateHistory } from './hooks/useRateHistory';
 export { useRatesSnapshot } from './hooks/useRatesSnapshot';
 
 export { ApiError } from './http/ApiError';
@@ -19,7 +20,7 @@ export { queryKeys } from './queryKeys';
 
 export { createHttpServices } from './services/createHttpServices';
 export { ServicesProvider } from './services/ServicesProvider';
-export type { Services } from './services/services';
+export type { RateHistoryQuery, Services } from './services/services';
 
 // The hand-written mirror of the API's DTOs, validated against
 // `docs/openapi.json` by `api/__tests__/openapiContract.test.ts`.
