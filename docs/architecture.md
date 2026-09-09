@@ -2,6 +2,9 @@
 
 This document is the design contract for the project. Every module, endpoint and
 behaviour described here is implemented; deviations must be reflected here.
+[`process.md`](process.md) is the other half of the record — not what was
+built, but how: the stages, the review loop, the audits, and the honest limits
+of both.
 
 ## 1. Overview
 
@@ -20,6 +23,7 @@ Monorepo layout:
 | `docker-compose.yml`     | api, web, redis, mongo for local orchestration                                          |
 | `docker-compose.dev.yml` | overlay: the backing services alone, published on loopback                              |
 | `docs/architecture.md`   | this document; §3 is the written API contract, and the generated one is Swagger `/docs` |
+| `docs/process.md`        | how the project was built: the stages, the review loop every pull request went through, the audits, and what that loop caught |
 | `README.md`              | how to run it, the configuration surface, the API reference, requirements traceability  |
 | `.github/workflows`      | CI: per app lint, format, typecheck, build, unit tests with coverage, audit and image build (plus e2e for the api); one more job that boots the Compose stack and probes it |
 
