@@ -78,6 +78,21 @@ describe('HTTP hardening (e2e)', () => {
       );
     });
 
+    // x-request-id is echoed on every response (see request-id.util.ts), but a
+    // browser script cannot read a cross-origin header unless CORS exposes it
+    // by name — without this, the Operations page cannot report a request id
+    // for a failed call.
+    it('exposes the request id header to an allowed origin', async () => {
+      const response = await request(server)
+        .get('/health')
+        .set('Origin', ALLOWED_ORIGIN)
+        .expect(200);
+
+      expect(response.headers['access-control-expose-headers']).toBe(
+        'x-request-id',
+      );
+    });
+
     // The browser is what enforces this: with no header the response is never
     // handed to the calling page.
     it('does not allow an origin outside the list', async () => {
