@@ -18,6 +18,7 @@ const OUTCOME: ConversionOutcome = {
     ratesTimestamp: '2026-09-08T12:00:00.000Z',
   },
   cacheDegraded: false,
+  archiveDegraded: false,
   recorded: true,
 };
 

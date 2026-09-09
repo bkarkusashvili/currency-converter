@@ -43,7 +43,8 @@
             "enum": [
               "cache",
               "provider",
-              "stale-cache"
+              "stale-cache",
+              "archive"
             ],
             "example": "cache",
             "type": "string"
@@ -144,7 +145,8 @@
             "enum": [
               "cache",
               "provider",
-              "stale-cache"
+              "stale-cache",
+              "archive"
             ],
             "example": "cache",
             "type": "string"
@@ -365,6 +367,79 @@
         ],
         "type": "object"
       },
+      "RateHistoryPointDto": {
+        "properties": {
+          "buy": {
+            "description": "What the bank paid in `quote` for one unit of `base`.",
+            "example": 44.35,
+            "type": "number"
+          },
+          "cross": {
+            "description": "Mid rate, published instead of a buy and sell pair for the currencies the bank quotes without a spread.",
+            "example": 60.7562,
+            "type": "number"
+          },
+          "date": {
+            "description": "The UTC day this point is the archived snapshot of, `YYYY-MM-DD`. One point per day; a day the archive has no snapshot for is absent rather than null, so a gap is visible as a gap.",
+            "example": "2026-09-08",
+            "type": "string"
+          },
+          "sell": {
+            "description": "What the bank charged in `quote` for one unit of `base`.",
+            "example": 44.831,
+            "type": "number"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "type": "object"
+      },
+      "RatesHistoryResponseDto": {
+        "properties": {
+          "base": {
+            "description": "The `base` that was asked for, upper-cased.",
+            "example": "USD",
+            "type": "string"
+          },
+          "days": {
+            "description": "The window that was read, in UTC days counting today as the first. Echoed so a client that relied on the default knows what it got.",
+            "example": 7,
+            "type": "number"
+          },
+          "points": {
+            "description": "One point per archived day inside the window that published this pair, oldest first. Shorter than `days` whenever the archive has a gap — the API was down, or had not been deployed yet — and empty when no day in the window is archived yet, which is not the same as a pair the archive has never published (that answers 422 instead).",
+            "example": [
+              {
+                "buy": 44.3,
+                "date": "2026-09-07",
+                "sell": 44.79
+              },
+              {
+                "buy": 44.35,
+                "date": "2026-09-08",
+                "sell": 44.831
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RateHistoryPointDto"
+            },
+            "type": "array"
+          },
+          "quote": {
+            "description": "The `quote` that was asked for, upper-cased.",
+            "example": "UAH",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base",
+          "quote",
+          "days",
+          "points"
+        ],
+        "type": "object"
+      },
       "RatesSnapshotResponseDto": {
         "properties": {
           "fetchedAt": {
@@ -399,7 +474,8 @@
             "enum": [
               "cache",
               "provider",
-              "stale-cache"
+              "stale-cache",
+              "archive"
             ],
             "example": "cache",
             "type": "string"
@@ -428,10 +504,11 @@
       "ResponseWarningDto": {
         "properties": {
           "code": {
-            "description": "What degraded. `CACHE_UNAVAILABLE` means the rates cache could not be reached while the request was answered, so it was neither read nor written — read `source` for where the rates came from; `HISTORY_NOT_RECORDED` means the conversion was answered but not stored, so it will not appear in `/history`.",
+            "description": "What degraded. `CACHE_UNAVAILABLE` means the rates cache could not be reached while the request was answered, so it was neither read nor written — read `source` for where the rates came from; `HISTORY_NOT_RECORDED` means the conversion was answered but not stored, so it will not appear in `/history`; `ARCHIVE_NOT_RECORDED` means the snapshot behind this answer was fetched but not archived, so it will not appear in `/rates/history`.",
             "enum": [
               "CACHE_UNAVAILABLE",
-              "HISTORY_NOT_RECORDED"
+              "HISTORY_NOT_RECORDED",
+              "ARCHIVE_NOT_RECORDED"
             ],
             "example": "CACHE_UNAVAILABLE",
             "type": "string"
@@ -784,6 +861,119 @@
           }
         ],
         "summary": "Drop both cache keys so the next read refetches from the upstream",
+        "tags": [
+          "rates"
+        ]
+      }
+    },
+    "/api/v1/rates/history": {
+      "get": {
+        "description": "One point per archived UTC day inside the window that published the pair, oldest first. The archive holds the last snapshot of each day, so a point is that day at its close rather than an average of it, and the orientation is the upstream's own: `base`/`quote` is asked for exactly as published, never inverted or crossed.",
+        "operationId": "RatesController_getHistory",
+        "parameters": [
+          {
+            "description": "ISO 4217 alpha-3 code of the currency being priced, as the upstream publishes the pair. Case-insensitive; the response echoes it upper-cased.",
+            "in": "query",
+            "name": "base",
+            "required": true,
+            "schema": {
+              "example": "USD",
+              "maxLength": 3,
+              "minLength": 3,
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO 4217 alpha-3 code the price is expressed in, on the same terms. The orientation is exact: the archive is asked for the pair the upstream published, not for one derived from it.",
+            "in": "query",
+            "name": "quote",
+            "required": true,
+            "schema": {
+              "example": "UAH",
+              "maxLength": 3,
+              "minLength": 3,
+              "pattern": "^[A-Za-z]{3}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "How many UTC days back to read, counting today as the first. The upper bound is the widest window this API answers; a wider one is refused here rather than answered short. The archive retention (`RATES_ARCHIVE_TTL_DAYS`) is never below it — the process refuses to start if it is — so every day inside the bound is one the archive is still keeping. A deployment may keep more than that; those days are past what this route accepts.",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 7,
+              "example": 7,
+              "maximum": 90,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatesHistoryResponseDto"
+                }
+              }
+            },
+            "description": "The archived series, oldest first. Shorter than `days` wherever the archive has a gap."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The request failed validation."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The request is well formed but cannot be satisfied with the current rates."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "The rate limit for this client is spent."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "An unexpected failure. The message is generic by design."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            },
+            "description": "A dependency the request needs is unavailable."
+          }
+        },
+        "summary": "Return the archived daily rates for one published pair",
         "tags": [
           "rates"
         ]

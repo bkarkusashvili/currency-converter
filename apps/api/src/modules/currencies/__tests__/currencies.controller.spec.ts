@@ -6,6 +6,7 @@ import { RatesSource } from '../../rates/domain/rates-source.enum';
 const LOOKUP: RatesLookup = {
   source: RatesSource.Cache,
   cacheDegraded: false,
+  archiveDegraded: false,
   snapshot: {
     fetchedAt: '2026-09-08T12:00:00.000Z',
     rates: [

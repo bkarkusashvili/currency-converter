@@ -19,6 +19,7 @@ interface RequestLoggerOptions {
   serializers: {
     req: (request: IncomingMessage) => unknown;
     res: (response: ServerResponse) => unknown;
+    err: (error: unknown) => unknown;
   };
 }
 
@@ -87,6 +88,21 @@ describe('buildLoggerParams', () => {
     expect(JSON.stringify(serializers.req(request))).not.toMatch(
       /secret|admin-key/,
     );
+  });
+
+  // pino's default `err` serializer walks the whole error, and an axios one
+  // carries the request that produced it.
+  it('keeps the request config of a failed upstream call out of the log', () => {
+    const { serializers } = optionsFor(production);
+    const failure = Object.assign(new Error('Request failed'), {
+      code: 'ECONNREFUSED',
+      config: { headers: { 'x-api-key': 'admin-key' } },
+    });
+
+    const serialized = serializers.err(failure);
+
+    expect(serialized).toMatchObject({ type: 'Error', code: 'ECONNREFUSED' });
+    expect(JSON.stringify(serialized)).not.toMatch(/admin-key/);
   });
 
   it('keeps the response down to its status', () => {

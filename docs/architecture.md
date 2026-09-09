@@ -29,13 +29,14 @@ and deployed in isolation (Docker, Railway).
 ## 2. Design principles
 
 - **Ports and adapters.** Domain code depends on interfaces (`RatesProvider`,
-  `RatesRepository`, `HistoryRepository`); infrastructure (Monobank, Redis,
-  Mongo) implements them and is bound through NestJS DI tokens. Swapping the
-  rate source or the cache is a one-line module change.
+  `RatesRepository`, `RatesArchive`, `HistoryRepository`); infrastructure
+  (Monobank, Redis, Mongo) implements them and is bound through NestJS DI
+  tokens. Swapping the rate source or the cache is a one-line module change.
 - **Strategy pattern** for conversion (identity, direct pair, cross via UAH),
   chosen by a resolver at runtime.
 - **Cache-aside** with a fresh key and a long-lived fallback key, explicit
-  invalidation, and single-flight de-duplication of concurrent misses.
+  invalidation, and single-flight de-duplication of concurrent misses — behind
+  a daily archive that outlives both keys and answers when neither can (§4).
 - **Resilience** around the upstream: timeout, retry with exponential backoff
   and jitter, circuit breaker (CLOSED → OPEN → HALF_OPEN).
 - **Graceful degradation, said out loud.** Redis or Mongo being down never
@@ -51,7 +52,7 @@ and deployed in isolation (Docker, Railway).
 ## 3. API contract
 
 Base path: `/api/v1`. All responses are JSON. Swagger UI at `/docs`,
-OpenAPI JSON at `/docs-json` — 7 operations, 10 schemas and one `admin` security
+OpenAPI JSON at `/docs-json` — 8 operations, 12 schemas and one `admin` security
 scheme, generated from the controllers and kept honest by
 `test/e2e/swagger.e2e-spec.ts`.
 
@@ -95,7 +96,7 @@ Response `200`:
   differ in the last cent. §5 has the rule and the arithmetic behind it.
   Arithmetic uses `big.js`; floating point is never used for money.
 - `strategy`: `identity` | `direct` | `cross`.
-- `source`: `cache` | `provider` | `stale-cache`.
+- `source`: `cache` | `provider` | `stale-cache` | `archive`.
 - `warnings` is absent unless something degraded while the conversion was
   answered — see **Warnings** below.
 
@@ -119,7 +120,81 @@ A pair carries `buy` and `sell` when Monobank publishes a spread for it and
 `cross` when it publishes a mid rate instead; §5 is the rule for which of the
 three a direction multiplies by.
 
+`source` has a fourth value, `archive`: the upstream could not be reached and
+neither cache key survived, so the answer is the newest snapshot the Mongo
+archive holds and `fetchedAt` is the day it was fetched on. It is the last tier
+of §4, and it is days old rather than hours — but never more than
+`RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` (7) of them. A day older than that is not
+served at all: the tier declines and the request answers
+`503 RATES_UNAVAILABLE` with the age and the ceiling in `details.reason`, which
+is the honest answer rather than a `200` carrying a rate the market left behind.
+Days past the ceiling stay in the archive and stay chartable on
+`/rates/history`; charting a day and pricing from it are different questions.
+
 `warnings` appears here on the same terms as on `/convert`.
+
+### GET `/api/v1/rates/history?base=USD&quote=UAH&days=7`
+
+The archived daily rates for one pair, oldest first. Every successful upstream
+fetch upserts its snapshot into `rate_snapshots` keyed by the UTC day, so the
+collection holds at most one document per day — always that day's *latest*
+snapshot — and this route reads a window of them.
+
+```json
+{
+  "base": "USD",
+  "quote": "UAH",
+  "days": 7,
+  "points": [{ "date": "2026-09-09", "buy": 44.43, "sell": 44.831 }]
+}
+```
+
+Captured from the Docker stack against the live upstream. It had been up for
+minutes, so the archive holds the one day it fetched; a deployment that has been
+up a week answers seven points, and one with a gap answers fewer than the days
+it was up.
+
+`base` and `quote` are validated exactly as `/convert`'s codes are — three
+letters, case-insensitive, echoed upper-cased — and `days` is an integer
+`1..90`, default `7`, validated rather than clamped: `?days=0`, `?days=91` and
+`?days=abc` each answer `400` naming the field. The `90` is
+`MAX_RATE_HISTORY_DAYS`, the widest window this API answers, and
+`RATES_ARCHIVE_TTL_DAYS` defaults to the same number. A retention below it is
+refused at boot (§8), so every day the route accepts is a day the archive is
+still keeping; a deployment that keeps more simply holds days past what the
+route will ask for. Either way a wider window is refused by the API rather than
+by expiry.
+
+A point carries `buy` and `sell`, or `cross`, on the same terms as a snapshot
+row, and the window counts today as its first day. A day the archive has no
+snapshot for is **absent rather than null**, so a gap — the API was down, or had
+not been deployed yet — is visible as a gap and the series can be shorter than
+`days`.
+
+The orientation is the upstream's own. `USD/UAH` is a pair Monobank publishes
+and `UAH/USD` is not, and this route reports what was published rather than what
+could be derived from it: inverting a spread means deciding which side of it a
+reversed `buy` is, and crossing means pricing a pair from two legs that are days
+old. Both are §5's job on a live snapshot, where the response names the
+`strategy` that priced them, and neither belongs in a chart of published quotes.
+
+Two 422s, drawn where `/convert` draws them: `UNSUPPORTED_CURRENCY` when a code
+appears on neither side of any pair in the window — but only once the window
+has a day to ask that of — and `RATE_NOT_AVAILABLE` when both codes are
+archived and this pair is not, which is what a reversed orientation and a
+same-currency request both are. A window with **no archived day at all** — a
+freshly deployed instance, or a pair asked for before the first fetch —
+answers `200` with `points: []` instead of either 422: nothing in an empty
+window says a code doesn't exist, so the honest reading is the same empty
+series a gap-filled window already returns, not a verdict reached by
+consulting nothing. That is the empty state the web already renders
+("History starts collecting from the first fetch").
+
+While MongoDB is unreachable this route answers `503 ARCHIVE_UNAVAILABLE` with a
+`details.reason`, never an empty series — "never published" and "the store is
+down" are different answers — and never a driver message, which carries the
+connection string with the credentials in it. Everything else keeps being served
+meanwhile: the day is skipped, the rates are not (§2).
 
 ### DELETE `/api/v1/rates/cache`
 
@@ -250,7 +325,10 @@ from the request log (§7); a failing one is not.
 ### Warnings
 
 `POST /api/v1/convert`, `GET /api/v1/rates` and `GET /api/v1/currencies` can
-carry a `warnings` array beside their answer:
+carry a `warnings` array beside their answer — the three routes that read a
+snapshot, and so the three that can fetch one and fail to archive it.
+`GET /api/v1/rates/history` carries none: it reads the archive and nothing else,
+and an archive it cannot read is its 503 rather than a warning:
 
 ```json
 {
@@ -276,6 +354,7 @@ and a healthy response is byte for byte the one it has always been.
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CACHE_UNAVAILABLE`    | Any of the three: Redis could not be read from or written to while the request was answered, so the cache neither served this response nor kept it for the next one |
 | `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but its record was dropped or timed out, so it will not appear in `/history`                                      |
+| `ARCHIVE_NOT_RECORDED` | The snapshot behind this answer was fetched from the upstream but could not be archived, so that day is missing from `/rates/history` and cannot back a later fallback |
 
 `message` is a sentence safe to show to a user; a client switches on `code`.
 `CACHE_UNAVAILABLE` says nothing about where the rates came from, because the
@@ -319,9 +398,10 @@ Every non-2xx response has this shape:
 | 422  | `UNSUPPORTED_CURRENCY` | Code is not in the snapshot                          |
 | 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                   |
 | 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                             |
-| 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists             |
+| 503  | `RATES_UNAVAILABLE`    | Upstream failed and nothing inside its age is cached or archived |
 | 503  | `CACHE_UNAVAILABLE`    | The cache could not be reached to invalidate it      |
 | 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read          |
+| 503  | `ARCHIVE_UNAVAILABLE`  | The rate snapshot archive cannot be read             |
 | 500  | `INTERNAL_ERROR`       | Anything unexpected; message is generic              |
 
 `details.errors` carries one entry per field that failed and exactly one message
@@ -390,7 +470,46 @@ interface RatesRepository {
   clear(): Promise<void>;                 // rejects: CacheUnavailableError when
                                           // the cache could not be reached
 }
+
+const RATES_ARCHIVE = Symbol('RATES_ARCHIVE');
+
+// domain/rate-history.types.ts — one archived UTC day. The key is the day, which
+// is what makes the collection hold at most one document per day.
+interface ArchivedSnapshot { date: string; fetchedAt: string; rates: ExchangeRate[]; }
+
+// The same day projected to one pair, which is all /rates/history reads: the
+// numbers that day published for it, and whether each code was quoted at all.
+interface PublishedRate { buy?: number; sell?: number; cross?: number; }
+interface ArchivedPairDay {
+  date: string;
+  rate?: PublishedRate;     // absent on a day that did not publish the pair
+  quotesBase: boolean;      // the code appears on either side of some pair
+  quotesQuote: boolean;
+}
+
+interface RatesArchive {
+  save(snapshot: RatesSnapshot): Promise<boolean>;   // never rejects; false = not archived
+  findLatest(): Promise<ArchivedSnapshot | null>;    // rejects: ArchiveUnavailableError
+  findPairWindow(query: RateHistoryQuery): Promise<ArchivedPairDay[]>;  // oldest first; same rejection
+}
 ```
+
+The archive's two contracts are opposite for the reason the history's are: a
+fetch is answered whether or not the day is stored, while `/rates/history` has
+nothing to answer with and says so.
+
+The two reads answer different shapes because they are answering different
+questions. `findLatest` is the fallback tier and every pair in the day it
+returns is about to be priced against, so it reads the day whole — one
+document. `findPairWindow` is a chart of one pair: a day document is the whole
+published board and the answer is three numbers of it, so the projection runs
+in the server. `$filter` keeps the entry published in exactly the asked-for
+orientation and `$map` narrows it to `buy`/`sell`/`cross`; two
+`$anyElementTrue` flags carry the only other thing the answer depends on —
+whether each code was quoted anywhere that day — so §3's three outcomes
+(points, `UNSUPPORTED_CURRENCY`, `RATE_NOT_AVAILABLE`) are still decided from
+one read. `collectRatePoints` stays the pure decision over that projected
+shape.
 
 ### `RatesService.getSnapshot()` (cache-aside)
 
@@ -398,13 +517,28 @@ interface RatesRepository {
 fresh = repo.getFresh()            → hit: return { snapshot, source: 'cache' }
 miss → single-flight:
   try   snapshot = provider.fetchRates()   (retry + circuit breaker inside)
-        repo.save(snapshot)                (errors logged, not thrown)
+        repo.save(snapshot) ‖ archive.save(snapshot)   (both degrade, neither throws)
         return { snapshot, source: 'provider' }
   catch stale = repo.getStale()
-        stale ? { snapshot: stale, source: 'stale-cache' } : throw RatesUnavailableError
+        stale ? { snapshot: stale, source: 'stale-cache' }
+              : archived = archive.findLatest()
+                archived && age(archived) <= RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS
+                         ? { snapshot: archived, source: 'archive' }
+                         : throw RatesUnavailableError
 
-every branch also carries cacheDegraded: whether any of those cache calls failed
+every branch also carries cacheDegraded (whether any cache call failed) and
+archiveDegraded (whether a snapshot it fetched could not be archived)
 ```
+
+Four tiers, each older than the one before it and each named on the response:
+the fresh key is minutes old, the upstream is now, the fallback key is up to a
+day old and the archive is up to `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` (7). A
+client is never left to guess which it got — and the last tier stops rather than
+pricing from a rate old enough that no client would have taken it: past the
+ceiling it declines, and the lookup ends in the documented `503` with the age
+and the ceiling in `details.reason`. The archive keeps days past that ceiling
+because `/rates/history` charts them; charting a day and pricing from it are
+different permissions (§8).
 
 - Concurrent callers during a miss share one in-flight promise, cleared in a
   `finally` so a failed refresh does not strand the caller behind it.
@@ -417,6 +551,25 @@ every branch also carries cacheDegraded: whether any of those cache calls failed
   they did, because `null` alone cannot tell an expiry from an outage. That flag
   travels on `RatesLookup.cacheDegraded` and becomes §3's `CACHE_UNAVAILABLE`
   warning on the response.
+- The two writes are issued together rather than one after the other: they go to
+  different stores, neither reads the other, and serialising them would add the
+  archive's latency to every refresh for nothing. Both are awaited and neither
+  can hold the answer — the cache write is bounded by
+  `REDIS_COMMAND_TIMEOUT_MS`, the archive write by a connection-readiness guard
+  and `RATES_ARCHIVE_OPERATION_TIMEOUT_MS`, and both degrade rather than reject.
+  Awaiting them is what lets the response say what was lost: a write nobody
+  waited for could only be reported on the *next* request, by which time the day
+  it dropped is not the one this client was told about.
+- Serving from the archive is logged at **warn**, like the stale copy and for a
+  stronger version of the same reason: the rates are days old and priced against
+  a market that has moved. Past the age ceiling there is nothing to log at warn
+  because nothing is served: the refusal is the `error` line the empty archive
+  already produced, with the age appended to its reason.
+- An archive that cannot be *read* on that last tier is a fallback with nothing
+  in it rather than a second failure to report: the client is already being told
+  the rates are unavailable and why the upstream could not answer.
+  `ARCHIVE_UNAVAILABLE` is `/rates/history`'s answer, where the archive is the
+  subject of the request rather than the last place left to look.
 
 ### Redis keys
 
@@ -428,6 +581,19 @@ every branch also carries cacheDegraded: whether any of those cache calls failed
 Both are written on every successful upstream fetch. `DELETE /rates/cache`
 removes both, or answers `503 CACHE_UNAVAILABLE` if it could not (§3). Values
 are the JSON-serialised `RatesSnapshot`.
+
+### The archive collection
+
+`rate_snapshots`, one document per UTC day: `_id` is the day itself
+(`'YYYY-MM-DD'`), `fetchedAt` is the upstream fetch that produced it and `rates`
+is the snapshot as published. The day *is* the primary key, so "at most one
+document per day" is enforced by the `_id` index rather than by whoever
+remembers to write the upsert filter, and every fetch inside a day replaces it —
+what a day holds is that day's latest snapshot. The key also sorts
+lexicographically in date order, which is why both reads (the newest day, and a
+window) ride on `_id` and the collection needs exactly one index beyond it: a
+TTL on `fetchedAt` from `RATES_ARCHIVE_TTL_DAYS`, reconciled with `syncIndexes`
+by `RatesArchiveIndexes` for the reasons §9 gives the history's.
 
 ## 5. Conversion semantics
 
@@ -640,6 +806,9 @@ reads.
 | `CIRCUIT_BREAKER_RESET_TIMEOUT_MS`  | `30000`                                   |
 | `RATES_CACHE_TTL_SECONDS`           | `300`                                     |
 | `RATES_STALE_TTL_SECONDS`           | `86400`                                   |
+| `RATES_ARCHIVE_TTL_DAYS`            | `90`                                      |
+| `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` | `7`                                     |
+| `RATES_ARCHIVE_OPERATION_TIMEOUT_MS`| `1000`                                    |
 | `THROTTLE_TTL_SECONDS`              | `60`                                      |
 | `THROTTLE_LIMIT`                    | `60`                                      |
 | `ADMIN_API_KEY`                     | *(unset → cache invalidation is open; required in production)* |
@@ -682,6 +851,37 @@ the write is dropped with the same one-per-outage warning, and the read answers
 `HISTORY_TTL_DAYS` drives the TTL index on that collection — a log nobody prunes
 grows without bound, and nothing reads a conversion from a month ago.
 
+`RATES_ARCHIVE_TTL_DAYS` is the retention of the `rate_snapshots` collection,
+and it is checked against `MAX_RATE_HISTORY_DAYS` — the widest window
+`/rates/history` accepts — rather than assumed equal to it. Both default to 90,
+and `buildConfiguredRateSnapshotSchema`, the one step that reads the retention,
+throws at boot when it is lower: the days between the two would be days the
+route accepts and the TTL index has already deleted, answered as the gaps §3
+reserves for an outage, and nothing else in the process reads both numbers. A
+longer retention starts and is a decision rather than a mistake — those days
+exist in the collection and are simply past what the route will ask for.
+
+`RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` is the age ceiling on the fourth tier,
+and it is a different question from the retention above it. The retention says
+how far back `/rates/history` can chart; this says how old a snapshot may be and
+still *price* an answer. Without it the last tier returns `200` from a rate up
+to `RATES_ARCHIVE_TTL_DAYS` old — a number no client would have accepted had it
+been asked, and one that looks like any other answer apart from `source` and
+`fetchedAt`. Past the ceiling the tier declines, and the lookup ends in
+`503 RATES_UNAVAILABLE` with the age and the ceiling named in `details.reason`,
+which a client already knows how to treat as "no rate". The age is in whole UTC
+days off the archive's own day key: an age in hours would make the same
+snapshot servable at 09:00 and refused at 10:00 on a boundary nothing else in
+the archive observes.
+
+`RATES_ARCHIVE_OPERATION_TIMEOUT_MS` bounds a single archive upsert or read,
+exactly as `HISTORY_OPERATION_TIMEOUT_MS` bounds a history one and for the same
+`readyState` reason. It is its own variable rather than a shared Mongo budget
+because the two sit on different paths: the archive is written on the way out of
+every upstream fetch, which `/rates`, `/currencies` and `/convert` all trigger,
+while the history is written by `/convert` alone. They are not the same decision
+even when they hold the same number.
+
 ## 9. API module layout
 
 ```
@@ -698,8 +898,10 @@ apps/api
 │   │   ├── conversion/          ConversionStrategyName (a string enum) and the OpenAPI option objects a
 │   │   │                        conversion response and a stored record of one publish identically
 │   │   ├── warnings/            ResponseWarning, the WarningCode enum, its DTO and collectWarnings — the §3 codes
-│   │   ├── currency/            CurrencyCode, Currency and the ISO 4217 table, read by the
-│   │   │                        Monobank mapper and the currencies projection alike
+│   │   ├── currency/            CurrencyCode, Currency, the ISO 4217 table read by the
+│   │   │                        Monobank mapper and the currencies projection alike, and the
+│   │   │                        alpha-3 pattern and upper-casing transform both code-taking
+│   │   │                        DTOs validate with
 │   │   ├── errors/              AppError, the ErrorCode enum, concrete errors
 │   │   ├── filters/             GlobalExceptionFilter and ErrorResponseDto, with the status → code
 │   │   │                        and payload → message mapping beside them in http-exception-mapping.util.ts
@@ -716,8 +918,9 @@ apps/api
 │   ├── infrastructure/
 │   │   ├── redis/               create-redis-client.factory.ts (the ioredis client and its REDIS_CLIENT
 │   │   │                        token) and the RedisConnection lifecycle
-│   │   └── mongo/               MongooseModule.forRootAsync, the connect options
-│   │                             and the MongoConnection lifecycle
+│   │   └── mongo/               MongooseModule.forRootAsync, the connect options,
+│   │                             the MongoConnection lifecycle and createIndexSyncer,
+│   │                             which both collections' index providers are built on
 │   └── modules/                 one folder per feature module, each with an index.ts
 │       ├── currencies/
 │       │   ├── dto/             CurrencyDto, CurrenciesResponseDto
@@ -727,18 +930,29 @@ apps/api
 │       │   └── index.ts         CurrenciesModule
 │       ├── rates/
 │       │   ├── domain/          exchange-rate.types.ts — ExchangeRate, RatesSnapshot, BASE_CURRENCY
-│       │   │                    and the RatesLookup a caller reads `cacheDegraded` off;
-│       │   │                    rates-source.enum.ts — RatesSource; rates-provider.interface.ts and
-│       │   │                    rates-repository.interface.ts — the two seams with their tokens
-│       │   │                    and CachedSnapshot / CacheWrite
-│       │   ├── dto/             ExchangeRateDto, RatesSnapshotResponseDto
+│       │   │                    and the RatesLookup a caller reads `cacheDegraded` and
+│       │   │                    `archiveDegraded` off; rates-source.enum.ts — RatesSource;
+│       │   │                    rates-provider.interface.ts, rates-repository.interface.ts and
+│       │   │                    rates-archive.interface.ts — the three seams with their tokens
+│       │   │                    and CachedSnapshot / CacheWrite; rate-history.types.ts —
+│       │   │                    ArchivedSnapshot, ArchivedPairDay, PublishedRate,
+│       │   │                    RateHistoryQuery, RateHistoryPoint, RateHistory;
+│       │   │                    rate-history-window.constants.ts and utc-day.util.ts, the day
+│       │   │                    keying both the adapter and the window are built on
+│       │   ├── dto/             ExchangeRateDto, RatesSnapshotResponseDto,
+│       │   │                    RatesHistoryQueryDto, RateHistoryPointDto, RatesHistoryResponseDto
+│       │   ├── schemas/         the Mongoose rate_snapshots schema and its TTL index, built
+│       │   │                    per deployment from RATES_ARCHIVE_TTL_DAYS
 │       │   ├── infrastructure/
 │       │   │   ├── monobank/    provider, zod payload schema, mapper, retry predicate
 │       │   │   ├── cached-rates-snapshot.schema.ts  zod schema for a cached value
 │       │   │   ├── rates-cache-keys.constants.ts
-│       │   │   └── redis-rates.repository.ts
-│       │   ├── application/     RatesService, describeRatesFailure
-│       │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
+│       │   │   ├── redis-rates.repository.ts
+│       │   │   ├── mongo-rates-archive.repository.ts
+│       │   │   └── rates-archive-indexes.provider.ts
+│       │   ├── application/     RatesService, describeRatesFailure, RateHistoryService
+│       │   │                    and collectRatePoints
+│       │   ├── rates.controller.ts  GET /rates, GET /rates/history, DELETE /rates/cache
 │       │   ├── rates.module.ts
 │       │   └── index.ts         RatesModule, RatesService, ExchangeRate, BASE_CURRENCY,
 │       │                        RatesSource and MONOBANK_CIRCUIT_BREAKER — the six
@@ -771,12 +985,13 @@ apps/api
 └── test
     ├── e2e/                     supertest suites over the real HTTP surface
     │   ├── create-e2e-app.ts    boots through the same configureHttp and setupSwagger main.ts uses
-    │   ├── override-*.ts        swaps Redis, the Mongo connection and the history repository for fakes
+    │   ├── override-*.ts        swaps Redis, the Mongo connection, the history repository and
+    │   │                        the rate archive for fakes
     │   ├── setup-e2e-env.ts     the environment every suite starts from
     │   ├── env/                 per-suite environment, imported before AppModule
     │   └── fixtures/            reads the shared snapshot and golden vectors at the repo root
-    ├── integration/             the two adapters against a real Redis and Mongo; skipped, visibly, unless
-    │                            INTEGRATION_REDIS_URL / INTEGRATION_MONGO_URL are set
+    ├── integration/             the three store adapters against a real Redis and Mongo; skipped,
+    │                            visibly, unless INTEGRATION_REDIS_URL / INTEGRATION_MONGO_URL are set
     ├── openapi-document.ts      generates and serialises the document docs/openapi.json holds
     ├── write-openapi.ts         `npm run openapi:write`
     ├── jest-e2e.json
@@ -867,11 +1082,25 @@ down, which is what the Mongo module is built for:
   fails, and swallows the rejection, which would leave the TTL index quietly
   missing. `HistoryIndexes` reconciles with `syncIndexes` once the connection is
   open — the expiry is configuration, and a changed `HISTORY_TTL_DAYS` is an
-  options conflict for `createIndexes`.
+  options conflict for `createIndexes`. The waiting, the reconciling and the two
+  outcomes are `createIndexSyncer` in `infrastructure/mongo`, shared with the
+  archive's provider: each collection's provider is the model it owns and the
+  two sentences it logs.
 
 The collection is `conversions`, with one index: `{ createdAt: -1 }` carrying
 `expireAfterSeconds`. A single-field index is read in either direction, so the
 newest-first page and the retention ride on the same key rather than on two.
+
+The rates module owns a second Mongo collection on the same terms, and for the
+same reasons: `rate_snapshots` (§4), written by `RatesService` on the way out of
+every upstream fetch and read by the fourth fallback tier and `/rates/history`.
+It reuses every part of the pattern above — the readiness guard before the
+command, the deadline `readyState` cannot replace, the once-per-outage report,
+`syncIndexes` at bootstrap over mongoose's swallowed automatic build — and adds
+one thing the history does not need: `runValidators` on the upsert, because an
+update runs no validators unless it is asked to and an upsert is the only way
+anything is written there. Without it the schema would describe the collection
+rather than constrain it.
 
 ## 10. Web app
 
@@ -1034,20 +1263,21 @@ newest-first page and the retention ride on the same key rather than on two.
 | Layer                | Tool                         | What is covered                                   |
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
-| E2E (api)            | Jest + supertest             | eight suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger`, `openapi-contract` |
+| E2E (api)            | Jest + supertest             | nine suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `rates-archive` (the archive as the fourth tier and the age ceiling that ends it, the day it leaves behind and its warning, `/rates/history` and its two 422s, the store unreachable), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger`, `openapi-contract` |
 | Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, the archive's date line on the card and in a history row, error display, history list and its loading and empty states, the rate-history chart's geometry from an archived fixture and the panel's four states, its keyboard day navigation and its range switching, health rendering, every HTTP service |
-| Integration (api)    | Jest against real servers    | the two adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp. Each suite runs on its own database — Redis 15, a Mongo database of its own — so a URL pointed at a running stack is never flushed. Skipped, with a `SKIPPED:` line naming the variable, unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI`, whose `orchestration` job points them at the stack it already starts |
+| Integration (api)    | Jest against real servers    | the three store adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp; the archive's TTL index, a second fetch of a day replacing that day's document rather than adding one, and the projected window read back oldest first — the pair filtered in the server, a mid rate arriving without the spread keys, the two membership flags, and a day dated ahead of the clock left out. Each suite runs on its own database — Redis 15, and a Mongo database of its own each — so a URL pointed at a running stack is never flushed and two suites Jest may run in parallel cannot drop each other's collections. Skipped, with a `SKIPPED:` line naming the variable, unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI`, whose `orchestration` job points them at the stack it already starts |
 | Contract             | Jest (api) + ajv (web)       | `docs/openapi.json` regenerated from the application's decorators and compared with the committed file; on the web side every sample response the suite renders validated against the schema that document publishes for its route |
 
 A `*.module.ts` is wiring and an `index.ts` is a list of names; both are
 excluded from coverage, so anything a module *decides* lives in a file of its
 own beside it — `buildMonobankHttpOptions`, `buildMonobankCircuitBreaker`,
-`buildConfiguredConversionRecordSchema` — where the gate can see it. A factory
-that only hands back what was injected into it decides nothing, and a spec
-asserting that it does so is a tautology, so the two of those stay inline in
-their modules: the order of `CONVERSION_STRATEGIES` is asserted by resolving
-the token through a testing module, which is where the `inject` list and the
-parameters it fills can actually disagree.
+`buildConfiguredConversionRecordSchema`, `buildConfiguredRateSnapshotSchema` —
+where the gate can see it. A factory that only hands back what was injected
+into it decides nothing, and a spec asserting that it does so is a tautology,
+so the two of those stay inline in their modules: the order of
+`CONVERSION_STRATEGIES` is asserted by resolving the token through a testing
+module, which is where the `inject` list and the parameters it fills can
+actually disagree.
 
 Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
 90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
@@ -1242,10 +1472,40 @@ project were taken further.
   newest `1..50` and has no offset or cursor, so there is no way to read past
   the first page. Deliberate for a demo surface, and the `{ createdAt: -1 }`
   index is already the one a cursor would ride on.
+- **The archive keeps one snapshot per day, not the day.** `rate_snapshots` is
+  keyed by the UTC day and every fetch inside a day replaces it, so a point on
+  `/rates/history` is that day *at its close* — the last fetch before midnight
+  UTC — and the intra-day movement between fetches is gone. That is the right
+  granularity for a daily chart and it keeps the collection one document per
+  day, but it means the series cannot answer "what was the rate at 09:00" and
+  that a day the API was only up in the morning is represented by a morning
+  quote. A time series would key by fetch instead and roll up on read.
+- **A day is a UTC day, which is not the reader's day.** The archive keys on
+  UTC and nothing else, so the point labelled `2026-09-09` closes at 03:00 Kyiv
+  on the 10th — a chart drawn in local time puts the last three hours of a Kyiv
+  day inside the next point, and a fetch at 02:00 Kyiv is filed under the
+  previous day. UTC is what makes the same snapshot key the same document on two
+  instances in two regions, and the upstream publishes in UTC anyway; a series
+  in the reader's timezone would key by fetch and roll up on read.
+- **The fallback age ceiling is a flat number of days.**
+  `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` (7) is what stops the fourth tier
+  pricing a `200` from a rate the market has left behind, and it treats every
+  pair the same: a currency that moves a tenth of a percent in a week and one
+  that moves ten percent get the same seven days. A tolerance on the *rate*
+  rather than on its age would be the better rule, and it needs a reference
+  price the API does not have precisely when it would be used — the upstream is
+  down, which is why the archive is being read at all.
+- **A gap in the series is silent about its cause.** A day the API was down, a
+  day it had not been deployed yet and a day the write was dropped are all one
+  absent point. `ARCHIVE_NOT_RECORDED` tells the client that *its* request lost
+  a day; nothing tells a later reader of the series which days were lost and
+  why.
 - **A timed-out history write may still land.** `withTimeout` stops waiting but
   cannot cancel the work, so a conversion answered with `HISTORY_NOT_RECORDED`
   can appear in `/history` a moment later (§9). The warning is honest about
-  what was observed, not about what the database eventually did.
+  what was observed, not about what the database eventually did. The archive
+  write is the same, and `ARCHIVE_NOT_RECORDED` means the same thing about a
+  day.
 
 **Security posture**
 
