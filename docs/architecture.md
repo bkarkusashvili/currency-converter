@@ -123,7 +123,13 @@ three a direction multiplies by.
 `source` has a fourth value, `archive`: the upstream could not be reached and
 neither cache key survived, so the answer is the newest snapshot the Mongo
 archive holds and `fetchedAt` is the day it was fetched on. It is the last tier
-of §4, and it is days old rather than hours.
+of §4, and it is days old rather than hours — but never more than
+`RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` (7) of them. A day older than that is not
+served at all: the tier declines and the request answers
+`503 RATES_UNAVAILABLE` with the age and the ceiling in `details.reason`, which
+is the honest answer rather than a `200` carrying a rate the market left behind.
+Days past the ceiling stay in the archive and stay chartable on
+`/rates/history`; charting a day and pricing from it are different questions.
 
 `warnings` appears here on the same terms as on `/convert`.
 
@@ -508,7 +514,8 @@ miss → single-flight:
   catch stale = repo.getStale()
         stale ? { snapshot: stale, source: 'stale-cache' }
               : archived = archive.findLatest()
-                archived ? { snapshot: archived, source: 'archive' }
+                archived && age(archived) <= RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS
+                         ? { snapshot: archived, source: 'archive' }
                          : throw RatesUnavailableError
 
 every branch also carries cacheDegraded (whether any cache call failed) and
@@ -517,8 +524,13 @@ archiveDegraded (whether a snapshot it fetched could not be archived)
 
 Four tiers, each older than the one before it and each named on the response:
 the fresh key is minutes old, the upstream is now, the fallback key is up to a
-day old and the archive is up to `RATES_ARCHIVE_TTL_DAYS`. A client is never
-left to guess which it got.
+day old and the archive is up to `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` (7). A
+client is never left to guess which it got — and the last tier stops rather than
+pricing from a rate old enough that no client would have taken it: past the
+ceiling it declines, and the lookup ends in the documented `503` with the age
+and the ceiling in `details.reason`. The archive keeps days past that ceiling
+because `/rates/history` charts them; charting a day and pricing from it are
+different permissions (§8).
 
 - Concurrent callers during a miss share one in-flight promise, cleared in a
   `finally` so a failed refresh does not strand the caller behind it.
@@ -542,7 +554,9 @@ left to guess which it got.
   it dropped is not the one this client was told about.
 - Serving from the archive is logged at **warn**, like the stale copy and for a
   stronger version of the same reason: the rates are days old and priced against
-  a market that has moved.
+  a market that has moved. Past the age ceiling there is nothing to log at warn
+  because nothing is served: the refusal is the `error` line the empty archive
+  already produced, with the age appended to its reason.
 - An archive that cannot be *read* on that last tier is a fallback with nothing
   in it rather than a second failure to report: the client is already being told
   the rates are unavailable and why the upstream could not answer.
@@ -785,6 +799,7 @@ reads.
 | `RATES_CACHE_TTL_SECONDS`           | `300`                                     |
 | `RATES_STALE_TTL_SECONDS`           | `86400`                                   |
 | `RATES_ARCHIVE_TTL_DAYS`            | `90`                                      |
+| `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` | `7`                                     |
 | `RATES_ARCHIVE_OPERATION_TIMEOUT_MS`| `1000`                                    |
 | `THROTTLE_TTL_SECONDS`              | `60`                                      |
 | `THROTTLE_LIMIT`                    | `60`                                      |
@@ -837,6 +852,19 @@ route accepts and the TTL index has already deleted, answered as the gaps §3
 reserves for an outage, and nothing else in the process reads both numbers. A
 longer retention starts and is a decision rather than a mistake — those days
 exist in the collection and are simply past what the route will ask for.
+
+`RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` is the age ceiling on the fourth tier,
+and it is a different question from the retention above it. The retention says
+how far back `/rates/history` can chart; this says how old a snapshot may be and
+still *price* an answer. Without it the last tier returns `200` from a rate up
+to `RATES_ARCHIVE_TTL_DAYS` old — a number no client would have accepted had it
+been asked, and one that looks like any other answer apart from `source` and
+`fetchedAt`. Past the ceiling the tier declines, and the lookup ends in
+`503 RATES_UNAVAILABLE` with the age and the ceiling named in `details.reason`,
+which a client already knows how to treat as "no rate". The age is in whole UTC
+days off the archive's own day key: an age in hours would make the same
+snapshot servable at 09:00 and refused at 10:00 on a boundary nothing else in
+the archive observes.
 
 `RATES_ARCHIVE_OPERATION_TIMEOUT_MS` bounds a single archive upsert or read,
 exactly as `HISTORY_OPERATION_TIMEOUT_MS` bounds a history one and for the same

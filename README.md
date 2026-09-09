@@ -192,12 +192,13 @@ in `.env` form.
 | `RATES_CACHE_TTL_SECONDS`           | `300`                                            | TTL of the fresh cache key `rates:latest`                                        |
 | `RATES_STALE_TTL_SECONDS`           | `86400`                                          | TTL of the long-lived stale fallback key `rates:fallback`                        |
 | `RATES_ARCHIVE_TTL_DAYS`            | `90`                                             | How long an archived daily snapshot is kept, enforced by a TTL index. Must be at least the 90-day window `GET /rates/history` accepts — the process refuses to start below it — and it is the depth of the archive fallback |
+| `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS`| `7`                                              | How old the newest archived day may be and still price an answer on the fourth fallback tier. Past it the tier declines and the lookup answers `503 RATES_UNAVAILABLE`: the retention above is what `/rates/history` charts, which is a different question from what may price a conversion |
 | `RATES_ARCHIVE_OPERATION_TIMEOUT_MS`| `1000`                                           | Deadline on a single archive upsert or read, so a Mongo that answers slowly cannot hold open the response that fetched the snapshot it is archiving |
 | `THROTTLE_TTL_SECONDS`              | `60`                                             | Rate-limit window                                                                |
 | `THROTTLE_LIMIT`                    | `60`                                             | Requests per window per client                                                   |
 | `ADMIN_API_KEY`                     | *(unset)*                                        | `x-api-key` for `DELETE /api/v1/rates/cache`. Unset makes `ApiKeyGuard` a no-op, so a local run needs no secret; startup **fails** when it is unset and `NODE_ENV=production`, because an open invalidation route is a lever on an upstream that allows one request a minute |
 
-That is the whole schema: 25 variables, and every one of them is in the table.
+That is the whole schema: 26 variables, and every one of them is in the table.
 
 ### Web (`apps/web`)
 
@@ -799,7 +800,7 @@ test name, or a live URL; every row was re-verified against this commit.
 | -- | ---------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | 8a | Comprehensive README with start instructions | met | This file: quick start in three forms, every root script, the full configuration table, the API reference above, real test numbers, the Railway deploy. Per-app READMEs add scripts and internals |
 | 8b | API documentation                        | met    | Swagger UI at `/docs`, OpenAPI at `/docs-json` (8 operations, 12 schemas, an `admin` scheme) generated from the code and committed as `docs/openapi.json`; `docs/architecture.md` §3 is the written contract. `test/e2e/swagger.e2e-spec.ts` keeps them in step — “documents no route that the API does not serve” — and `openapi-contract.e2e-spec.ts` fails when the committed document drifts from the decorators (`npm run openapi:write` regenerates it) |
-| 8c | Environment configuration                | met    | `apps/api/src/config/env.schema.ts` (zod, fails fast), `apps/api/.env.example` and root `.env.example`; the configuration table above lists all 25 variables |
+| 8c | Environment configuration                | met    | `apps/api/src/config/env.schema.ts` (zod, fails fast), `apps/api/.env.example` and root `.env.example`; the configuration table above lists all 26 variables |
 
 ### Beyond the task
 

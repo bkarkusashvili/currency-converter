@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import { RatesUnavailableError } from '../../../common/errors';
+import type { TypedConfigService } from '../../../config/typed-config.service';
 import { RatesLookup, RatesSnapshot } from '../domain/exchange-rate.types';
 import { ArchivedSnapshot } from '../domain/rate-history.types';
 import { RatesSource } from '../domain/rates-source.enum';
@@ -10,6 +12,7 @@ import { RATES_PROVIDER } from '../domain/rates-provider.interface';
 import type { RatesProvider } from '../domain/rates-provider.interface';
 import { RATES_REPOSITORY } from '../domain/rates-repository.interface';
 import type { RatesRepository } from '../domain/rates-repository.interface';
+import { utcDayAge } from '../domain/utc-day.util';
 import { describeRatesFailure } from './describe-rates-failure.util';
 
 // A fetch and what storing it cost: the snapshot the upstream answered with,
@@ -30,15 +33,18 @@ export class RatesService {
     @Inject(RATES_PROVIDER) private readonly provider: RatesProvider,
     @Inject(RATES_REPOSITORY) private readonly repository: RatesRepository,
     @Inject(RATES_ARCHIVE) private readonly archive: RatesArchive,
+    @Inject(ConfigService) private readonly config: TypedConfigService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(RatesService.name);
   }
 
   // Four tiers, in the order §4 states them: the fresh key, the upstream, the
-  // fallback key, and the newest archived day. Each is older than the one
-  // before it and each says so on the response, so a client is never left
-  // guessing how old the rates behind an answer are.
+  // fallback key, and the newest archived day if it is inside
+  // RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS. Each is older than the one before it
+  // and each says so on the response, so a client is never left guessing how
+  // old the rates behind an answer are — and the last one stops rather than
+  // pricing from a rate old enough that no client would have taken it.
   async getSnapshot(): Promise<RatesLookup> {
     const fresh = await this.repository.getFresh();
 
@@ -127,11 +133,12 @@ export class RatesService {
     }
 
     const archived = await this.readArchive();
+    const tooOld = archived === null ? null : this.describeAgeRefusal(archived);
 
     // Days old rather than hours, and priced against a market that has moved:
     // this is the answer of last resort, and the log says so at the level an
     // operator is paged on.
-    if (archived !== null) {
+    if (archived !== null && tooOld === null) {
       this.logger.warn(
         { err: error },
         `Serving archived rates fetched at ${archived.fetchedAt}: ${reason}`,
@@ -147,12 +154,41 @@ export class RatesService {
       };
     }
 
+    // Why there was nothing left, in the client's terms: the upstream failure
+    // that started this, and — when the archive had a day and it was refused —
+    // how old that day was. Both are the API's own vocabulary, numbers and
+    // resilience decisions; no upstream or driver message is in either.
+    const failure = tooOld === null ? reason : `${reason}; ${tooOld}`;
+
     this.logger.error(
       { err: error },
-      `Exchange rates are unavailable: ${reason}`,
+      `Exchange rates are unavailable: ${failure}`,
     );
 
-    throw new RatesUnavailableError({ reason });
+    throw new RatesUnavailableError({ reason: failure });
+  }
+
+  // The retention is how far back /rates/history can chart; it is not a
+  // statement about what may price a conversion. Left uncapped this tier prices
+  // a 200 from a rate up to RATES_ARCHIVE_TTL_DAYS old — a number no client
+  // would have accepted had it been asked, and one that reads like any other
+  // answer apart from `source` and `fetchedAt`. Past the ceiling the tier
+  // declines and the lookup ends in the documented 503, which a client already
+  // knows how to treat as "no rate".
+  //
+  // Whole UTC days, on the day key the archive is written on: the alternative
+  // is an age in hours that would make the same snapshot servable at 09:00 and
+  // refused at 10:00 on a boundary nothing else in the archive observes.
+  private describeAgeRefusal(archived: ArchivedSnapshot): string | null {
+    const maxAgeDays = this.config.get('RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS', {
+      infer: true,
+    });
+    const ageDays = utcDayAge(archived.date, new Date());
+
+    return ageDays > maxAgeDays
+      ? `the newest archived rates are ${ageDays} days old, past the ` +
+          `${maxAgeDays} day fallback ceiling`
+      : null;
   }
 
   // The archive is a fallback, so an archive that cannot be read is a fallback

@@ -140,6 +140,55 @@ describe('rates archive (e2e)', () => {
       });
     });
 
+    // The retention is how far back /rates/history charts; it is not a
+    // statement about what may price a conversion. Past
+    // RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS the tier declines rather than
+    // answering 200 from a rate no client would have taken.
+    describe('with nothing archived inside the fallback age ceiling', () => {
+      beforeEach(async () => {
+        await boot(
+          new InMemoryRatesArchive({ seed: [archived(daysAgo(8), 43.0)] }),
+        );
+      });
+
+      it('answers 503 rather than pricing from the day it has', async () => {
+        const response = await request(server).get(RATES_PATH).expect(503);
+
+        expect(response.body).toMatchObject({
+          statusCode: 503,
+          code: ErrorCode.RATES_UNAVAILABLE,
+          details: {
+            reason: expect.stringContaining(
+              'past the 7 day fallback ceiling',
+            ) as string,
+          },
+        });
+      });
+
+      // The reviewer's case: a conversion is where an old rate does damage,
+      // because a 200 there is a number the client uses.
+      it('refuses the conversion on the same terms', async () => {
+        const response = await request(server)
+          .post(CONVERT_PATH)
+          .send({ from: 'USD', to: 'UAH', amount: 100 })
+          .expect(503);
+
+        expect(response.body).toMatchObject({
+          code: ErrorCode.RATES_UNAVAILABLE,
+        });
+      });
+    });
+
+    // A day inside the ceiling is served, which is what makes the refusal above
+    // about the age rather than about the tier.
+    it('still serves an archived day inside the ceiling', async () => {
+      await boot(
+        new InMemoryRatesArchive({ seed: [archived(daysAgo(6), 43.5)] }),
+      );
+
+      await request(server).get(RATES_PATH).expect(200);
+    });
+
     it('answers 503 in the documented envelope with an empty archive', async () => {
       await boot(new InMemoryRatesArchive());
 

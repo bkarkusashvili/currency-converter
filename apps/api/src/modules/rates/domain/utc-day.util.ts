@@ -15,3 +15,11 @@ export function toUtcDay(instant: Date): string {
 export function utcWindowStart(days: number, instant: Date): string {
   return toUtcDay(new Date(instant.getTime() - (days - 1) * MS_PER_DAY));
 }
+
+// How many UTC days ago a day key is: 0 for today, 1 for yesterday. Both sides
+// are exact UTC midnights, so this is whole days and never a fraction of one —
+// which is what lets an age be compared against a configured number of days
+// without a clock time entering into it.
+export function utcDayAge(day: string, instant: Date): number {
+  return (Date.parse(toUtcDay(instant)) - Date.parse(day)) / MS_PER_DAY;
+}

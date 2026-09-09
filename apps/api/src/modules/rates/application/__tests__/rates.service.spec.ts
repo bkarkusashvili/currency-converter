@@ -1,4 +1,5 @@
 import { RatesUnavailableError } from '../../../../common/errors/rates-unavailable.error';
+import { fakeConfig } from '../../../../config/__tests__/fake-config';
 import { CircuitOpenError } from '../../../../common/resilience/circuit-open.error';
 import {
   createFakePinoLogger,
@@ -52,15 +53,34 @@ interface ArchiveDouble {
   findPairWindow: jest.Mock;
 }
 
+// How old the newest archived day may be and still price an answer.
+const MAX_AGE_DAYS = 7;
+
+// Dated against the clock rather than pinned: the tier now refuses a day past
+// the ceiling, so a fixed date would fall outside it the day after it was
+// written. Read once, so a suite that starts at 23:59:59 dates every fixture
+// from the same day.
+const TODAY = Date.now();
+
+function daysAgo(days: number): string {
+  return new Date(TODAY - days * 86_400_000).toISOString().slice(0, 10);
+}
+
 // Days older than the stale key by construction: the archive is what is left
 // when the fallback has expired too.
-const ARCHIVED: ArchivedSnapshot = {
-  date: '2026-09-01',
-  fetchedAt: '2026-09-01T12:00:00.000Z',
-  rates: [
-    { base: 'USD', quote: 'UAH', buy: 41.9, date: '2026-09-01T11:00:00.000Z' },
-  ],
-};
+function archived(days: number): ArchivedSnapshot {
+  const date = daysAgo(days);
+
+  return {
+    date,
+    fetchedAt: `${date}T12:00:00.000Z`,
+    rates: [
+      { base: 'USD', quote: 'UAH', buy: 41.9, date: `${date}T11:00:00.000Z` },
+    ],
+  };
+}
+
+const ARCHIVED = archived(1);
 
 describe('RatesService', () => {
   let provider: ProviderDouble;
@@ -87,6 +107,7 @@ describe('RatesService', () => {
       provider,
       repository,
       archive,
+      fakeConfig({ RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS: MAX_AGE_DAYS }),
       logger.asPinoLogger(),
     );
   });
@@ -301,6 +322,53 @@ describe('RatesService', () => {
       await expect(service.getSnapshot()).rejects.toBeInstanceOf(
         RatesUnavailableError,
       );
+    });
+
+    // The retention is how far back the chart goes; it is not a statement about
+    // what may price a conversion. Left uncapped this tier answers 200 from a
+    // 90-day-old rate that reads like any other answer.
+    describe('and the newest archived day is past the fallback ceiling', () => {
+      beforeEach(() => {
+        archive.findLatest.mockResolvedValue(archived(MAX_AGE_DAYS + 1));
+      });
+
+      it('declines rather than pricing from it', async () => {
+        await expect(service.getSnapshot()).rejects.toBeInstanceOf(
+          RatesUnavailableError,
+        );
+      });
+
+      // The reason travels to the client in the envelope, so it is the API's
+      // own vocabulary — the resilience decision and two numbers — and carries
+      // no upstream or driver message.
+      it('says how old the day was and what the ceiling is', async () => {
+        await expect(service.getSnapshot()).rejects.toMatchObject({
+          details: {
+            reason:
+              `upstream request failed; the newest archived rates are ` +
+              `${MAX_AGE_DAYS + 1} days old, past the ${MAX_AGE_DAYS} day ` +
+              `fallback ceiling`,
+          },
+        });
+      });
+
+      it('never carries the upstream message into the reason', async () => {
+        provider.fetchRates.mockRejectedValue(
+          new Error('connect ECONNREFUSED api.monobank.ua:443'),
+        );
+
+        await expect(service.getSnapshot()).rejects.not.toThrow(/monobank\.ua/);
+      });
+    });
+
+    // The ceiling is a maximum age, not a range that excludes its own bound: a
+    // day exactly that old is the oldest one this still prices from.
+    it('serves an archived day that is exactly at the ceiling', async () => {
+      archive.findLatest.mockResolvedValue(archived(MAX_AGE_DAYS));
+
+      await expect(service.getSnapshot()).resolves.toMatchObject({
+        source: 'archive',
+      });
     });
 
     // The client is already being told the rates are unavailable and why. An

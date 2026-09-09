@@ -43,9 +43,11 @@ npm run start:dev
 `source` is worth reading: `stale-cache` is a `200` served from the fallback key
 because the upstream could not be reached, so the rates are older than the cache
 TTL, and `archive` is a `200` served from the newest day the Mongo archive holds
-because the fallback key had expired too — days old rather than hours. When the
-upstream fails and neither has a copy, `/rates` and `/currencies` answer
-`503 RATES_UNAVAILABLE`. Redis being down is not a failure at all: the
+because the fallback key had expired too — days old rather than hours, and never
+more than `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` (7) of them. When the upstream
+fails and neither has a copy — or the newest archived day is past that ceiling,
+which is a rate no client would have taken — `/rates`, `/convert` and
+`/currencies` answer `503 RATES_UNAVAILABLE`. Redis being down is not a failure at all: the
 rates come from the upstream and the answer carries a `CACHE_UNAVAILABLE`
 warning saying the cache was not part of it (see **Warnings** below).
 
