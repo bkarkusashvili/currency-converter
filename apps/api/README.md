@@ -195,10 +195,13 @@ process refuses to start below it), enforced by a TTL index.
 
 The orientation is the upstream's own: `USD/UAH` is a pair Monobank publishes
 and `UAH/USD` is not, and this route reports what was published rather than what
-could be derived from it. A code the window never quoted answers
+could be derived from it. A code no archived day quoted answers
 `422 UNSUPPORTED_CURRENCY`; two archived codes with no published pair between
-them — a reversed orientation included — answer `422 RATE_NOT_AVAILABLE`.
-`?days=0`, `?days=91` and `?days=abc` answer `400` naming the field, and a
+them — a reversed orientation included — answer `422 RATE_NOT_AVAILABLE`. A
+window with **no archived day at all** — right after a deploy, or a pair asked
+for before the first fetch — answers `200` with `points: []` instead of either
+422: nothing in an empty window says a code doesn't exist. `?days=0`, `?days=91`
+and `?days=abc` answer `400` naming the field, and a
 Mongo that cannot be read answers `503 ARCHIVE_UNAVAILABLE` rather than an empty
 series.
 
