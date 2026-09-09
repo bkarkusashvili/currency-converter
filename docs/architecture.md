@@ -1426,8 +1426,15 @@ forward. It lives there rather than here because it is what a reviewer reads
 first and because it cites test names, which drift faster than design does;
 duplicating it would give the project two versions of the same claim.
 
+The same table carries a second half — the work delivered beyond those eight
+sections, each row with a path that resolves: the daily snapshot archive and the
+series read off it, the client's service layer and offline estimate, the
+container-backed integration suites and the contract check, the naming and
+boundary work, the theme, and the reviewer page itself.
+
 This document is the other half of that answer: the table says *where* a
-requirement is met, and the sections above say *why* it is met that way.
+requirement is met, the sections above say *why* it is met that way, and
+[`process.md`](process.md) says how the work got done.
 
 ## 14. Known limitations and follow-ups
 
@@ -1547,6 +1554,13 @@ project were taken further.
   `openapi-contract.e2e-spec.ts` fails when `docs/openapi.json` no longer
   matches what the decorators generate. Everything else here is prose a reviewer
   has to keep true.
+- **The process record's counts are a snapshot, not a live number.**
+  [`process.md`](process.md) and the reviewer page each carry one dated table of
+  counts — pull requests, review comments, tests, deploys — and nothing
+  recomputes them. Every other sentence in both is deliberately count-free so it
+  stays true as they move, but the tables themselves go stale the moment
+  anything lands after their date. Wiring them to a script that regenerates from
+  the GitHub API and a test run would fix it; the date is the mitigation.
 - **The web's types are checked against the contract, not generated from it.**
   `apps/web/src/api/types.ts` is still hand-written; what the ajv test proves is
   that the bodies the suite renders would be accepted by the published schemas,
