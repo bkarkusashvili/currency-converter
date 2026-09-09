@@ -103,5 +103,8 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "overrides": {
+    "multer": "2.3.0"
   }
 }
