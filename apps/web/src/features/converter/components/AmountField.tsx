@@ -16,8 +16,6 @@ interface AmountFieldProps {
   value: string;
   error: string | null;
   separators: AmountSeparators;
-  /** A conversion is in flight: the field steps back and its hint stands down (board 1g). */
-  isSubmitting: boolean;
   inputRef: RefObject<HTMLInputElement | null>;
   onChange: (value: string) => void;
 }
@@ -28,8 +26,9 @@ interface AmountFieldProps {
  * something an amount could be, and the caret stays where the user left it
  * rather than jumping to the end when a separator appears in front of it.
  *
- * While a conversion is on its way the field dims and drops its hint, so the
- * pane the answer is landing in is the only thing on the card still speaking.
+ * A conversion in flight changes nothing here: the field keeps its size, its
+ * hint and the description that names it, so pressing Convert moves no part of
+ * the form.
  */
 export function AmountField({
   id,
@@ -38,17 +37,12 @@ export function AmountField({
   value,
   error,
   separators,
-  isSubmitting,
   inputRef,
   onChange,
 }: AmountFieldProps) {
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const caret = useCaret(inputRef, value);
-  // A hint that is not on the page is not a description of anything.
-  const describedBy = [isSubmitting ? null : hintId, error === null ? null : errorId]
-    .filter((id): id is string => id !== null)
-    .join(' ');
 
   function apply(raw: string, at: number): void {
     const next = formatAmountInput(raw, at, separators);
@@ -93,7 +87,7 @@ export function AmountField({
   }
 
   return (
-    <div className={['grid gap-2', isSubmitting ? 'opacity-60' : ''].join(' ').trim()}>
+    <div className="grid gap-2">
       <label className="field-label" htmlFor={id}>
         {label}
       </label>
@@ -109,16 +103,14 @@ export function AmountField({
         enterKeyHint="go"
         value={value}
         aria-invalid={error !== null}
-        aria-describedby={describedBy === '' ? undefined : describedBy}
+        aria-describedby={error === null ? hintId : `${hintId} ${errorId}`}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
       />
-      {!isSubmitting && (
-        <p id={hintId} className="text-faint numeric text-xs">
-          {hint}
-        </p>
-      )}
+      <p id={hintId} className="text-faint numeric text-xs">
+        {hint}
+      </p>
       {error !== null && (
         <p id={errorId} role="alert" className="text-danger flex items-start gap-1.5 text-sm">
           <WarningIcon className="mt-0.5 h-4 w-4 shrink-0" />
