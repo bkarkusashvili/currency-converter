@@ -83,7 +83,7 @@ export function AmountField({
   }
 
   return (
-    <div>
+    <div className="grid gap-2">
       <label className="field-label" htmlFor={id}>
         {label}
       </label>
@@ -104,11 +104,11 @@ export function AmountField({
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
       />
-      <p id={hintId} className="text-faint numeric mt-2 text-xs">
+      <p id={hintId} className="text-faint numeric text-xs">
         {hint}
       </p>
       {error !== null && (
-        <p id={errorId} role="alert" className="text-danger mt-2 flex items-start gap-1.5 text-sm">
+        <p id={errorId} role="alert" className="text-danger flex items-start gap-1.5 text-sm">
           <WarningIcon className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </p>

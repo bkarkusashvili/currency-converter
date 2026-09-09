@@ -29,18 +29,18 @@ export function CurrencySelect({
   // none, so the same words are a caption instead of a dangling `for`.
   if (isLoading) {
     return (
-      <div>
+      <div className="grid gap-3.5">
         <p className="field-label">{label}</p>
         <div role="status">
           <span className="sr-only">{t('converter.form.currenciesLoading', { field: label })}</span>
-          <Skeleton className="h-[3.125rem] w-full rounded-[0.625rem]" />
+          <Skeleton className="h-12 w-full rounded-[0.625rem] sm:h-11" />
         </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="grid gap-3.5">
       <label className="field-label" htmlFor={id}>
         {label}
       </label>
@@ -84,7 +84,7 @@ export function CurrencySelect({
         </svg>
       </div>
       {error !== null && (
-        <p id={errorId} role="alert" className="text-danger mt-2 flex items-start gap-1.5 text-sm">
+        <p id={errorId} role="alert" className="text-danger flex items-start gap-1.5 text-sm">
           <WarningIcon className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </p>
