@@ -425,6 +425,18 @@
     animation: rise-in 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
   }
 
+  /* The chart's lines drawing themselves in when the range changes: a clip
+     rect wiped across the plot, rather than a dash slid along the path. A
+     dash would be the usual way to say this, but its length is resolved
+     against the SVG's rendered size and not its user units, so the same
+     `stroke-dasharray` that draws a 7-day line whole cuts a 30-day one off
+     a third of the way across. A wipe scales with the plot by construction. */
+  .chart-wipe {
+    transform-box: fill-box;
+    transform-origin: left center;
+    animation: chart-draw 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  }
+
   .code-block {
     background-color: var(--surface-sunken);
     border: 1px solid var(--line);
@@ -503,6 +515,15 @@
   }
   50% {
     opacity: 0.5;
+  }
+}
+
+@keyframes chart-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }
 

@@ -14,6 +14,12 @@ interface UseConverterFormOptions {
   onSubmit: (request: ConvertRequest) => void;
   /** Called instead of submitting, so the form can put the caret on what needs fixing. */
   onAmountInvalid: () => void;
+  /**
+   * The pair, whenever it changes. The rate-history panel below the card reads
+   * the *selected* pair rather than the converted one, so it follows a pick
+   * and a swap without waiting for a conversion (§5.2).
+   */
+  onPairChange?: (pair: { from: string; to: string }) => void;
 }
 
 export interface ConverterFormState {
@@ -32,6 +38,7 @@ export function useConverterForm({
   serverErrors,
   onSubmit,
   onAmountInvalid,
+  onPairChange,
 }: UseConverterFormOptions): ConverterFormState {
   const { t } = useTranslation();
   const formatters = useFormatters();
@@ -72,17 +79,20 @@ export function useConverterForm({
   function setFrom(value: string) {
     setFromValue(value);
     markEdited('from');
+    onPairChange?.({ from: value, to });
   }
 
   function setTo(value: string) {
     setToValue(value);
     markEdited('to');
+    onPairChange?.({ from, to: value });
   }
 
   function swap() {
     setFromValue(to);
     setToValue(from);
     markEdited('from', 'to');
+    onPairChange?.({ from: to, to: from });
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

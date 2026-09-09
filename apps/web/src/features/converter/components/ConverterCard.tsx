@@ -29,6 +29,8 @@ interface ConverterCardProps {
   /** The answer, which the output pane holds until the next one replaces it. */
   outcome: ConversionOutcome | undefined;
   onSubmit: (request: ConvertRequest) => void;
+  /** The selected pair, reported upward so the rate-history panel can follow it. */
+  onPairChange?: (pair: { from: string; to: string }) => void;
 }
 
 /**
@@ -50,6 +52,7 @@ export function ConverterCard({
   isSubmitting,
   outcome,
   onSubmit,
+  onPairChange,
 }: ConverterCardProps) {
   const { t } = useTranslation();
   const formatters = useFormatters();
@@ -59,6 +62,7 @@ export function ConverterCard({
     serverErrors,
     onSubmit,
     onAmountInvalid: () => amountRef.current?.focus(),
+    onPairChange,
   });
   const options = currencyOptions(currencies);
   // A failed request whose persisted copy is answering is a different sentence
