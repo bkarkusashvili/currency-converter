@@ -888,6 +888,22 @@ newest-first page and the retention ride on the same key rather than on two.
   rather than between them. The `grid-template-areas` that do it are in
   `index.css`; the component only names the areas. Recent conversions move to a
   320px aside beside the card, and below it when there is no room for one.
+- **The rate-history panel** sits below the card and reads the archive for the
+  pair the form is *selected* on, so it follows a pick and a swap rather than a
+  conversion. `buildRateHistorySeries` (`features/converter/lib/`) turns the
+  archived days into everything the chart draws — a scale whose three ticks are
+  the smallest "nice" step the series fits inside the plot on, the two
+  polylines and the band between them, the low, the high, the latest and which
+  days are named under the axis — with no DOM, locale or theme in it, so the
+  geometry is checked against the board's own numbers in a unit test. The chart
+  itself is `role="img"` with the panel's summary as its description, and the
+  days are reachable one at a time as real buttons in a strip over the plot
+  (arrow keys, Home/End, Esc), each named by its date and described by the
+  tooltip; the table beside it is the same series row by row and the accessible
+  fallback for the picture. Loading, "nothing archived yet" and a failure are
+  all panel-local: nothing here can disable Convert, and a 422 from the route is
+  read as a pair with no archived day rather than as a failure, because that is
+  what it means.
 - Runtime configuration: `public/config.js` sets `window.__APP_CONFIG__.apiUrl`;
   the Docker image regenerates it from `API_URL` at container start so the same
   image runs locally and on Railway. The value is JSON-escaped as it is written,
@@ -900,13 +916,16 @@ newest-first page and the retention ride on the same key rather than on two.
   through a React context
   (`ServicesProvider` / `useServices`). `src/api/hooks` wraps them in
   TanStack Query hooks (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
-  `useHistory`, `useHealth`) that depend only on the interfaces. `src/api/http` is the only place that knows about `fetch`; a
+  `useRateHistory`, `useHistory`, `useHealth`) that depend only on the
+  interfaces. `src/api/http` is the only place that knows about `fetch`; a
   component imports nothing from it but the `ApiError` and field-error types it
   renders. They are *services* and not repositories because this side stores
   nothing: the API has a repository per store, and reusing the word for a
   client that only calls it made the pattern harder to talk about.
 - **State.** TanStack Query owns server state (with persistence for rates and
-  currencies); React context provides the service implementations (swapped for
+  currencies — the archived series is deliberately not persisted: it would be
+  restored a day staler than it was written, and an offline browser has no use
+  for a chart); React context provides the service implementations (swapped for
   fakes in tests); form state is local to the converter; there is no global
   store because no client state is shared beyond the query cache.
 - **The public surface.** `api/`, `components/`, `lib/`, `i18n/`, `theme/` and
@@ -963,6 +982,13 @@ newest-first page and the retention ride on the same key rather than on two.
   panel shows each entry's `source` for the same reason §3 stores it, and marks
   the row the answer on screen produced — matched on the five fields that
   identify one conversion of one snapshot, because the response carries no id.
+- **The archive's date.** `source: archive` is the one source whose rates are
+  dated to a *day* — the archive keeps one snapshot per day — so everywhere the
+  client says when they are from it says a date and drops the clock time:
+  `Rates from 7 Sep 2026` in the timestamp eyebrow, at the head of the source
+  sentence and on the history row. The day is read in UTC, because that is the
+  day the archive keyed the snapshot by, and it is assembled from `Intl`'s own
+  parts in one order so `en-US` cannot write it `Sep 7, 2026`.
 - **Warnings.** §3's `warnings` array is a successful answer saying what
   degraded while it was produced, so it is rendered as a footnote and never as
   a failure: warn-tone notes at the foot of the card for a conversion's, and
@@ -1009,7 +1035,7 @@ newest-first page and the retention ride on the same key rather than on two.
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
 | E2E (api)            | Jest + supertest             | eight suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger`, `openapi-contract` |
-| Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, error display, history list and its loading and empty states, health rendering, every HTTP service |
+| Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, the archive's date line on the card and in a history row, error display, history list and its loading and empty states, the rate-history chart's geometry from an archived fixture and the panel's four states, its keyboard day navigation and its range switching, health rendering, every HTTP service |
 | Integration (api)    | Jest against real servers    | the two adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp. Each suite runs on its own database — Redis 15, a Mongo database of its own — so a URL pointed at a running stack is never flushed. Skipped, with a `SKIPPED:` line naming the variable, unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI`, whose `orchestration` job points them at the stack it already starts |
 | Contract             | Jest (api) + ajv (web)       | `docs/openapi.json` regenerated from the application's decorators and compared with the committed file; on the web side every sample response the suite renders validated against the schema that document publishes for its route |
 
@@ -1171,7 +1197,7 @@ extends it:
   in `createHttpServices.ts`, handed to the tree through a provider, and
   `src/api/hooks` exposes the TanStack Query hooks
   components consume (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
-  `useHistory`, `useHealth`). A component never fetches, and it imports the
+  `useRateHistory`, `useHistory`, `useHealth`). A component never fetches, and it imports the
   folder's `index.ts` rather than a file inside it.
 - Tests inject a fake service through that same provider rather than mocking
   `fetch` or the network, so a component test never depends on the transport.
