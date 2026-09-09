@@ -1,19 +1,9 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { WarningIcon } from '../../../components';
 import { useIsCompact } from '../../../lib';
-import { filterCurrencies } from '../lib/currencyFilter';
+import { useComboboxState } from '../hooks/useComboboxState';
 import { optionName, type CurrencyOption } from '../lib/currencyOptions';
-import { placePopover } from '../lib/popoverPlacement';
 import { CurrencyPopover } from './CurrencyPopover';
 import { CurrencySheet } from './CurrencySheet';
 import { CurrencyTrigger } from './CurrencyTrigger';
@@ -39,7 +29,8 @@ interface CurrencyComboboxProps {
 /**
  * A currency picker with a search field: the popover of board `1c` on a wide
  * viewport and the bottom sheet of board `1j` below 640px, which are two
- * surfaces around one keyboard model.
+ * surfaces around one keyboard model — `useComboboxState` — and one set of
+ * rows.
  *
  * The trigger is the combobox and the search field is where typing lands, so
  * `aria-activedescendant` travels with focus onto the field while the list is
@@ -60,13 +51,6 @@ export function CurrencyCombobox({
 }: CurrencyComboboxProps) {
   const { t } = useTranslation();
   const compact = useIsCompact();
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [position, setPosition] = useState<CSSProperties>({});
 
   const labelId = `${id}-label`;
   const listboxId = `${id}-listbox`;
@@ -74,194 +58,23 @@ export function CurrencyCombobox({
   const titleId = `${id}-sheet-title`;
   const errorId = `${id}-error`;
 
-  const matches = useMemo(() => filterCurrencies(currencies, query), [currencies, query]);
-  const selected = currencies.find((currency) => currency.code === value);
   const optionId = useCallback((index: number) => `${id}-option-${String(index)}`, [id]);
-
-  const close = useCallback((restoreFocus = true) => {
-    setOpen(false);
-    setQuery('');
-    if (restoreFocus) {
-      triggerRef.current?.focus();
-    }
-  }, []);
-
-  function openWith(seed: string) {
-    const rows = filterCurrencies(currencies, seed);
-    const current = rows.findIndex((match) => match.option.code === value);
-    setQuery(seed);
-    setActiveIndex(current === -1 ? 0 : current);
-    setOpen(true);
-  }
-
-  function changeQuery(next: string) {
-    setQuery(next);
-    setActiveIndex(0);
-  }
-
-  function select(code: string) {
-    onChange(code);
-    close();
-  }
-
-  function move(delta: number) {
-    if (matches.length === 0) {
-      return;
-    }
-    setActiveIndex((index) => (index + delta + matches.length) % matches.length);
-  }
-
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-    switch (event.key) {
-      case 'ArrowDown':
-        event.preventDefault();
-        move(1);
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        move(-1);
-        break;
-      case 'Home':
-        event.preventDefault();
-        setActiveIndex(0);
-        break;
-      case 'End':
-        event.preventDefault();
-        setActiveIndex(Math.max(matches.length - 1, 0));
-        break;
-      case 'Enter': {
-        // Always swallowed: the picker lives inside the converter's form, and
-        // Enter meaning "submit" while a list is open would convert whatever
-        // the row under the caret was about to change.
-        event.preventDefault();
-        const match = matches[activeIndex];
-        if (match !== undefined) {
-          select(match.option.code);
-        }
-        break;
-      }
-      case 'Tab':
-        // The popover is not modal: Tab leaves it, the way it leaves any
-        // control. Focus goes back to the trigger first, so the browser's own
-        // Tab carries on from there — closing without it left the caret on a
-        // node being unmounted, and the next Tab started again at `<body>`.
-        // The sheet is modal, and its trap keeps Tab inside instead.
-        if (!compact) {
-          close();
-        }
-        break;
-      default:
-        break;
-    }
-  }
-
-  // Measured rather than positioned by the flow: the converter card clips its
-  // own overflow, so the popover is fixed to coordinates read off the trigger
-  // and off its own size — which is what `placePopover` needs to know whether
-  // it still fits under the trigger. Re-measured while the list is open,
-  // because scrolling the page and filtering the list both move it.
-  useLayoutEffect(() => {
-    if (!open || compact) {
-      return;
-    }
-
-    function place() {
-      const trigger = triggerRef.current?.getBoundingClientRect();
-      const panel = popoverRef.current?.getBoundingClientRect();
-      if (trigger === undefined || panel === undefined) {
-        return;
-      }
-
-      const { top, left } = placePopover(trigger, panel, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-      setPosition({ top, left });
-    }
-
-    place();
-    window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, true);
-
-    return () => {
-      window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place, true);
-    };
-  }, [open, compact, matches.length]);
-
-  useEffect(() => {
-    if (open) {
-      inputRef.current?.focus();
-    }
-  }, [open]);
-
-  // Escape belongs to the surface, not to the search field. In the sheet the
-  // Cancel button and the clear button are both Tab stops, and Escape from
-  // either of them was reaching nothing at all.
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        close();
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open, close]);
-
-  // Keeps the active row in view when the list is longer than the five rows
-  // the popover shows. jsdom has no layout and no `scrollIntoView`.
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    document.getElementById(optionId(activeIndex))?.scrollIntoView?.({ block: 'nearest' });
-  }, [open, activeIndex, optionId]);
-
-  // A click anywhere else is a dismissal, and the trigger's own click would
-  // otherwise close and reopen in one gesture.
-  useEffect(() => {
-    if (!open || compact) {
-      return;
-    }
-
-    function onPointerDown(event: MouseEvent) {
-      const target = event.target;
-      if (
-        target instanceof Node &&
-        triggerRef.current?.contains(target) !== true &&
-        document.getElementById(listboxId)?.closest('.combobox-popover')?.contains(target) !== true
-      ) {
-        close(false);
-      }
-    }
-
-    document.addEventListener('mousedown', onPointerDown);
-
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-    };
-  }, [open, compact, close, listboxId]);
+  const picker = useComboboxState({ currencies, value, compact, listboxId, optionId, onChange });
+  const selected = currencies.find((currency) => currency.code === value);
 
   const listProps = {
     listboxId,
     labelledBy: labelId,
     optionId,
-    matches,
-    activeIndex,
+    matches: picker.matches,
+    activeIndex: picker.activeIndex,
     value,
     otherValue,
-    query,
-    onSelect: select,
-    onHover: setActiveIndex,
+    query: picker.query,
+    onSelect: picker.select,
+    onHover: (index: number) => {
+      picker.changeActiveIndex(index);
+    },
   };
 
   return (
@@ -277,18 +90,18 @@ export function CurrencyCombobox({
           listboxId={listboxId}
           code={value}
           name={selected === undefined ? undefined : optionName(selected)}
-          open={open}
+          open={picker.open}
           isLoading={isLoading}
           disabled={disabled}
           invalid={error !== null}
           describedBy={error === null ? undefined : errorId}
-          triggerRef={triggerRef}
-          onOpen={openWith}
+          triggerRef={picker.triggerRef}
+          onOpen={picker.openWith}
           onToggle={() => {
-            if (open) {
-              close();
+            if (picker.open) {
+              picker.close();
             } else {
-              openWith('');
+              picker.openWith('');
             }
           }}
         />
@@ -299,7 +112,7 @@ export function CurrencyCombobox({
           </span>
         )}
 
-        {open &&
+        {picker.open &&
           (compact ? (
             <CurrencySheet
               {...listProps}
@@ -307,23 +120,23 @@ export function CurrencyCombobox({
               titleId={titleId}
               title={sheetTitle}
               total={currencies.length}
-              inputRef={inputRef}
-              onQueryChange={changeQuery}
-              onKeyDown={handleKeyDown}
+              inputRef={picker.inputRef}
+              onQueryChange={picker.changeQuery}
+              onKeyDown={picker.onKeyDown}
               onDismiss={() => {
-                close();
+                picker.close();
               }}
             />
           ) : (
             <CurrencyPopover
               {...listProps}
               searchId={searchId}
-              popoverRef={popoverRef}
-              position={position}
+              popoverRef={picker.popoverRef}
+              position={picker.position}
               total={currencies.length}
-              inputRef={inputRef}
-              onQueryChange={changeQuery}
-              onKeyDown={handleKeyDown}
+              inputRef={picker.inputRef}
+              onQueryChange={picker.changeQuery}
+              onKeyDown={picker.onKeyDown}
             />
           ))}
       </div>
