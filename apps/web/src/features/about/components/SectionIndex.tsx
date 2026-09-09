@@ -16,11 +16,12 @@ interface SectionIndexProps {
  * The same list in two shapes: a sticky rail beside the content where there is
  * a column for it, and a scrolling chip row above it where there is not.
  *
- * The link is the target and the pill is only what it draws: 44px of anchor
- * around the design's 30px chip, so a thumb has something to land on. Drawing
- * that hit area as a pseudo-element instead would put it outside the anchor's
- * own box, where this nav's horizontal scrollport — `overflow-x: auto` forces
- * `overflow-y: auto` — clips it back to the pill.
+ * The link is the target and the pill is only what it draws: the chip plus the
+ * 8px band above and below it, never less than 44px, so a thumb has something
+ * to land on. The band is padding on the anchor rather than a pseudo-element
+ * around it, because a pseudo-element is drawn outside the anchor's own box —
+ * where this nav's horizontal scrollport, `overflow-x: auto` forcing
+ * `overflow-y: auto`, clips it back to the pill.
  */
 export function SectionIndex({ entries, active }: SectionIndexProps) {
   const { t } = useTranslation();
@@ -42,7 +43,7 @@ export function SectionIndex({ entries, active }: SectionIndexProps) {
             href={`#${entry.id}`}
             aria-current={isCurrent ? 'location' : undefined}
             className={[
-              'inline-flex min-h-11 shrink-0 items-center no-underline lg:min-h-0 lg:border-l-2',
+              'inline-flex min-h-11 shrink-0 items-center py-2 no-underline lg:min-h-0 lg:border-l-2 lg:py-0',
               isCurrent ? 'lg:border-accent' : 'lg:border-line',
             ].join(' ')}
           >

@@ -159,9 +159,9 @@ describe('SectionIndex', () => {
     const link = screen.getByRole('link', { name: 'Live' });
 
     // The nav scrolls horizontally, and a scrollport clips what is drawn
-    // outside it, so the 44px has to be the anchor's own box rather than a
-    // taller band painted around a 30px pill.
-    expect(link).toHaveClass('min-h-11');
+    // outside it, so the band has to be padding inside the anchor's own box
+    // rather than a taller pseudo-element painted around the pill.
+    expect(link).toHaveClass('min-h-11', 'py-2');
     expect(link.firstElementChild).toHaveTextContent('Live');
   });
 });
