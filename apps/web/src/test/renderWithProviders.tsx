@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router';
 import { ServicesProvider } from '../api';
 import type { Services } from '../api';
 import { i18nInstance } from '../i18n';
+import { ThemeProvider } from '../theme';
 import { createFakeServices } from './fakes/createFakeServices';
 
 interface RenderOptions {
@@ -33,11 +34,13 @@ export function renderWithProviders(ui: ReactElement, options: RenderOptions = {
 
   return render(
     <I18nextProvider i18n={i18nInstance}>
-      <ServicesProvider services={services}>
-        <QueryClientProvider client={queryClient}>
-          <MemoryRouter>{ui}</MemoryRouter>
-        </QueryClientProvider>
-      </ServicesProvider>
+      <ThemeProvider>
+        <ServicesProvider services={services}>
+          <QueryClientProvider client={queryClient}>
+            <MemoryRouter>{ui}</MemoryRouter>
+          </QueryClientProvider>
+        </ServicesProvider>
+      </ThemeProvider>
     </I18nextProvider>,
   );
 }

@@ -9,6 +9,22 @@
     />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f5f3" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1113" />
+    <script>
+      // The theme, before the bundle: an explicit choice is on <html> for the
+      // first paint instead of one frame after it. The key, the attribute and
+      // the two values it accepts are src/theme's, and
+      // src/theme/__tests__/prePaintScript.test.ts holds the two copies in step.
+      (function () {
+        try {
+          var theme = localStorage.getItem('currency-converter:theme');
+          if (theme === 'light' || theme === 'dark') {
+            document.documentElement.setAttribute('data-theme', theme);
+          }
+        } catch (error) {
+          // Storage blocked or unavailable: prefers-color-scheme still applies.
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

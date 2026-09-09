@@ -7,6 +7,7 @@ import { QueryProvider, ServicesProvider, createHttpServices } from './api';
 import { i18nInstance } from './i18n';
 import './index.css';
 import { createQueryClient } from './queryClient';
+import { ThemeProvider } from './theme';
 
 const container = document.getElementById('root');
 
@@ -17,13 +18,15 @@ if (container === null) {
 createRoot(container).render(
   <StrictMode>
     <I18nextProvider i18n={i18nInstance}>
-      <ServicesProvider services={createHttpServices()}>
-        <QueryProvider client={createQueryClient()}>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </QueryProvider>
-      </ServicesProvider>
+      <ThemeProvider>
+        <ServicesProvider services={createHttpServices()}>
+          <QueryProvider client={createQueryClient()}>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </QueryProvider>
+        </ServicesProvider>
+      </ThemeProvider>
     </I18nextProvider>
   </StrictMode>,
 );
