@@ -9,10 +9,10 @@ is weaker than it looks.
 ## Stages
 
 Each stage is a set of pull requests. Every one that has merged, merged into
-`main` green, and nothing was pushed to `main` directly. Two of stage 9's three
-were still open when this was written — the pull request numbers below name them
-either way, so the table is a map of the work rather than a claim about what has
-landed.
+`main` green, and nothing was pushed to `main` directly. The last of stage 9's
+three was still open when this was written — the pull request numbers below name
+it either way, so the table is a map of the work rather than a claim about what
+has landed.
 
 | # | Stage | Landed as |
 | - | ----- | --------- |
@@ -81,33 +81,34 @@ Five passes over merged code, each read-only until it had something to say.
 
 ## Numbers
 
-Counts as of **9 September 2026**, from the GitHub API and a fresh run of both
-suites on the merge commit this document landed in.
+Counts as of **9 September 2026**, from the GitHub API, the Railway CLI and a
+fresh run of all four suites on the commit that merged the second redesign
+pull request into this branch.
 
 | What | Count |
 | ---- | ----- |
 | Pull requests opened | 20 |
-| …merged into `main` | 17 |
-| Commits on `main` | 18 |
-| Review posts on those pull requests | 32 |
+| …merged into `main` | 18 |
+| Commits on `main` | 19 |
+| Review posts on those pull requests | 33 |
 | Line-anchored review comments | 59 |
-| Pull requests that went back for a fix round | 13 |
+| Pull requests that went back for a fix round | 14 |
 | Audits over merged code | 5 |
 | API tests — unit · end-to-end · integration | 767 · 163 · 25 |
-| Client tests | 297 |
-| Deploys — API · client, as `railway deployment list` reports them | 12 · 7 |
+| Client tests | 409 |
+| Deploys — API · client, as `railway deployment list` reports them | 12 · 8 |
 | Agent runs behind all of the above | roughly 75, as reported by the orchestrating session |
 
-Three pull requests were open when this table was taken: the second and third
-of the redesign set, and the one that adds this document. Every count above
-moves when they land — the merged, commit, review and client-test rows by the
-most — which is the reason the table has a date on it and the reason nothing
-else in this document counts anything.
+Two pull requests were open when this table was taken: the third of the
+redesign set, and the one that adds this document. Every count above moves when
+they land — the merged, commit, review and client-test rows by the most — which
+is the reason the table has a date on it and the reason nothing else in this
+document counts anything.
 
 Everything above except the agent runs is recoverable: the pull request, review
 and comment counts from the GitHub API's reviews and comments endpoints for each
 pull request, the commit count from `git rev-list --count main`, the test counts
-from a run of both suites, the deploy counts from the Railway CLI. The agent-run
+from a run of all four suites, the deploy counts from the Railway CLI. The agent-run
 figure is the one number here with no artefact behind it, and it is approximate
 for that reason.
 
