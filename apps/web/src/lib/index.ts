@@ -1,11 +1,5 @@
 /** Cross-feature helpers: formatting, the repository links, the message hooks. */
-export { createFormatters } from './createFormatters';
-export type {
-  AmountSeparators,
-  FormattedTimestamp,
-  Formatters,
-  TimestampKind,
-} from './createFormatters';
+export type { AmountSeparators, TimestampKind } from './createFormatters';
 export {
   healthUrl,
   livenessUrl,
