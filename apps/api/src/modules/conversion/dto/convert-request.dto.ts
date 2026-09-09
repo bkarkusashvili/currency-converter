@@ -1,24 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsNumber, IsPositive, IsString, Matches, Max } from 'class-validator';
+import {
+  CURRENCY_CODE_LENGTH,
+  CURRENCY_CODE_PATTERN,
+  toUpperCase,
+} from '../../../common/currency';
 import { ConversionRequest } from '../domain/conversion-request.types';
-
-// class-transformer types a transform's value as `any`, which would spread into
-// every DTO that used one inline; taking it as unknown here is what keeps this
-// one free of it.
-//
-// A value that is not a string is passed through untouched, so what a caller
-// sees is the type error class-validator reports for the field rather than a
-// TypeError raised while preparing to validate it.
-export function toUpperCase({ value }: { value: unknown }): unknown {
-  return typeof value === 'string' ? value.toUpperCase() : value;
-}
-
-// The whole rule for a code, and the only one: a length check beside it would
-// report one mistake twice in `details.errors[].messages`, since a code of the
-// wrong length is already a code that does not match. The `minLength` and
-// `maxLength` below are for OpenAPI, which cannot read a pattern's quantifier.
-const CURRENCY_CODE = /^[A-Za-z]{3}$/;
 
 // A trillion, the bound §3 states. Above roughly nine quadrillion a double
 // stops holding whole units exactly, and a limit far below that is what keeps
@@ -41,11 +29,11 @@ export class ConvertRequestDto implements ConversionRequest {
       'ISO 4217 alpha-3 code to convert from. Case-insensitive; the response ' +
       'echoes it upper-cased.',
     example: 'EUR',
-    minLength: 3,
-    maxLength: 3,
-    pattern: CURRENCY_CODE.source,
+    minLength: CURRENCY_CODE_LENGTH,
+    maxLength: CURRENCY_CODE_LENGTH,
+    pattern: CURRENCY_CODE_PATTERN.source,
   })
-  @Matches(CURRENCY_CODE)
+  @Matches(CURRENCY_CODE_PATTERN)
   @IsString()
   @Transform(toUpperCase)
   from!: string;
@@ -53,11 +41,11 @@ export class ConvertRequestDto implements ConversionRequest {
   @ApiProperty({
     description: 'ISO 4217 alpha-3 code to convert to, on the same terms.',
     example: 'GBP',
-    minLength: 3,
-    maxLength: 3,
-    pattern: CURRENCY_CODE.source,
+    minLength: CURRENCY_CODE_LENGTH,
+    maxLength: CURRENCY_CODE_LENGTH,
+    pattern: CURRENCY_CODE_PATTERN.source,
   })
-  @Matches(CURRENCY_CODE)
+  @Matches(CURRENCY_CODE_PATTERN)
   @IsString()
   @Transform(toUpperCase)
   to!: string;
