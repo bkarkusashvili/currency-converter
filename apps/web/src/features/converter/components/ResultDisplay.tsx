@@ -36,7 +36,11 @@ export function ResultDisplay({ outcome, isSubmitting }: ResultDisplayProps) {
 
       {!isSubmitting && outcome === undefined && (
         <>
-          <p className="figure text-line-strong flex items-center sm:h-16">—</p>
+          {/* The dash holds the figure's height open; the sentence under it is
+              what says the slot is empty, so the dash is not read out too. */}
+          <p aria-hidden="true" className="figure text-line-strong flex items-center sm:h-16">
+            —
+          </p>
           <p className="text-faint text-xs text-pretty">{t('converter.result.placeholder')}</p>
         </>
       )}

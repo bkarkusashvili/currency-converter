@@ -116,7 +116,9 @@ describe('the two-pane card', () => {
     renderPage();
 
     const result = screen.getByRole('group', { name: 'Result' });
-    expect(result).toHaveTextContent('—');
+    // The dash draws the empty slot and the sentence says what it is, so only
+    // one of the two is read out.
+    expect(within(result).getByText('—')).toHaveAttribute('aria-hidden', 'true');
     expect(result).toHaveTextContent('Rate, strategy and source appear here once you convert.');
     expect(screen.queryByText('Strategy')).not.toBeInTheDocument();
   });
