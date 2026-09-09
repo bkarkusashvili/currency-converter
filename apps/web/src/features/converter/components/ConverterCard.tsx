@@ -77,6 +77,7 @@ export function ConverterCard({
           value={form.from}
           currencies={options}
           isLoading={currenciesLoading}
+          isSubmitting={isSubmitting}
           error={form.errors.from}
           onChange={form.setFrom}
         />
@@ -94,6 +95,7 @@ export function ConverterCard({
           value={form.amount}
           error={form.errors.amount}
           separators={formatters.separators}
+          isSubmitting={isSubmitting}
           inputRef={amountRef}
           onChange={form.setAmount}
         />
@@ -123,6 +125,7 @@ export function ConverterCard({
           value={form.to}
           currencies={options}
           isLoading={currenciesLoading}
+          isSubmitting={isSubmitting}
           error={form.errors.to}
           onChange={form.setTo}
         />

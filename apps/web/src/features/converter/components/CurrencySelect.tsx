@@ -9,6 +9,8 @@ interface CurrencySelectProps {
   currencies: readonly CurrencyOption[];
   /** The list is still on its way, so the select would otherwise offer two codes and then forty. */
   isLoading: boolean;
+  /** A conversion is in flight: the trigger drops its chevron until it lands (board 1g). */
+  isSubmitting: boolean;
   error: string | null;
   onChange: (code: string) => void;
 }
@@ -19,6 +21,7 @@ export function CurrencySelect({
   value,
   currencies,
   isLoading,
+  isSubmitting,
   error,
   onChange,
 }: CurrencySelectProps) {
@@ -67,21 +70,24 @@ export function CurrencySelect({
             );
           })}
         </select>
-        <svg
-          viewBox="0 0 12 12"
-          aria-hidden="true"
-          focusable="false"
-          className="text-muted pointer-events-none absolute top-1/2 right-3.5 h-3 w-3 -translate-y-1/2"
-        >
-          <path
-            d="M2.5 4.5 6 8l3.5-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        {/* Nothing is going to open while the card is waiting for an answer. */}
+        {!isSubmitting && (
+          <svg
+            viewBox="0 0 12 12"
+            aria-hidden="true"
+            focusable="false"
+            className="text-muted pointer-events-none absolute top-1/2 right-3.5 h-3 w-3 -translate-y-1/2"
+          >
+            <path
+              d="M2.5 4.5 6 8l3.5-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
       </div>
       {error !== null && (
         <p id={errorId} role="alert" className="text-danger flex items-start gap-1.5 text-sm">

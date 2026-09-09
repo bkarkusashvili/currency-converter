@@ -49,6 +49,11 @@ function block(name: string): HTMLElement {
   return found;
 }
 
+/** The two select triggers' own glyphs, which the busy state takes away. */
+function chevrons(): Element[] {
+  return [...card().querySelectorAll('.control-select + svg')];
+}
+
 describe('the two-pane card', () => {
   it('stacks input, seam, output and action in that order, which is the mobile layout', async () => {
     renderPage();
@@ -155,6 +160,34 @@ describe('the two-pane card', () => {
     expect(result.querySelectorAll('.skeleton')).toHaveLength(3);
     expect(within(result).queryByText('—')).not.toBeInTheDocument();
     expect(screen.queryByText('cross')).not.toBeInTheDocument();
+  });
+
+  it('steps the input pane back while the answer is on its way (board 1g)', async () => {
+    const user = userEvent.setup();
+    const fake = createFakeServices({ currencies: FAKE_RESPONSES.currencies });
+    renderWithProviders(<ConverterPage />, {
+      services: {
+        ...fake.services,
+        conversion: { convert: () => new Promise<ConvertResponse>(() => undefined) },
+      },
+    });
+
+    await screen.findByLabelText('From');
+    const amount = screen.getByLabelText('Amount');
+    expect(amount).toHaveAccessibleDescription(/Numbers only/);
+    expect(chevrons()).toHaveLength(2);
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    await waitFor(() => {
+      expect(amount.parentElement).toHaveClass('opacity-60');
+    });
+    // The hint stands down rather than being read out beside a field nobody
+    // is typing in, and a hint that is off the page describes nothing.
+    expect(screen.queryByText(/Numbers only/)).not.toBeInTheDocument();
+    expect(amount).not.toHaveAttribute('aria-describedby');
+    // Nothing is going to open, so neither trigger draws a chevron.
+    expect(chevrons()).toHaveLength(0);
   });
 
   it('lifts the badges off the sunken pane they sit on', async () => {
