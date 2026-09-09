@@ -547,9 +547,10 @@
 
   /* ── Currency combobox (§3.7) ──────────────────────────────────────────── */
 
-  /* Full width and 48 tall on a phone, where the pane is the whole screen;
-     shrink-to-fit and 44 tall beside a second pane, where a trigger as wide as
-     its column would claim room the amount field needs. */
+  /* The trigger fills its pane at every width — 48 tall on a phone, 44 beside
+     a second pane — so From and To are the same box as the amount field under
+     them rather than three widths in one card. A long name is the part that
+     gives: the chip and the chevron keep their size and the name ellipsises. */
   .combobox-trigger {
     display: flex;
     width: 100%;
@@ -978,8 +979,6 @@
     }
 
     .combobox-trigger {
-      width: fit-content;
-      max-width: 100%;
       height: 2.75rem;
     }
 

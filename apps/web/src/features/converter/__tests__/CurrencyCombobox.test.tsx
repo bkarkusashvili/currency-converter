@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
@@ -59,6 +62,16 @@ function Harness({
 function renderCombobox(props: HarnessProps = {}) {
   renderWithProviders(<Harness {...props} />);
   return screen.getByRole('combobox', { name: /^From/ });
+}
+
+const css = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../../index.css'),
+  'utf8',
+);
+
+/** The chevron, and the spinner that stands in its box while the list loads. */
+function glyph(trigger: HTMLElement): Element | null {
+  return trigger.querySelector('.combobox-chevron');
 }
 
 function options(): HTMLElement[] {
@@ -301,10 +314,33 @@ describe('CurrencyCombobox', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading the currency list for From…');
   });
 
-  it('is not changeable while a conversion is in flight', () => {
+  it('is not changeable while a conversion is in flight, and keeps its chevron', () => {
     const trigger = renderCombobox({ disabled: true });
 
     expect(trigger).toBeDisabled();
+    // The glyph goes fainter, not away: a chevron removed and put back is the
+    // trigger changing width under the pointer on every Convert.
+    expect(glyph(trigger)).toHaveClass('text-faint');
+  });
+
+  it('gives the loading spinner the chevron’s own box', () => {
+    const trigger = renderCombobox({ isLoading: true });
+
+    expect(glyph(trigger)).toBeInTheDocument();
+    // One class carries the size, so neither state is a different width.
+    expect(css).toMatch(/\.combobox-chevron \{\s*height: 0\.75rem;\s*width: 0\.75rem;\s*\}/);
+  });
+
+  it('fills its pane at every width rather than shrinking to its name', () => {
+    renderCombobox();
+
+    // Board 1o draws From, To and the amount field as one column of equal
+    // boxes; a shrink-to-fit trigger made each pane a different width and
+    // moved when the currency changed.
+    expect(css).toMatch(/\.combobox-trigger \{[^}]*width: 100%;/);
+    expect(css).not.toMatch(/\.combobox-trigger \{[^}]*fit-content/);
+    // And the name is what gives when there is not room for all of it.
+    expect(css).toMatch(/\.combobox-name \{[^}]*text-overflow: ellipsis;/);
   });
 
   it('wears the field error and points at the sentence that explains it', () => {
