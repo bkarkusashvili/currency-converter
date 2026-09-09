@@ -82,27 +82,28 @@ Five passes over merged code, each read-only until it had something to say.
 ## Numbers
 
 Counts as of **9 September 2026**, from the GitHub API, the Railway CLI and a
-fresh run of all four suites on the commit that merged the second redesign
-pull request into this branch.
+fresh run of all four suites on the commit that merged the last of the redesign
+pull requests into this branch.
 
 | What | Count |
 | ---- | ----- |
 | Pull requests opened | 20 |
-| …merged into `main` | 18 |
-| Commits on `main` | 19 |
-| Review posts on those pull requests | 33 |
+| …merged into `main` | 20 |
+| Commits on `main` | 21 |
+| Review posts on those pull requests | 34 |
 | Line-anchored review comments | 59 |
-| Pull requests that went back for a fix round | 14 |
+| Pull requests that went back for a fix round | 15 |
 | Audits over merged code | 5 |
 | API tests — unit · end-to-end · integration | 767 · 163 · 25 |
-| Client tests | 409 |
-| Deploys — API · client, as `railway deployment list` reports them | 12 · 8 |
+| Client tests | 478 |
+| Deploys — API · client, as `railway deployment list` reports them | 12 · 9 |
 | Agent runs behind all of the above | roughly 75, as reported by the orchestrating session |
 
-Two pull requests were open when this table was taken: the third of the
-redesign set, and the one that adds this document. Every count above moves when
-they land — the merged, commit, review and client-test rows by the most — which
-is the reason the table has a date on it and the reason nothing else in this
+One pull request was open when this table was taken: the one that adds this
+document. The pull-request, commit and merged rows count it as landing, because
+it is the last one and nothing follows it; the review rows are what the API
+reported at the time, so a review posted on it after the run moves them. That is
+the reason the table has a date on it and the reason nothing else in this
 document counts anything.
 
 Everything above except the agent runs is recoverable: the pull request, review

@@ -436,7 +436,7 @@
       },
       "numbers": {
         "title": "By the numbers",
-        "caption": "As of 9 September 2026, with the last redesign pull request and the one adding this section still open — so every row moves when they land. The rest of this page is written without counts so it stays true as they do; these carry a date instead.",
+        "caption": "As of 9 September 2026, counting the pull request that adds this section as landing — it is the last one, and nothing follows it. The rest of this page is written without counts so it stays true; these carry a date instead.",
         "metricHeading": "What",
         "valueHeading": "Count",
         "rows": [
@@ -446,11 +446,11 @@
           },
           {
             "metric": "…merged into main",
-            "value": "18"
+            "value": "20"
           },
           {
             "metric": "Review posts on them",
-            "value": "33"
+            "value": "34"
           },
           {
             "metric": "Line-anchored review comments",
@@ -458,7 +458,7 @@
           },
           {
             "metric": "Pull requests that went back for a fix round",
-            "value": "14"
+            "value": "15"
           },
           {
             "metric": "Audits over merged code",
@@ -470,11 +470,11 @@
           },
           {
             "metric": "Client tests",
-            "value": "409"
+            "value": "478"
           },
           {
             "metric": "Deploys — API · client",
-            "value": "12 · 8"
+            "value": "12 · 9"
           }
         ]
       },
