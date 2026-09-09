@@ -1,5 +1,5 @@
 import { INestApplication, Logger } from '@nestjs/common';
-import { listenOrExit } from '../listen-or-exit';
+import { listenOrExit } from '../listen-or-exit.util';
 
 // Declared as properties rather than by implementing INestApplication: a
 // jest.Mock read off a method signature is what the unbound-method rule exists

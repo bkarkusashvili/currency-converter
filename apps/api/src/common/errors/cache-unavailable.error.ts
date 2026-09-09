@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { AppError } from './app-error';
+import { AppError } from './app.error';
 import { ErrorCode } from './error-code.enum';
 
 // The cache refusing a command is a degradation on the request path and a

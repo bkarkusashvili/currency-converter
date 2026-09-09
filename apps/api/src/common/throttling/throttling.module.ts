@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { buildThrottlerOptions } from './build-throttler-options';
+import { buildThrottlerOptions } from './build-throttler-options.util';
 
 @Module({
   imports: [

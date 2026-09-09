@@ -1,4 +1,4 @@
-import { findRate } from '../find-rate';
+import { findRate } from '../find-rate.util';
 import { RATES } from './rates.fixture';
 
 describe('findRate', () => {

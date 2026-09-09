@@ -1,4 +1,4 @@
-import { CircuitBreaker } from '../../../../common/resilience/circuit-breaker';
+import { CircuitBreaker } from '../../../../common/resilience/circuit-breaker.util';
 import type { TypedConfigService } from '../../../../config/typed-config.service';
 
 // The provider and the health indicator have to share one breaker instance:

@@ -7,14 +7,14 @@ import { HistoryUnavailableError } from '../../../common/errors/history-unavaila
 import {
   createOutageReporter,
   OutageReporter,
-} from '../../../common/logging/outage-reporter';
+} from '../../../common/logging/outage-reporter.factory';
 import { TimeoutError } from '../../../common/utils/timeout.error';
-import { withTimeout } from '../../../common/utils/with-timeout';
+import { withTimeout } from '../../../common/utils/with-timeout.util';
 import type { TypedConfigService } from '../../../config/typed-config.service';
-import { ConversionRecord } from '../domain/conversion-record';
-import type { NewConversionRecord } from '../domain/conversion-record';
-import { MAX_HISTORY_LIMIT } from '../domain/history-limits';
-import { HistoryRepository } from '../domain/history-repository.port';
+import { ConversionRecord } from '../domain/conversion-record.types';
+import type { NewConversionRecord } from '../domain/conversion-record.types';
+import { MAX_HISTORY_LIMIT } from '../domain/history-limits.constants';
+import { HistoryRepository } from '../domain/history-repository.interface';
 import {
   CONVERSION_RECORD_MODEL,
   ConversionRecordDocument,

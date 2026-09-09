@@ -1,8 +1,8 @@
 import type Big from 'big.js';
-import { Money } from '../../../common/money/money';
-import { CurrencyCode } from '../../../common/currency/currency-code';
-import { ExchangeRate } from '../../rates/domain/exchange-rate';
-import { findRate } from './find-rate';
+import { Money } from '../../../common/money/money.constants';
+import { CurrencyCode } from '../../../common/currency/currency-code.types';
+import { ExchangeRate } from '../../rates/domain/exchange-rate.types';
+import { findRate } from './find-rate.util';
 
 // A rate the snapshot cannot be trusted to price with. The upstream payload is
 // validated positive at its boundary, but a cached snapshot outlives a deploy

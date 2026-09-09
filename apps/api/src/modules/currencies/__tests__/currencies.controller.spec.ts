@@ -1,5 +1,5 @@
 import { RatesService } from '../../rates/application/rates.service';
-import { RatesLookup } from '../../rates/domain/exchange-rate';
+import { RatesLookup } from '../../rates/domain/exchange-rate.types';
 import { CurrenciesController } from '../currencies.controller';
 
 const LOOKUP: RatesLookup = {

@@ -9,8 +9,8 @@ import {
   COMMAND_TIMED_OUT,
   FakeRedisClient,
 } from '../../../../infrastructure/redis/__tests__/fake-redis-client';
-import { RatesSnapshot } from '../../domain/exchange-rate';
-import { RATES_CACHE_KEYS } from '../rates-cache-keys';
+import { RatesSnapshot } from '../../domain/exchange-rate.types';
+import { RATES_CACHE_KEYS } from '../rates-cache-keys.constants';
 import { RedisRatesRepository } from '../redis-rates.repository';
 
 const FRESH_TTL_SECONDS = 300;

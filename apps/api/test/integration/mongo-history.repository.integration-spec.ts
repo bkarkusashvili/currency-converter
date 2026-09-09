@@ -1,8 +1,8 @@
 import { createConnection, Connection, Model } from 'mongoose';
 import { createFakePinoLogger } from '../../src/common/logging/__tests__/fake-pino-logger';
 import { fakeConfig } from '../../src/config/__tests__/fake-config';
-import { NewConversionRecord } from '../../src/modules/history/domain/conversion-record';
-import { MAX_HISTORY_LIMIT } from '../../src/modules/history/domain/history-limits';
+import { NewConversionRecord } from '../../src/modules/history/domain/conversion-record.types';
+import { MAX_HISTORY_LIMIT } from '../../src/modules/history/domain/history-limits.constants';
 import { MongoHistoryRepository } from '../../src/modules/history/infrastructure/mongo-history.repository';
 import {
   buildConversionRecordSchema,

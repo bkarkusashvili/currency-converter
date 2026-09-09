@@ -3,7 +3,7 @@ import {
   FakePinoLogger,
 } from '../../../common/logging/__tests__/fake-pino-logger';
 import { fakeConfig } from '../../../config/__tests__/fake-config';
-import { MongoConnection } from '../mongo-connection';
+import { MongoConnection } from '../mongo-connection.provider';
 import { FakeMongoConnection } from './fake-mongo-connection';
 
 // Longer than the retry delay the module is built around, so the test does not

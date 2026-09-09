@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type Big from 'big.js';
-import { CurrencyCode } from '../../../common/currency/currency-code';
+import { CurrencyCode } from '../../../common/currency/currency-code.types';
 import { RateNotAvailableError } from '../../../common/errors/rate-not-available.error';
 import { UnsupportedCurrencyError } from '../../../common/errors/unsupported-currency.error';
-import { ExchangeRate } from '../../rates/domain/exchange-rate';
-import { CONVERSION_STRATEGIES } from './conversion-strategy';
-import type { ConversionStrategy } from './conversion-strategy';
+import { ExchangeRate } from '../../rates/domain/exchange-rate.types';
+import { CONVERSION_STRATEGIES } from './conversion-strategy.interface';
+import type { ConversionStrategy } from './conversion-strategy.interface';
 
 // Whether the snapshot quotes a code at all, on either side of any pair. It is
 // the same question `GET /currencies` answers, so a code this says no to is one

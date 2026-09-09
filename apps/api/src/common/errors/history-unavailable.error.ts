@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { AppError } from './app-error';
+import { AppError } from './app.error';
 import { ErrorCode } from './error-code.enum';
 
 // The history is a dependency of one route rather than of the API (§2): the

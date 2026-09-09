@@ -1,6 +1,6 @@
 import { ConversionController } from '../conversion.controller';
 import { ConversionService } from '../conversion.service';
-import { ConversionOutcome } from '../domain/conversion-outcome';
+import { ConversionOutcome } from '../domain/conversion-outcome.types';
 
 const REQUEST = { from: 'EUR', to: 'GBP', amount: 100 };
 

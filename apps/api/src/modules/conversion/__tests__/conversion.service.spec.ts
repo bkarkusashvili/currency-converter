@@ -6,10 +6,10 @@ import {
 } from '../../../common/logging/__tests__/fake-pino-logger';
 import { HistoryService } from '../../history/history.service';
 import { RatesService } from '../../rates/application/rates.service';
-import { RatesLookup } from '../../rates/domain/exchange-rate';
+import { RatesLookup } from '../../rates/domain/exchange-rate.types';
 import { ConversionService } from '../conversion.service';
-import { ConversionRequest } from '../domain/conversion-request';
-import { ConversionResult } from '../domain/conversion-result';
+import { ConversionRequest } from '../domain/conversion-request.types';
+import { ConversionResult } from '../domain/conversion-result.types';
 import { ConversionStrategyResolver } from '../strategies/conversion-strategy.resolver';
 import { CrossRateStrategy } from '../strategies/cross-rate.strategy';
 import { DirectPairStrategy } from '../strategies/direct-pair.strategy';

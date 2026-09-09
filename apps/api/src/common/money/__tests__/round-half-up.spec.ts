@@ -1,6 +1,6 @@
 import Big from 'big.js';
-import { RATE_DECIMALS, RESULT_DECIMALS } from '../money-decimals';
-import { roundHalfUp } from '../round-half-up';
+import { RATE_DECIMALS, RESULT_DECIMALS } from '../money-decimals.constants';
+import { roundHalfUp } from '../round-half-up.util';
 
 describe('roundHalfUp', () => {
   it('rounds a half up to the money scale', () => {

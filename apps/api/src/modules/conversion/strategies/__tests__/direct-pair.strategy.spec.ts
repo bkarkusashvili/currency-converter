@@ -1,5 +1,5 @@
-import { RATE_DECIMALS } from '../../../../common/money/money-decimals';
-import { roundHalfUp } from '../../../../common/money/round-half-up';
+import { RATE_DECIMALS } from '../../../../common/money/money-decimals.constants';
+import { roundHalfUp } from '../../../../common/money/round-half-up.util';
 import { DirectPairStrategy } from '../direct-pair.strategy';
 import { RATES } from './rates.fixture';
 

@@ -1,5 +1,5 @@
 import { BadRequestException, ValidationError } from '@nestjs/common';
-import { FieldValidationError } from './field-validation-error';
+import { FieldValidationError } from './field-validation-error.types';
 
 // class-validator nests errors for object properties; the envelope exposes a
 // flat list keyed by dotted path so a client can map messages onto form fields.

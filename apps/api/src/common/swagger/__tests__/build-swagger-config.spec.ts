@@ -2,7 +2,7 @@ import { API_KEY_HEADER } from '../../guards/api-key.guard';
 import {
   ADMIN_SECURITY_SCHEME,
   buildSwaggerConfig,
-} from '../build-swagger-config';
+} from '../build-swagger-config.util';
 
 describe('buildSwaggerConfig', () => {
   const config = buildSwaggerConfig({

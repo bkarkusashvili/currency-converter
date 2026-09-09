@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { NewConversionRecord } from '../../domain/conversion-record';
+import { NewConversionRecord } from '../../domain/conversion-record.types';
 import {
   buildConversionRecordSchema,
   ConversionRecordDocument,

@@ -4,11 +4,15 @@ import Redis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
 import { CacheUnavailableError } from '../../../common/errors/cache-unavailable.error';
 import type { TypedConfigService } from '../../../config/typed-config.service';
-import { REDIS_CLIENT } from '../../../infrastructure/redis/create-redis-client';
-import { CachedSnapshot, CacheWrite, RatesRepository } from '../domain/ports';
-import { RatesSnapshot } from '../domain/exchange-rate';
+import { REDIS_CLIENT } from '../../../infrastructure/redis/create-redis-client.factory';
+import {
+  CachedSnapshot,
+  CacheWrite,
+  RatesRepository,
+} from '../domain/rates-repository.interface';
+import { RatesSnapshot } from '../domain/exchange-rate.types';
 import { cachedRatesSnapshotSchema } from './cached-rates-snapshot.schema';
-import { RATES_CACHE_KEYS } from './rates-cache-keys';
+import { RATES_CACHE_KEYS } from './rates-cache-keys.constants';
 
 // A cache that answered, with nothing to answer with. Kept beside the degraded
 // case so the two ways of returning no snapshot are visibly different: this one

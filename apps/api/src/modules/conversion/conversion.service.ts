@@ -3,14 +3,14 @@ import { PinoLogger } from 'nestjs-pino';
 import {
   RATE_DECIMALS,
   RESULT_DECIMALS,
-} from '../../common/money/money-decimals';
-import { Money } from '../../common/money/money';
-import { roundHalfUp } from '../../common/money/round-half-up';
+} from '../../common/money/money-decimals.constants';
+import { Money } from '../../common/money/money.constants';
+import { roundHalfUp } from '../../common/money/round-half-up.util';
 import { HistoryService } from '../history/history.service';
 import { RatesService } from '../rates/application/rates.service';
-import { ConversionOutcome } from './domain/conversion-outcome';
-import { ConversionRequest } from './domain/conversion-request';
-import { ConversionResult } from './domain/conversion-result';
+import { ConversionOutcome } from './domain/conversion-outcome.types';
+import { ConversionRequest } from './domain/conversion-request.types';
+import { ConversionResult } from './domain/conversion-result.types';
 import { ConversionStrategyResolver } from './strategies/conversion-strategy.resolver';
 
 @Injectable()

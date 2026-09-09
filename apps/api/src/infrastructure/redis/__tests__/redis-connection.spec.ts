@@ -1,5 +1,5 @@
 import { createFakePinoLogger } from '../../../common/logging/__tests__/fake-pino-logger';
-import { RedisConnection } from '../redis-connection';
+import { RedisConnection } from '../redis-connection.provider';
 import { FakeRedisClient, OFFLINE_QUEUE_REJECTION } from './fake-redis-client';
 
 describe('RedisConnection', () => {

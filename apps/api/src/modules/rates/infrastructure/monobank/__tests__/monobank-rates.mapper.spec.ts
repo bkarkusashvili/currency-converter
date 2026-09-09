@@ -2,7 +2,7 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../../../common/logging/__tests__/fake-pino-logger';
-import { ExchangeRate } from '../../../domain/exchange-rate';
+import { ExchangeRate } from '../../../domain/exchange-rate.types';
 import { MonobankRate } from '../monobank-rate.schema';
 import { mapMonobankRates } from '../monobank-rates.mapper';
 

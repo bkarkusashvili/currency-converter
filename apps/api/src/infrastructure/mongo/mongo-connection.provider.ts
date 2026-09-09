@@ -11,7 +11,7 @@ import { PinoLogger } from 'nestjs-pino';
 import {
   createOutageReporter,
   OutageReporter,
-} from '../../common/logging/outage-reporter';
+} from '../../common/logging/outage-reporter.factory';
 import type { TypedConfigService } from '../../config/typed-config.service';
 import { buildMongoConnectOptions } from './mongo-connect.options';
 

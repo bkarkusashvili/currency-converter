@@ -1,4 +1,4 @@
-import { validateEnv } from '../validate-env';
+import { validateEnv } from '../validate-env.util';
 
 describe('validateEnv', () => {
   describe('defaults', () => {

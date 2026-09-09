@@ -1,8 +1,8 @@
 import { Params } from 'nestjs-pino';
 import { TypedConfigService } from '../../config/typed-config.service';
-import { assignRequestId } from './request-id';
-import { resolveLogLevel } from './resolve-log-level';
-import { serializeRequest, serializeResponse } from './serializers';
+import { assignRequestId } from './request-id.util';
+import { resolveLogLevel } from './resolve-log-level.util';
+import { serializeRequest, serializeResponse } from './serializers.util';
 export function buildLoggerParams(config: TypedConfigService): Params {
   const isDevelopment =
     config.get('NODE_ENV', { infer: true }) === 'development';

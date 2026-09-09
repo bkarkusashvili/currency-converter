@@ -2,7 +2,7 @@ import { Controller, Get, HttpStatus, INestApplication } from '@nestjs/common';
 import { OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { ApiErrorResponses } from '../api-error-responses.decorator';
-import { buildSwaggerConfig } from '../build-swagger-config';
+import { buildSwaggerConfig } from '../build-swagger-config.util';
 
 @Controller('probe')
 class ProbeController {

@@ -3,7 +3,7 @@ import { conversionStrategiesProvider } from '../conversion.module';
 import {
   ConversionStrategy,
   CONVERSION_STRATEGIES,
-} from '../strategies/conversion-strategy';
+} from '../strategies/conversion-strategy.interface';
 import { CrossRateStrategy } from '../strategies/cross-rate.strategy';
 import { DirectPairStrategy } from '../strategies/direct-pair.strategy';
 import { IdentityStrategy } from '../strategies/identity.strategy';

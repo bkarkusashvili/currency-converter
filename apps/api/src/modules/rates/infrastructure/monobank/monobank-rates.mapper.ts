@@ -1,6 +1,6 @@
 import { PinoLogger } from 'nestjs-pino';
-import { alphaFromNumeric } from '../../../../common/currency/iso-4217';
-import { ExchangeRate } from '../../domain/exchange-rate';
+import { alphaFromNumeric } from '../../../../common/currency/iso-4217.util';
+import { ExchangeRate } from '../../domain/exchange-rate.types';
 import { MonobankRate } from './monobank-rate.schema';
 
 const MILLISECONDS_PER_SECOND = 1000;

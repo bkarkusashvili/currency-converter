@@ -1,5 +1,5 @@
 import { createFakePinoLogger, FakePinoLogger } from './fake-pino-logger';
-import { createOutageReporter } from '../outage-reporter';
+import { createOutageReporter } from '../outage-reporter.factory';
 
 const MESSAGES = {
   down: 'the dependency is down',

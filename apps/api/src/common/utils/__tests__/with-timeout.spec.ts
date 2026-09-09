@@ -1,5 +1,5 @@
 import { TimeoutError } from '../timeout.error';
-import { withTimeout } from '../with-timeout';
+import { withTimeout } from '../with-timeout.util';
 
 const TIMEOUT_MS = 20;
 

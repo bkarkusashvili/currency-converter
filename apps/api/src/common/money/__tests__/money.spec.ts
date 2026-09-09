@@ -1,5 +1,5 @@
 import Big from 'big.js';
-import { Money } from '../money';
+import { Money } from '../money.constants';
 
 // `Big.DP` and `Big.RM` are process-wide and writable by anything that imports
 // big.js. These are the guarantees the money path is entitled to assume when

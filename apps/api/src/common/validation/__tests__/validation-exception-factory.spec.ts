@@ -6,7 +6,7 @@ import {
 import {
   flattenValidationErrors,
   validationExceptionFactory,
-} from '../validation-exception-factory';
+} from '../validation-exception.factory';
 
 describe('validationExceptionFactory', () => {
   const exception = validationExceptionFactory([

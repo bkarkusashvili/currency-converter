@@ -1,4 +1,4 @@
-import { collectWarnings } from '../collect-warnings';
+import { collectWarnings } from '../collect-warnings.util';
 
 describe('collectWarnings', () => {
   // Absent, not empty: every response would otherwise carry a field a client

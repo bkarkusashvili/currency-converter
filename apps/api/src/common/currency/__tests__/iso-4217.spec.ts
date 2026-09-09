@@ -1,4 +1,4 @@
-import { alphaFromNumeric, describeCurrency } from '../iso-4217';
+import { alphaFromNumeric, describeCurrency } from '../iso-4217.util';
 
 describe('alphaFromNumeric', () => {
   it.each([

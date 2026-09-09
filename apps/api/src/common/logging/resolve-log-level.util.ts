@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
-import { PROBE_PATHS } from '../http/paths';
+import { PROBE_PATHS } from '../http/paths.constants';
 
 // Narrower than pino's LevelWithSilent, which is what pino-http asks for; every
 // member here is one of its levels.

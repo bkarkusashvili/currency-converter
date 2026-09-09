@@ -1,6 +1,6 @@
-import { RatesSource } from '../../rates/domain/exchange-rate';
-import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
-import { ConversionRequest } from './conversion-request';
+import { RatesSource } from '../../rates/domain/exchange-rate.types';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
+import { ConversionRequest } from './conversion-request.types';
 
 // A whole conversion: the request it answered, the numbers it produced, and the
 // provenance of the rates it used. Nothing about the request that produced it:

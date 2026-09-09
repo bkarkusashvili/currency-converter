@@ -1,5 +1,5 @@
 import { fakeConfig } from '../../../config/__tests__/fake-config';
-import { buildThrottlerOptions } from '../build-throttler-options';
+import { buildThrottlerOptions } from '../build-throttler-options.util';
 
 const MILLISECONDS_PER_SECOND = 1000;
 

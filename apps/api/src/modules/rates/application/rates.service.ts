@@ -1,10 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { RatesUnavailableError } from '../../../common/errors/rates-unavailable.error';
-import { RatesLookup, RatesSnapshot } from '../domain/exchange-rate';
-import { RATES_PROVIDER, RATES_REPOSITORY } from '../domain/ports';
-import type { RatesProvider, RatesRepository } from '../domain/ports';
-import { describeRatesFailure } from './describe-rates-failure';
+import { RatesLookup, RatesSnapshot } from '../domain/exchange-rate.types';
+import { RATES_PROVIDER } from '../domain/rates-provider.interface';
+import type { RatesProvider } from '../domain/rates-provider.interface';
+import { RATES_REPOSITORY } from '../domain/rates-repository.interface';
+import type { RatesRepository } from '../domain/rates-repository.interface';
+import { describeRatesFailure } from './describe-rates-failure.util';
 
 // A fetch and what caching it cost: the snapshot the upstream answered with,
 // and whether the write of it degraded. Both halves belong to the same flight,

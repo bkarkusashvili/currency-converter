@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import Redis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
-import { REDIS_CLIENT } from './create-redis-client';
+import { REDIS_CLIENT } from './create-redis-client.factory';
 
 @Injectable()
 export class RedisConnection implements OnModuleInit, OnApplicationShutdown {

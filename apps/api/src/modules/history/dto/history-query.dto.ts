@@ -4,7 +4,7 @@ import { IsInt, Max, Min } from 'class-validator';
 import {
   DEFAULT_HISTORY_LIMIT,
   MAX_HISTORY_LIMIT,
-} from '../domain/history-limits';
+} from '../domain/history-limits.constants';
 
 export class HistoryQueryDto {
   @ApiPropertyOptional({

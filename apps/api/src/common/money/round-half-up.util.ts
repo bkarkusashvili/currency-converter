@@ -1,5 +1,5 @@
 import type Big from 'big.js';
-import { Money } from './money';
+import { Money } from './money.constants';
 
 // Half away from zero, the rounding a price list and an invoice both use.
 //

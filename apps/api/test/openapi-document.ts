@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { OpenAPIObject } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
-import { buildOpenApiDocument } from '../src/common/swagger/setup-swagger';
+import { buildOpenApiDocument } from '../src/common/swagger/setup-swagger.util';
 import { createE2eApp } from './e2e/create-e2e-app';
 
 // The published contract, committed so a change to it shows up in a diff. The

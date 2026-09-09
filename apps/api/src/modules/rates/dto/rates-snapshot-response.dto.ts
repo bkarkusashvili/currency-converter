@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ResponseWarningDto } from '../../../common/warnings/response-warning.dto';
-import { RATES_SOURCES } from '../domain/exchange-rate';
-import type { RatesSource } from '../domain/exchange-rate';
+import { RATES_SOURCES } from '../domain/exchange-rate.types';
+import type { RatesSource } from '../domain/exchange-rate.types';
 import { ExchangeRateDto } from './exchange-rate.dto';
 
 export class RatesSnapshotResponseDto {

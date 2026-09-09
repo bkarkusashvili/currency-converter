@@ -1,5 +1,5 @@
-import { ExchangeRate } from '../../rates/domain/exchange-rate';
-import { collectCurrencies } from '../collect-currencies';
+import { ExchangeRate } from '../../rates/domain/exchange-rate.types';
+import { collectCurrencies } from '../collect-currencies.util';
 
 const DATE = '2026-09-08T11:00:00.000Z';
 

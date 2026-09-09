@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios';
 import { CircuitOpenError } from '../../../../common/resilience/circuit-open.error';
-import { describeRatesFailure } from '../describe-rates-failure';
+import { describeRatesFailure } from '../describe-rates-failure.util';
 
 describe('describeRatesFailure', () => {
   it('names the breaker when the call was never attempted', () => {

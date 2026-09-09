@@ -1,5 +1,5 @@
 import { AxiosError, AxiosHeaders } from 'axios';
-import { shouldRetryMonobank } from '../should-retry-monobank';
+import { shouldRetryMonobank } from '../should-retry-monobank.util';
 
 function withStatus(status: number): AxiosError {
   const error = new AxiosError('Request failed');

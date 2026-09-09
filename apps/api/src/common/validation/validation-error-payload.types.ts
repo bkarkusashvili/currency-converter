@@ -1,4 +1,4 @@
-import { FieldValidationError } from './field-validation-error';
+import { FieldValidationError } from './field-validation-error.types';
 
 export interface ValidationErrorPayload {
   errors: FieldValidationError[];

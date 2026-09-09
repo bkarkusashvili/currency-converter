@@ -1,9 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
-import { DOCS_JSON_PATH, DOCS_PATH } from '../http/paths';
+import { DOCS_JSON_PATH, DOCS_PATH } from '../http/paths.constants';
 import { ErrorResponseDto } from '../filters/error-response.dto';
-import { buildSwaggerConfig } from './build-swagger-config';
-import { readPackageMetadata } from './read-package-metadata';
+import { buildSwaggerConfig } from './build-swagger-config.util';
+import { readPackageMetadata } from './read-package-metadata.util';
 
 // The document itself, separate from serving it: the e2e contract test and the
 // `openapi:write` script both need the document without a route to fetch it

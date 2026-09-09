@@ -1,4 +1,4 @@
-import { CircuitBreaker } from '../circuit-breaker';
+import { CircuitBreaker } from '../circuit-breaker.util';
 import { CircuitOpenError } from '../circuit-open.error';
 
 const RESET_TIMEOUT_MS = 1000;

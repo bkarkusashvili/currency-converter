@@ -6,7 +6,7 @@ import {
   MONOBANK_CIRCUIT_BREAKER,
   buildMonobankCircuitBreaker,
 } from './monobank-circuit-breaker.factory';
-import { RATES_PROVIDER } from '../../domain/ports';
+import { RATES_PROVIDER } from '../../domain/rates-provider.interface';
 import { buildMonobankHttpOptions } from './monobank-http.options';
 import { MonobankRatesProvider } from './monobank-rates.provider';
 

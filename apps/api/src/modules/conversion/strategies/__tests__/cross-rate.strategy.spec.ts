@@ -1,6 +1,6 @@
-import { RATE_DECIMALS } from '../../../../common/money/money-decimals';
-import { roundHalfUp } from '../../../../common/money/round-half-up';
-import { ExchangeRate } from '../../../rates/domain/exchange-rate';
+import { RATE_DECIMALS } from '../../../../common/money/money-decimals.constants';
+import { roundHalfUp } from '../../../../common/money/round-half-up.util';
+import { ExchangeRate } from '../../../rates/domain/exchange-rate.types';
 import { CrossRateStrategy } from '../cross-rate.strategy';
 import { RATES } from './rates.fixture';
 

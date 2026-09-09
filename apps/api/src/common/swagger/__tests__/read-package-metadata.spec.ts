@@ -1,4 +1,4 @@
-import { readPackageMetadata } from '../read-package-metadata';
+import { readPackageMetadata } from '../read-package-metadata.util';
 
 describe('readPackageMetadata', () => {
   const metadata = readPackageMetadata();

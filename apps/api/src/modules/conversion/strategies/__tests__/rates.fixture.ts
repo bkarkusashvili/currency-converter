@@ -1,4 +1,4 @@
-import { ExchangeRate } from '../../../rates/domain/exchange-rate';
+import { ExchangeRate } from '../../../rates/domain/exchange-rate.types';
 
 const QUOTED_AT = '2026-09-08T11:00:00.000Z';
 

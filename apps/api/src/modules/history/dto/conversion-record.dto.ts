@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CONVERSION_PROPERTIES } from '../../../common/conversion/conversion-api-properties';
-import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
-import { RATES_SOURCES } from '../../rates/domain/exchange-rate';
-import type { RatesSource } from '../../rates/domain/exchange-rate';
-import { ConversionRecord } from '../domain/conversion-record';
+import { CONVERSION_PROPERTIES } from '../../../common/conversion/conversion-api-properties.constants';
+import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
+import { RATES_SOURCES } from '../../rates/domain/exchange-rate.types';
+import type { RatesSource } from '../../rates/domain/exchange-rate.types';
+import { ConversionRecord } from '../domain/conversion-record.types';
 
 // A record is the conversion that was answered plus the two fields the store
 // owns. It declares its own properties rather than inheriting the convert

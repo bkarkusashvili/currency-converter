@@ -2,7 +2,7 @@ import {
   ResponseWarning,
   WARNING_CODES,
   WarningCode,
-} from './response-warning';
+} from './response-warning.types';
 
 // The sentence each code carries, in one place: the message is part of the
 // contract a client renders, and two wordings for the same degradation is what

@@ -1,8 +1,8 @@
 import Big from 'big.js';
-import { RATE_DECIMALS } from '../../../../common/money/money-decimals';
-import { roundHalfUp } from '../../../../common/money/round-half-up';
-import { ExchangeRate } from '../../../rates/domain/exchange-rate';
-import { directionalRate } from '../directional-rate';
+import { RATE_DECIMALS } from '../../../../common/money/money-decimals.constants';
+import { roundHalfUp } from '../../../../common/money/round-half-up.util';
+import { ExchangeRate } from '../../../rates/domain/exchange-rate.types';
+import { directionalRate } from '../directional-rate.util';
 import { RATES } from './rates.fixture';
 
 const QUOTED_AT = '2026-09-08T11:00:00.000Z';

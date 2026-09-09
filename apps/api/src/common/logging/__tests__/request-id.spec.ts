@@ -5,7 +5,7 @@ import {
   REQUEST_ID_HEADER,
   requestIdMiddleware,
   sanitiseRequestId,
-} from '../request-id';
+} from '../request-id.util';
 
 function createRequest(headerValue?: string | string[]): IncomingMessage {
   return {

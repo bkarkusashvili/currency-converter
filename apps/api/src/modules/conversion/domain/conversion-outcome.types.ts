@@ -1,4 +1,4 @@
-import { ConversionResult } from './conversion-result';
+import { ConversionResult } from './conversion-result.types';
 
 // What one request produced: the conversion, and what degraded while it was
 // being answered. The two are kept apart because they answer different

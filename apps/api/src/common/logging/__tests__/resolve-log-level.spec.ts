@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
-import { resolveLogLevel } from '../resolve-log-level';
+import { resolveLogLevel } from '../resolve-log-level.util';
 
 function createRequest(url: string): IncomingMessage {
   return { url } as unknown as IncomingMessage;

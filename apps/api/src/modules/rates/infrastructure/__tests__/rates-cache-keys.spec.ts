@@ -1,4 +1,4 @@
-import { RATES_CACHE_KEYS } from '../rates-cache-keys';
+import { RATES_CACHE_KEYS } from '../rates-cache-keys.constants';
 
 // Every other spec reads a key through this constant, which makes renaming one
 // invisible to the suite and visible only in production: the next deploy would

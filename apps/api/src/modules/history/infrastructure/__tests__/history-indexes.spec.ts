@@ -5,7 +5,7 @@ import {
 } from '../../../../common/logging/__tests__/fake-pino-logger';
 import { FakeMongoConnection } from '../../../../infrastructure/mongo/__tests__/fake-mongo-connection';
 import { ConversionRecordDocument } from '../../schemas/conversion-record.schema';
-import { HistoryIndexes } from '../history-indexes';
+import { HistoryIndexes } from '../history-indexes.provider';
 
 interface ModelDouble {
   syncIndexes: jest.Mock;

@@ -5,8 +5,8 @@ import {
   HealthIndicatorService,
 } from '@nestjs/terminus';
 import { Connection, ConnectionStates } from 'mongoose';
-import { HealthIndicatorPort } from './health-indicator.port';
-import { pingIndicator } from './ping-indicator';
+import { HealthIndicatorPort } from './health-indicator.interface';
+import { pingIndicator } from './ping-indicator.util';
 
 const INDICATOR_KEY = 'mongodb';
 

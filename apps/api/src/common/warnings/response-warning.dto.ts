@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResponseWarning, WARNING_CODES } from './response-warning';
-import type { WarningCode } from './response-warning';
+import { ResponseWarning, WARNING_CODES } from './response-warning.types';
+import type { WarningCode } from './response-warning.types';
 
 export class ResponseWarningDto implements ResponseWarning {
   @ApiProperty({

@@ -1,4 +1,4 @@
-import { AppConfig } from './app-config';
+import { AppConfig } from './app-config.types';
 import { envSchema } from './env.schema';
 
 // Docker Compose and CI runners pass unset variables through as empty strings;

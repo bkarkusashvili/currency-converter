@@ -3,7 +3,7 @@ import {
   HealthIndicatorService,
 } from '@nestjs/terminus';
 import { TimeoutError } from '../../common/utils/timeout.error';
-import { withTimeout } from '../../common/utils/with-timeout';
+import { withTimeout } from '../../common/utils/with-timeout.util';
 
 // `HealthIndicatorService.check` returns the session an indicator reports
 // through, and the package does not export its type.

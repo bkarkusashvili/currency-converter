@@ -3,7 +3,7 @@ import {
   errorStack,
   serializeRequest,
   serializeResponse,
-} from '../serializers';
+} from '../serializers.util';
 
 interface RequestFields {
   id?: string;

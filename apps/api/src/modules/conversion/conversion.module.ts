@@ -7,7 +7,7 @@ import { ConversionService } from './conversion.service';
 import {
   ConversionStrategy,
   CONVERSION_STRATEGIES,
-} from './strategies/conversion-strategy';
+} from './strategies/conversion-strategy.interface';
 import { ConversionStrategyResolver } from './strategies/conversion-strategy.resolver';
 import { CrossRateStrategy } from './strategies/cross-rate.strategy';
 import { DirectPairStrategy } from './strategies/direct-pair.strategy';

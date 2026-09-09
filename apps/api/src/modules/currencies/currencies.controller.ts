@@ -1,9 +1,9 @@
 import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiErrorResponses } from '../../common/swagger/api-error-responses.decorator';
-import { collectWarnings } from '../../common/warnings/collect-warnings';
+import { collectWarnings } from '../../common/warnings/collect-warnings.util';
 import { RatesService } from '../rates/application/rates.service';
-import { collectCurrencies } from './collect-currencies';
+import { collectCurrencies } from './collect-currencies.util';
 import { CurrenciesResponseDto } from './dto/currencies-response.dto';
 
 @ApiTags('currencies')

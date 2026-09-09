@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CONVERSION_PROPERTIES } from '../../../common/conversion/conversion-api-properties';
-import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
+import { CONVERSION_PROPERTIES } from '../../../common/conversion/conversion-api-properties.constants';
+import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
 import { ResponseWarningDto } from '../../../common/warnings/response-warning.dto';
-import { RATES_SOURCES } from '../../rates/domain/exchange-rate';
-import type { RatesSource } from '../../rates/domain/exchange-rate';
-import { ConversionResult } from '../domain/conversion-result';
+import { RATES_SOURCES } from '../../rates/domain/exchange-rate.types';
+import type { RatesSource } from '../../rates/domain/exchange-rate.types';
+import { ConversionResult } from '../domain/conversion-result.types';
 
 // The conversion as the client receives it: the domain result, plus what
 // degraded while the request that produced it ran. The fields a stored record

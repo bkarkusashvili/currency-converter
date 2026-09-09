@@ -1,4 +1,4 @@
-import { ConversionStrategy } from '../conversion-strategy';
+import { ConversionStrategy } from '../conversion-strategy.interface';
 import { IdentityStrategy } from '../identity.strategy';
 import { RATES } from './rates.fixture';
 

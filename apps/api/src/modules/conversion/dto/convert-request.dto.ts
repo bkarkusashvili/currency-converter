@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsNumber, IsPositive, IsString, Matches, Max } from 'class-validator';
-import { ConversionRequest } from '../domain/conversion-request';
+import { ConversionRequest } from '../domain/conversion-request.types';
 
 // class-transformer types a transform's value as `any`, which would spread into
 // every DTO that used one inline; taking it as unknown here is what keeps this

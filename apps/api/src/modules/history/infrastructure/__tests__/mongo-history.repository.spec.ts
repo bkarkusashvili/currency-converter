@@ -6,8 +6,8 @@ import {
 } from '../../../../common/logging/__tests__/fake-pino-logger';
 import { fakeConfig } from '../../../../config/__tests__/fake-config';
 import { FakeMongoConnection } from '../../../../infrastructure/mongo/__tests__/fake-mongo-connection';
-import { NewConversionRecord } from '../../domain/conversion-record';
-import { MAX_HISTORY_LIMIT } from '../../domain/history-limits';
+import { NewConversionRecord } from '../../domain/conversion-record.types';
+import { MAX_HISTORY_LIMIT } from '../../domain/history-limits.constants';
 import { ConversionRecordDocument } from '../../schemas/conversion-record.schema';
 import { MongoHistoryRepository } from '../mongo-history.repository';
 

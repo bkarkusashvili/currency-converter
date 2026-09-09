@@ -1,8 +1,8 @@
-import { Money } from '../../../../common/money/money';
+import { Money } from '../../../../common/money/money.constants';
 import { RateNotAvailableError } from '../../../../common/errors/rate-not-available.error';
 import { UnsupportedCurrencyError } from '../../../../common/errors/unsupported-currency.error';
-import { ExchangeRate } from '../../../rates/domain/exchange-rate';
-import { ConversionStrategy } from '../conversion-strategy';
+import { ExchangeRate } from '../../../rates/domain/exchange-rate.types';
+import { ConversionStrategy } from '../conversion-strategy.interface';
 import { ConversionStrategyResolver } from '../conversion-strategy.resolver';
 import { CrossRateStrategy } from '../cross-rate.strategy';
 import { DirectPairStrategy } from '../direct-pair.strategy';

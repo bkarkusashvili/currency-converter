@@ -1,4 +1,4 @@
-import type { AppConfig } from '../app-config';
+import type { AppConfig } from '../app-config.types';
 import type { TypedConfigService } from '../typed-config.service';
 
 // One config double for every spec that needs one. It answers from the values

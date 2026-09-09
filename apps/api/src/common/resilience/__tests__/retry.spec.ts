@@ -1,4 +1,4 @@
-import { RetryOptions, retry } from '../retry';
+import { RetryOptions, retry } from '../retry.util';
 
 interface Harness {
   readonly delays: number[];

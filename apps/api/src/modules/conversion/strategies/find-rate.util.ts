@@ -1,5 +1,5 @@
-import { CurrencyCode } from '../../../common/currency/currency-code';
-import { ExchangeRate } from '../../rates/domain/exchange-rate';
+import { CurrencyCode } from '../../../common/currency/currency-code.types';
+import { ExchangeRate } from '../../rates/domain/exchange-rate.types';
 
 // A snapshot is a handful of pairs, so the lookup is a scan; it is a function
 // of its own so that "the pair the upstream published for base/quote" is

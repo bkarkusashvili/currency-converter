@@ -2,7 +2,7 @@ import { INestApplication, ModuleMetadata } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { Logger } from 'nestjs-pino';
-import { setupSwagger } from '../../src/common/swagger/setup-swagger';
+import { setupSwagger } from '../../src/common/swagger/setup-swagger.util';
 import type { TypedConfigService } from '../../src/config/typed-config.service';
 import { configureHttp } from '../../src/configure-http';
 import { overrideHistory } from './override-history';

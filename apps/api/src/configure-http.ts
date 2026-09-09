@@ -7,8 +7,8 @@ import {
   GLOBAL_PREFIX,
   HEALTH_LIVE_PATH,
   HEALTH_PATH,
-} from './common/http/paths';
-import { requestIdMiddleware } from './common/logging/request-id';
+} from './common/http/paths.constants';
+import { requestIdMiddleware } from './common/logging/request-id.util';
 import type { TypedConfigService } from './config/typed-config.service';
 
 // Shared by main.ts and the e2e suite so both exercise the same HTTP surface

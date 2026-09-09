@@ -1,4 +1,7 @@
-import { ConversionRecord, NewConversionRecord } from './conversion-record';
+import {
+  ConversionRecord,
+  NewConversionRecord,
+} from './conversion-record.types';
 
 // The seam the Mongo adapter plugs into. Writing and reading have opposite
 // contracts on purpose, because §2 gives them opposite jobs: a conversion is

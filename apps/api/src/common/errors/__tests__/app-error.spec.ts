@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { AppError } from '../app-error';
+import { AppError } from '../app.error';
 import { ErrorCode } from '../error-code.enum';
 import { HistoryUnavailableError } from '../history-unavailable.error';
 import { RateNotAvailableError } from '../rate-not-available.error';

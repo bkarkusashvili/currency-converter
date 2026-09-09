@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
-import { AppConfig } from '../../../config/app-config';
+import { AppConfig } from '../../../config/app-config.types';
 import { fakeConfig } from '../../../config/__tests__/fake-config';
-import { buildLoggerParams } from '../build-logger-params';
+import { buildLoggerParams } from '../build-logger-params.util';
 
 // The parts of pino-http's options this module fills in. Reaching for them
 // through the built params is what makes the assertions below exercise the

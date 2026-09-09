@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
-import { getRequestId } from './request-id';
+import { getRequestId } from './request-id.util';
 
 // What reaches a log line, and nothing else. pino's defaults would write the
 // whole header bag on both sides of a request — roughly 1.5 KB of mostly the

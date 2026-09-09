@@ -4,7 +4,7 @@ import { z } from 'zod';
 import {
   ExchangeRate,
   RatesSnapshot,
-} from '../../../src/modules/rates/domain/exchange-rate';
+} from '../../../src/modules/rates/domain/exchange-rate.types';
 
 // The rates and the conversions of them both live at the repository root, in
 // JSON, because the web app's offline estimate is tested against exactly the

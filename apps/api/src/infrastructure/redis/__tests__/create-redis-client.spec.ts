@@ -4,7 +4,7 @@ import {
   FakePinoLogger,
 } from '../../../common/logging/__tests__/fake-pino-logger';
 import { fakeConfig } from '../../../config/__tests__/fake-config';
-import { createRedisClient } from '../create-redis-client';
+import { createRedisClient } from '../create-redis-client.factory';
 
 const COMMAND_TIMEOUT_MS = 300;
 

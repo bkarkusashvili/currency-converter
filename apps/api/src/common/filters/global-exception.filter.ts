@@ -7,14 +7,14 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { PinoLogger } from 'nestjs-pino';
-import { AppError } from '../errors/app-error';
+import { AppError } from '../errors/app.error';
 import { ErrorCode } from '../errors/error-code.enum';
-import { getRequestId } from '../logging/request-id';
-import { isValidationErrorPayload } from '../validation/validation-error-payload';
+import { getRequestId } from '../logging/request-id.util';
+import { isValidationErrorPayload } from '../validation/validation-error-payload.types';
 import {
   deriveErrorCode,
   extractHttpExceptionMessage,
-} from './http-exception-mapping';
+} from './http-exception-mapping.util';
 import { ErrorResponseDto } from './error-response.dto';
 const INTERNAL_ERROR_MESSAGE = 'An unexpected error occurred';
 

@@ -1,5 +1,5 @@
 import { ApiPropertyOptions } from '@nestjs/swagger';
-import { CONVERSION_STRATEGY_NAMES } from './conversion-strategy-name';
+import { CONVERSION_STRATEGY_NAMES } from './conversion-strategy-name.enum';
 
 // What a conversion publishes about itself, as OpenAPI option objects. A stored
 // record is the conversion that was answered plus the two fields the store owns

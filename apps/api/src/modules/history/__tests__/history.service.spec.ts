@@ -3,8 +3,8 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../common/logging/__tests__/fake-pino-logger';
-import { ConversionRecord } from '../domain/conversion-record';
-import type { NewConversionRecord } from '../domain/conversion-record';
+import { ConversionRecord } from '../domain/conversion-record.types';
+import type { NewConversionRecord } from '../domain/conversion-record.types';
 import { HistoryService } from '../history.service';
 
 // Exactly what a conversion answers, which is why the service can take the

@@ -4,8 +4,8 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { ErrorCode } from '../../src/common/errors/error-code.enum';
 import { FakeRedisClient } from '../../src/infrastructure/redis/__tests__/fake-redis-client';
-import { RATES_PROVIDER } from '../../src/modules/rates/domain/ports';
-import { RATES_CACHE_KEYS } from '../../src/modules/rates/infrastructure/rates-cache-keys';
+import { RATES_PROVIDER } from '../../src/modules/rates/domain/rates-provider.interface';
+import { RATES_CACHE_KEYS } from '../../src/modules/rates/infrastructure/rates-cache-keys.constants';
 import { createE2eApp } from './create-e2e-app';
 import {
   DETACHED_RATES_SNAPSHOT,

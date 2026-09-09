@@ -10,7 +10,7 @@ import {
   deriveErrorCode,
   extractHttpExceptionMessage,
   upperSnakeCase,
-} from '../http-exception-mapping';
+} from '../http-exception-mapping.util';
 
 function codeFor(exception: HttpException): string {
   return deriveErrorCode(exception.getStatus(), exception.getResponse());
