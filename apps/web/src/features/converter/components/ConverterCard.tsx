@@ -138,7 +138,10 @@ export function ConverterCard({
         {outcome !== undefined && !isSubmitting && <ResultBadges outcome={outcome} />}
       </div>
 
-      <div className="pane-action border-line border-t px-5 pt-4 pb-0 sm:border-t-0 sm:px-6 sm:pt-[1.125rem] sm:pb-6">
+      {/* Before the first conversion this block is the card's last one, and the
+          provenance footer that would otherwise pad the card is not there yet:
+          `last:pb-5` is the 20px board 1k puts under Convert on a phone. */}
+      <div className="pane-action border-line border-t px-5 pt-4 last:pb-5 sm:border-t-0 sm:px-6 sm:pt-[1.125rem] sm:pb-6 sm:last:pb-6">
         <button
           type="submit"
           className="button button-primary w-full"

@@ -70,6 +70,18 @@ describe('the two-pane card', () => {
     expect(seam).toContainElement(screen.getByRole('button', { name: 'Swap the two currencies' }));
   });
 
+  it('keeps the phone card padded under Convert before there is a footer to pad it', async () => {
+    renderPage();
+    await screen.findByLabelText('From');
+
+    // Nothing has been converted, so the action block is the card's last child.
+    // `last:pb-5` is what puts board 1k's 20px under the button there; the
+    // `pb-0` it replaced assumed a provenance footer that does not exist yet.
+    const action = block('action');
+    expect(blocks().indexOf(action)).toBe(blocks().length - 1);
+    expect(action).toHaveClass('last:pb-5', 'sm:pb-6');
+  });
+
   it('puts the swap control on the seam rather than inside either pane', () => {
     renderPage();
 
