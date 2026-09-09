@@ -514,8 +514,11 @@
     box-shadow: var(--shadow);
   }
 
+  /* Fixed, not absolute: the converter card clips its own overflow, and a
+     popover positioned inside it would be cut off at the pane's edge. The
+     coordinates are measured off the trigger. */
   .combobox-popover {
-    position: absolute;
+    position: fixed;
     z-index: 30;
     width: 20rem;
     max-width: calc(100vw - 2rem);
@@ -534,6 +537,9 @@
 
   .combobox-search input {
     flex: 1;
+    /* The row is the target, not the text: stretching the field over it means
+       a tap anywhere along it lands on the caret. */
+    align-self: stretch;
     min-width: 0;
     background: transparent;
     border: 0;
@@ -712,6 +718,9 @@
 
   .control-search input {
     flex: 1;
+    /* The row is the target, not the text: stretching the field over it means
+       a tap anywhere along it lands on the caret. */
+    align-self: stretch;
     min-width: 0;
     background: transparent;
     border: 0;
@@ -788,9 +797,13 @@
     color: var(--ink);
   }
 
+  /* The board writes this label #ffffff, which is right on the light palette's
+     deep red and unreadable on the dark one's pale one. The surface colour is
+     white in light and near-black in dark, so it is the same intent that
+     survives the theme. */
   .button-danger {
     background-color: var(--danger);
-    color: #ffffff;
+    color: var(--surface);
   }
 
   .button-danger-outline {

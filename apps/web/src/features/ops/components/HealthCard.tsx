@@ -75,18 +75,18 @@ export function HealthCard() {
         </>
       )}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3">
         <a
           href={livenessUrl()}
           target="_blank"
           rel="noreferrer"
-          className="text-faint hover:text-ink inline-flex min-h-11 items-center font-mono text-[0.6875rem] tracking-[0.12em] uppercase no-underline"
+          className="text-faint hover:text-ink inline-flex min-h-11 items-center font-mono text-[0.6875rem] tracking-[0.12em] whitespace-nowrap uppercase no-underline"
         >
           {t('ops.health.livenessPath')} <span aria-hidden="true">&nbsp;↗</span>
         </a>
         <button
           type="button"
-          className="button-flat"
+          className="button-flat whitespace-nowrap"
           disabled={isFetching}
           onClick={() => {
             void refetch();

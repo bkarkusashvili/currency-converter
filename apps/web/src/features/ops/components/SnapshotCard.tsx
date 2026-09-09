@@ -48,7 +48,10 @@ export function SnapshotCard({ upstreamDown, hasKey, onClear }: SnapshotCardProp
 
   const durationText = useDurationText();
   const ttl = data === undefined ? null : snapshotTtl(data.fetchedAt);
-  const atRisk = data?.source === 'stale-cache' || upstreamDown || ttl?.isStale === true;
+  // Only when the fallback really is the last thing standing. A derived TTL
+  // that has run out is not that: the API is still answering `cache`, and only
+  // it knows what its keys are doing.
+  const atRisk = data?.source === 'stale-cache' || upstreamDown;
   const count = currencies.data?.currencies.length ?? data?.rates.length;
   const sourceKey = data === undefined ? undefined : SOURCE_VALUE_KEY[data.source];
 
@@ -130,7 +133,7 @@ export function SnapshotCard({ upstreamDown, hasKey, onClear }: SnapshotCardProp
         </>
       )}
 
-      <div className="border-line flex flex-wrap items-center justify-between gap-4 border-t pt-4 sm:pt-5">
+      <div className="border-line flex flex-wrap items-center justify-between gap-4 border-t pt-4 sm:flex-nowrap sm:pt-5">
         <div className="grid gap-0.5">
           <span className="font-semibold">{t('ops.clear.title')}</span>
           <span className="text-muted text-[0.8125rem] text-pretty">

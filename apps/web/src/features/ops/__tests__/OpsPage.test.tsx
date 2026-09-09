@@ -175,6 +175,26 @@ describe('OpsPage snapshot card', () => {
     expect(screen.getByText('expired')).toBeInTheDocument();
   });
 
+  it('does not cry stale over a derived TTL the API has not confirmed', async () => {
+    // The snapshot is older than the documented five minutes, but the API is
+    // still answering `cache` and Monobank is up: nothing is at risk, and the
+    // derivation is not entitled to say otherwise.
+    renderOps({
+      rates: {
+        ...FAKE_RESPONSES.rates,
+        source: 'cache',
+        fetchedAt: new Date(Date.now() - FRESH_TTL_MS - 60_000).toISOString(),
+      },
+    });
+
+    expect(await screen.findByText('expired')).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'Clearing now would leave nothing to fall back on while Monobank is unreachable.',
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it('cannot send the command without a key', async () => {
     renderOps();
 
