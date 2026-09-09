@@ -143,9 +143,26 @@ describe('SectionIndex', () => {
 
     const current = screen.getByRole('link', { name: 'Requirements' });
     expect(current).toHaveAttribute('href', '#requirements');
-    expect(current).toHaveAttribute('aria-current', 'true');
+    // The section being read, not a page this link would navigate to.
+    expect(current).toHaveAttribute('aria-current', 'location');
     expect(nav).toContainElement(current);
     expect(screen.getByRole('link', { name: 'Live' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('makes the link itself the thumb target and draws the pill inside it', () => {
+    render(
+      <I18nextProvider i18n={i18nInstance}>
+        <SectionIndex entries={entries} active="requirements" />
+      </I18nextProvider>,
+    );
+
+    const link = screen.getByRole('link', { name: 'Live' });
+
+    // The nav scrolls horizontally, and a scrollport clips what is drawn
+    // outside it, so the 44px has to be the anchor's own box rather than a
+    // taller band painted around a 30px pill.
+    expect(link).toHaveClass('min-h-11');
+    expect(link.firstElementChild).toHaveTextContent('Live');
   });
 });
 
