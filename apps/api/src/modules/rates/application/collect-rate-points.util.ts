@@ -26,16 +26,31 @@ import {
 // layers they would answer from two different reads of the archive. This stays
 // the pure decision over the projected shape — three fields per day, no
 // document — so what the store hands over can shrink without the rule moving.
+//
+// A third case sits in front of both: the window itself can be empty, on a
+// freshly deployed instance or a pair asked for before the first fetch. That
+// is not "no day quoted this code" — it is no day at all — and answering
+// UNSUPPORTED_CURRENCY for it would accuse a code of not existing on the
+// strength of having checked nothing. An empty projected days array is the
+// signal the store already hands over, so the decision is made here rather
+// than by asking the store to distinguish "no days" from "no quoting days".
 export function collectRatePoints(
   days: ArchivedPairDay[],
   base: CurrencyCode,
   quote: CurrencyCode,
 ): RateHistoryPoint[] {
-  // A code the window never mentions on either side of a pair is not a currency
-  // this API can chart, whether it is misspelt, delisted or simply never quoted
-  // by the upstream. An empty archive therefore answers this rather than an
-  // empty series, which is the honest reading: nothing in the window says the
-  // code exists.
+  // Nothing in the window says anything about either code: the honest answer
+  // is the empty series the web's empty state already expects ("History
+  // starts collecting from the first fetch"), not a 422 that reads as a
+  // verdict on `base` when no day was ever consulted.
+  if (days.length === 0) {
+    return [];
+  }
+
+  // A code that no archived day quotes on either side of a pair is not a
+  // currency this API can chart, whether it is misspelt, delisted or simply
+  // never quoted by the upstream — now that the window is known not to be
+  // empty, this is a verdict on the code rather than on the archive.
   if (!days.some((day) => day.quotesBase)) {
     throw new UnsupportedCurrencyError(base);
   }

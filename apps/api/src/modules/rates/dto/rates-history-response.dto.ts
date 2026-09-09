@@ -60,8 +60,9 @@ export class RatesHistoryResponseDto implements RateHistory {
     description:
       'One point per archived day inside the window that published this ' +
       'pair, oldest first. Shorter than `days` whenever the archive has a ' +
-      'gap — the API was down, or had not been deployed yet — and never ' +
-      'empty: a pair with no archived day at all answers 422 instead.',
+      'gap — the API was down, or had not been deployed yet — and empty ' +
+      'when no day in the window is archived yet, which is not the same as ' +
+      'a pair the archive has never published (that answers 422 instead).',
     type: [RateHistoryPointDto],
     example: [
       { date: '2026-09-07', buy: 44.3, sell: 44.79 },

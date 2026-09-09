@@ -445,6 +445,30 @@ describe('rates archive (e2e)', () => {
     });
   });
 
+  // A freshly deployed instance, or a pair asked for before the first fetch:
+  // the window holds no archived day at all, which says nothing about either
+  // code — not the misspelt-or-delisted verdict `UNSUPPORTED_CURRENCY` reads
+  // as. This is the case the web's empty state ("History starts collecting
+  // from the first fetch") expects.
+  describe('GET /rates/history with nothing archived in the window', () => {
+    beforeEach(async () => {
+      await boot(new InMemoryRatesArchive());
+    });
+
+    it('answers 200 with an empty series rather than 422', async () => {
+      const response = await request(server)
+        .get(`${HISTORY_PATH}?base=USD&quote=UAH&days=7`)
+        .expect(200);
+
+      expect(response.body).toStrictEqual({
+        base: 'USD',
+        quote: 'UAH',
+        days: 7,
+        points: [],
+      });
+    });
+  });
+
   describe('when the archive cannot be read', () => {
     beforeEach(async () => {
       await boot(new InMemoryRatesArchive({ failsWith: DRIVER_FAILURE }));

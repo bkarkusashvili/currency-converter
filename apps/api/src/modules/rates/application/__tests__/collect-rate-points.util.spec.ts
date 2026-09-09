@@ -92,12 +92,11 @@ describe('collectRatePoints', () => {
     );
   });
 
-  // Nothing in an empty window says the code exists, which is the honest
-  // reading — and it is a different answer from "the pair was never published".
-  it('rejects any code against an empty window', () => {
-    expect(() => collectRatePoints([], 'USD', 'UAH')).toThrow(
-      UnsupportedCurrencyError,
-    );
+  // Nothing in an empty window says anything about either code — not "it
+  // exists" and not "it doesn't" — so this is the empty series the web's empty
+  // state expects, not a verdict on `base` reached by asking nothing.
+  it('answers an empty series for an empty window, naming neither code', () => {
+    expect(collectRatePoints([], 'USD', 'UAH')).toStrictEqual([]);
   });
 
   // Both codes are quoted and there is still no series: this is the same
