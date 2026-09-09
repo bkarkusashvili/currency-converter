@@ -29,6 +29,16 @@ describe('Timestamp', () => {
     expect(screen.getByText(/^at \d{1,2}:\d{2}/)).toBeInTheDocument();
   });
 
+  it('takes a sentence that carries the time instead of a preposition', () => {
+    renderWithProviders(
+      <Timestamp value="2024-03-05T12:00:00.000Z" sentenceKey="converter.result.ratesFetchedShort" />,
+    );
+
+    const time = screen.getByText(/^Fetched .*2024/);
+    expect(time.tagName).toBe('TIME');
+    expect(time).toHaveAttribute('dateTime', '2024-03-05T12:00:00.000Z');
+  });
+
   it('shows a dash when the value is not a date', () => {
     renderWithProviders(<Timestamp value="whenever" />);
 

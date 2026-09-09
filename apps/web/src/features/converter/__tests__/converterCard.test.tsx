@@ -164,6 +164,24 @@ describe('the two-pane card', () => {
     expect(screen.queryByText('cross')).not.toBeInTheDocument();
   });
 
+  it('shortens the fetched line for a phone and keeps the long one beside it', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const footer = await screen.findByText(/Rates fetched/);
+    const short = within(block('footer')).getByText(/^Fetched /);
+
+    // Board 1i's wording under 640 and the card's above it. One of the two is
+    // `display: none` at any width, so only one is read out — and both read
+    // the clock as 24 hours.
+    expect(short).toHaveClass('sm:hidden');
+    expect(footer).toHaveClass('hidden', 'sm:inline');
+    expect(short).toHaveTextContent(/^Fetched .*\d{2}:\d{2}$/);
+    expect(footer).toHaveTextContent(/on .*\d{2}:\d{2}$/);
+  });
+
   it('steps the input pane back while the answer is on its way (board 1g)', async () => {
     const user = userEvent.setup();
     const fake = createFakeServices({ currencies: FAKE_RESPONSES.currencies });
