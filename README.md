@@ -608,6 +608,12 @@ overlay layered on (so Redis and Mongo publish on the loopback), probes
 `/health/live` and `/health`, and runs the integration suite against the
 services it just started.
 
+The `npm audit` in each of those two jobs is advisory (`continue-on-error`),
+because a new advisory is published against a lockfile the PR did not
+necessarily touch and so shouldn't fail an unrelated change; `audit.yml` runs
+the same two commands as a blocking check on a weekly schedule and on
+`workflow_dispatch` instead.
+
 ## Deployment
 
 Hosted on [Railway](https://railway.com) in project `currency-converter`: two

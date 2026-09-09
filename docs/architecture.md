@@ -994,7 +994,11 @@ agree on and both would have wrong.
   `test(web): …`, `chore: …`, `ci: …`, `docs: …`). The subject says what changed;
   the body says why, and is where a decision that is not obvious from the diff
   gets argued.
-- Every change lands through a pull request into `main`; CI must be green.
+- Every change lands through a pull request into `main`; CI must be green. The
+  `npm audit` step in `ci.yml` is advisory rather than part of that gate,
+  because an advisory is published against a lockfile the PR did not
+  necessarily touch; `audit.yml` runs the same check weekly (and on demand) as
+  a blocking job instead.
 - The implementation was AI-assisted under human direction and review: this
   document was written first and each pull request was reviewed against it. The
   commits carry a `Co-Authored-By` trailer naming the assistant, so the record
