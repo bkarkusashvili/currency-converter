@@ -78,12 +78,16 @@ export function CurrencyCombobox({
   };
 
   return (
-    <div className="grid gap-3.5">
+    // `min-w-0` twice: a grid item's automatic minimum is its content, and the
+    // trigger's content is a name of any length. Without it the pane grows to
+    // fit the longest currency name and the amount field grows with it, which
+    // is the shrink-to-fit trigger again by another route.
+    <div className="grid min-w-0 gap-3.5">
       <span className="field-label" id={labelId}>
         {label}
       </span>
 
-      <div className="relative">
+      <div className="relative min-w-0">
         <CurrencyTrigger
           id={id}
           labelId={labelId}

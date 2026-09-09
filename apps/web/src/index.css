@@ -472,79 +472,6 @@
     overflow-wrap: anywhere;
   }
 
-  @media (min-width: 40rem) {
-    .shell {
-      padding-inline: 1.5rem;
-    }
-
-    .page-title {
-      font-size: 2.5rem;
-    }
-
-    .section-title {
-      font-size: 1.5rem;
-    }
-
-    .control-select {
-      height: 2.75rem;
-    }
-
-    .control-amount {
-      height: 4rem;
-      padding: 0 1rem;
-      font-size: 1.875rem;
-    }
-
-    .figure {
-      font-size: 2.5rem;
-    }
-
-    .result-figure {
-      min-height: 4rem;
-    }
-
-    /* 38px: the same two lines at 13px, whose line box is 17.33. */
-    .result-detail {
-      min-height: 2.375rem;
-    }
-
-    .converter-card {
-      grid-template-columns: 1fr 1fr;
-      grid-template-areas:
-        'input output'
-        'action output'
-        'footer footer';
-    }
-
-    .converter-card > .pane-input {
-      grid-area: input;
-    }
-
-    .converter-card > .pane-action {
-      grid-area: action;
-    }
-
-    .converter-card > .pane-output {
-      grid-area: output;
-    }
-
-    .converter-card > .pane-footer {
-      grid-area: footer;
-    }
-  }
-
-  .code-block {
-    background-color: var(--surface-sunken);
-    border: 1px solid var(--line);
-    border-radius: 0.625rem;
-    padding: 0.875rem 1rem;
-    font-family: var(--font-mono);
-    font-size: 0.78125rem;
-    line-height: 1.7;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
   /* ── Currency combobox (§3.7) ──────────────────────────────────────────── */
 
   /* The trigger fills its pane at every width — 48 tall on a phone, 44 beside
@@ -960,6 +887,9 @@
     color: var(--ink);
   }
 
+  /* Everything the wide layout changes, in one block at the end of the layer:
+     these rules and the base ones they override have the same specificity, so
+     the media query has to come last to win. */
   @media (min-width: 40rem) {
     .shell {
       padding-inline: 1.5rem;
@@ -1000,6 +930,15 @@
       font-size: 1.25rem;
     }
 
+    .result-figure {
+      min-height: 4rem;
+    }
+
+    /* 38px: the same two lines at 13px, whose line box is 17.33. */
+    .result-detail {
+      min-height: 2.375rem;
+    }
+
     .converter-card {
       grid-template-columns: 1fr 1fr;
       grid-template-areas:
@@ -1008,8 +947,13 @@
         'footer footer';
     }
 
+    /* `1fr` alone is not a promise of half the card: a grid track's automatic
+       minimum is its content, so one very long currency name would widen the
+       pane and take the width off the other. `min-width: 0` is what lets the
+       name ellipsise instead, which is what the trigger is built to do. */
     .converter-card > .pane-input {
       grid-area: input;
+      min-width: 0;
     }
 
     .converter-card > .pane-action {
@@ -1018,6 +962,7 @@
 
     .converter-card > .pane-output {
       grid-area: output;
+      min-width: 0;
     }
 
     .converter-card > .pane-footer {
