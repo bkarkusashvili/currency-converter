@@ -1,0 +1,57 @@
+name: Audit
+
+# The PR-time audit in ci.yml is advisory: it runs against a lockfile the PR
+# did not necessarily touch, so a newly published advisory should not fail an
+# unrelated change. This workflow is where that check is actually blocking —
+# on a schedule, so a new high-severity advisory against either app's
+# dependency tree gets caught even in a week with no PRs open.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: api
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Audit
+        run: npm audit --omit=dev --audit-level=high
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Audit
+        run: npm audit --omit=dev --audit-level=high

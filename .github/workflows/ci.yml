@@ -53,14 +53,19 @@ jobs:
       - name: E2E tests
         run: npm run test:e2e
 
-      # Clean today, and a dependency that stops being clean should fail here
-      # rather than at the next person to look. After the tests, because it is
-      # the one step whose result does not depend on the diff: an advisory
-      # published this morning, or a registry that is briefly unreachable,
-      # would otherwise fail a green PR before anything had been run and would
-      # say something about a transitive dependency while doing it.
-      - name: Audit
+      # Clean today, and a dependency that stops being clean should be visible
+      # here rather than only at the next person to look. After the tests,
+      # because it is the one step whose result does not depend on the diff:
+      # an advisory published this morning, or a registry that is briefly
+      # unreachable, would otherwise fail a green PR before anything had been
+      # run and would say something about a transitive dependency while doing
+      # it. Advisory rather than blocking for the same reason: it is published
+      # against a lockfile the PR did not touch, so a PR with an unrelated diff
+      # should not go red for it. The blocking check lives in the weekly
+      # audit.yml workflow instead.
+      - name: Audit (advisory)
         run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
 
       # The image is a deliverable of this package, so a Dockerfile that no
       # longer builds has to fail here rather than at deploy time.
@@ -100,9 +105,11 @@ jobs:
       - name: Build
         run: npm run build
 
-      # After the tests, for the reason the api job gives.
-      - name: Audit
+      # After the tests, and advisory rather than blocking, for the reason the
+      # api job gives.
+      - name: Audit (advisory)
         run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
 
       # The image is a deliverable of this package, so a Dockerfile that no
       # longer builds has to fail here rather than at deploy time.
