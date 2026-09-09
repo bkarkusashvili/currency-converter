@@ -42,6 +42,24 @@ function unreachable(): ApiError {
   return ApiError.network('https://api.test/api/v1/convert', new TypeError('Failed to fetch'));
 }
 
+/**
+ * The two-pane card once it holds an answer. The provenance terms render only
+ * with one, so waiting for them is waiting for the conversion to land — and
+ * the card is the `<form>` around them, input pane and all.
+ */
+async function findAnsweredCard(): Promise<HTMLElement> {
+  const term = await screen.findByText('Strategy');
+  return term.closest('form')!;
+}
+
+/** The output pane with nothing in it yet: the placeholder holds the slot. */
+function expectNoAnswer(): void {
+  expect(
+    screen.getByText('Rate, strategy and source appear here once you convert.'),
+  ).toBeInTheDocument();
+  expect(screen.queryByText('Strategy')).not.toBeInTheDocument();
+}
+
 function renderPage(options: FakeServicesOptions) {
   const fake = createFakeServices(options);
   const queryClient = createTestQueryClient();
@@ -76,7 +94,7 @@ describe('converting while the API is unreachable', () => {
 
     await convert();
 
-    const card = await screen.findByRole('region', { name: 'Result' });
+    const card = await findAnsweredCard();
     expect(card).toHaveTextContent('4,435.00 UAH');
     expect(card).toHaveTextContent('1 USD = 44.35 UAH');
     expect(card).toHaveTextContent('1 UAH = 0.022548 USD');
@@ -97,7 +115,7 @@ describe('converting while the API is unreachable', () => {
     });
 
     await convert();
-    await screen.findByRole('region', { name: 'Result' });
+    await findAnsweredCard();
 
     expect(fake.historyLimits).toHaveLength(1);
   });
@@ -109,7 +127,7 @@ describe('converting while the API is unreachable', () => {
     });
 
     await convert();
-    const card = await screen.findByRole('region', { name: 'Result' });
+    const card = await findAnsweredCard();
 
     await waitFor(() => {
       expect(fake.historyLimits).toHaveLength(2);
@@ -149,7 +167,7 @@ describe('converting while the API is unreachable', () => {
     expect(
       await screen.findByText(/That currency is not in the current rate snapshot/),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Result' })).not.toBeInTheDocument();
+    expectNoAnswer();
   });
 
   it('does not estimate a pair the snapshot cannot price', async () => {
@@ -158,7 +176,7 @@ describe('converting while the API is unreachable', () => {
     await convert();
 
     expect(await screen.findByText(/Cannot reach the API/)).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Result' })).not.toBeInTheDocument();
+    expectNoAnswer();
     expect(
       screen.queryByText(/No rates have been cached in this browser yet/),
     ).not.toBeInTheDocument();
@@ -175,7 +193,7 @@ describe('converting while the API is unreachable', () => {
     const notice = await screen.findByText(/No rates have been cached in this browser yet/);
     expect(notice).toBeInTheDocument();
     expect(screen.getByText(/Cannot reach the API/)).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Result' })).not.toBeInTheDocument();
+    expectNoAnswer();
   });
 });
 
@@ -192,7 +210,7 @@ describe('converting from a browser that reports itself offline', () => {
     goOffline();
     await convert();
 
-    const card = await screen.findByRole('region', { name: 'Result' });
+    const card = await findAnsweredCard();
     expect(within(card).getByText('offline estimate')).toBeInTheDocument();
     expect(card).toHaveTextContent('4,435.00 UAH');
     // A paused mutation never reaches the service; this one was rejected by it.
@@ -214,7 +232,7 @@ describe('converting from a browser that reports itself offline', () => {
     void page.queryClient.invalidateQueries({ queryKey: queryKeys.rates });
     await convert();
 
-    expect(await screen.findByRole('region', { name: 'Result' })).toHaveTextContent('5,000.00 UAH');
+    expect(await findAnsweredCard()).toHaveTextContent('5,000.00 UAH');
   });
 
   it('keeps loading the currency list the form offers', async () => {

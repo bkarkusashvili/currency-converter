@@ -873,8 +873,17 @@ newest-first page and the retention ride on the same key rather than on two.
 
 - React 19, Vite, TypeScript strict, Tailwind CSS, React Router, TanStack Query,
   i18next + react-i18next.
-- Routes: `/` converter (form, result card, recent conversions), `/about`
-  reviewer page (what was built, why, links to repo / API docs / health).
+- Routes: `/` converter, `/about` reviewer page (what was built, why, links to
+  repo / API docs / health).
+- **The converter is one card, not two.** An input pane (from, amount, Convert)
+  and an output pane (to, the figure, the badges) sit side by side above 640px
+  with the swap control on the seam between them and the provenance — path,
+  timestamp, the strategy/source `<dl>`, any warnings — across the foot. Below
+  640 the same four blocks stack, and Convert moves out of the input pane into
+  the card's own footer so the thumb reaches it after reading both halves
+  rather than between them. The `grid-template-areas` that do it are in
+  `index.css`; the component only names the areas. Recent conversions move to a
+  320px aside beside the card, and below it when there is no room for one.
 - Runtime configuration: `public/config.js` sets `window.__APP_CONFIG__.apiUrl`;
   the Docker image regenerates it from `API_URL` at container start so the same
   image runs locally and on Railway. The value is JSON-escaped as it is written,
@@ -896,8 +905,8 @@ newest-first page and the retention ride on the same key rather than on two.
   currencies); React context provides the service implementations (swapped for
   fakes in tests); form state is local to the converter; there is no global
   store because no client state is shared beyond the query cache.
-- **The public surface.** `api/`, `components/`, `lib/`, `i18n/` and each
-  folder under `features/` publish an `index.ts`, and that index is how the
+- **The public surface.** `api/`, `components/`, `lib/`, `i18n/`, `theme/` and
+  each folder under `features/` publish an `index.ts`, and that index is how the
   rest of the app reaches them: `features/converter` imports `../../api`, not
   `../../api/http/request`. `no-restricted-imports` in
   `apps/web/eslint.config.js` enforces it — one configuration per relative
@@ -941,21 +950,39 @@ newest-first page and the retention ride on the same key rather than on two.
   silent 1000× error — and a half-typed `12.` submitted with Enter, which does
   not blur, parses as nothing at all. Blur still trims a dangling separator, but
   only so the field looks finished; correctness does not depend on it.
-- **Provenance in the client.** The result card prints the rate in both
+- **Provenance in the client.** The output pane prints the rate in both
   directions — the API publishes one, and `inverseRate` (in
   `features/converter/lib/money.ts`, beside the scoped `big.js` constructor and
   the decimal scales) computes the other on
   the same `big.js` constructor, rounded half-up to the six places §3 uses — and
-  draws the hops the strategy took. The history panel shows each entry's
-  `source` for the same reason §3 stores it.
+  draws the hops the strategy took across the card's footer. The history
+  panel shows each entry's `source` for the same reason §3 stores it, and marks
+  the row the answer on screen produced — matched on the five fields that
+  identify one conversion of one snapshot, because the response carries no id.
 - **Warnings.** §3's `warnings` array is a successful answer saying what
   degraded while it was produced, so it is rendered as a footnote and never as
-  a failure: warn-tone notes at the foot of the result card for a conversion's,
-  and one line under the form — beside the currency-list hint — for the ones
+  a failure: warn-tone notes at the foot of the card for a conversion's, and
+  one line in the input pane — beside the currency-list hint — for the ones
   `/currencies` and `/rates` carry, deduplicated by code because a cache that is
   down is down for both. The sentence shown is the translated one for a code
   this client knows (`warnings.*` in `en.json`) and the server's own for a code
   it does not, the same bargain the error envelope makes.
+- **Theme.** `src/theme/` owns the preference — `System` (the default,
+  deferring to `prefers-color-scheme`), `Light` or `Dark` — and nothing below it
+  re-renders when it changes: an explicit pick puts `data-theme` on `<html>`,
+  and `index.css` declares the palette three times, once on `:root`, once under
+  `prefers-color-scheme: dark` for a root that is not explicitly light, and once
+  for `:root[data-theme="dark"]` (`themeTokens.test.ts` keeps the two dark copies
+  identical, because CSS cannot share one block between a media query and a
+  selector). The choice persists to `localStorage` behind the same guards the
+  query cache uses, and an inline script in `index.html` applies it before the
+  bundle loads, so a reload never flashes the other palette; the key, the
+  attribute and the two values that script accepts are asserted against the
+  module by `prePaintScript.test.ts`. The switcher is a native radio group above
+  640px — the arrow keys and the roving focus are the platform's — and one
+  cycling 44px button below it. `color-scheme` follows the palette so native
+  controls do too, and both `theme-color` tags are repointed so the browser
+  chrome does.
 - **Internationalisation.** Every user-facing string lives in
   `src/i18n/en.json`, loaded through `react-i18next`; the `CustomTypeOptions`
   augmentation type-checks keys against the JSON. Numbers and dates are

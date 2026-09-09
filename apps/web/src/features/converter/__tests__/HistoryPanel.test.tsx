@@ -5,6 +5,7 @@ import type { HistoryItem } from '../../../api';
 import { createFakeServices } from '../../../test/fakes/createFakeServices';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { HISTORY_LIMIT, HistoryPanel } from '../components/HistoryPanel';
+import { conversionKey } from '../lib/historyHighlight';
 
 const entry: HistoryItem = {
   id: '1',
@@ -19,9 +20,9 @@ const entry: HistoryItem = {
   createdAt: '2024-03-05T12:00:00.000Z',
 };
 
-function renderWithItems(items: HistoryItem[]) {
+function renderWithItems(items: HistoryItem[], highlight?: string) {
   const fake = createFakeServices({ history: { items } });
-  renderWithProviders(<HistoryPanel />, { services: fake.services });
+  renderWithProviders(<HistoryPanel highlight={highlight} />, { services: fake.services });
   return fake;
 }
 
@@ -43,7 +44,8 @@ describe('HistoryPanel', () => {
 
     const [stale, fresh] = await screen.findAllByRole('listitem');
     expect(within(stale as HTMLElement).getByText('stale cache')).toBeInTheDocument();
-    expect(within(fresh as HTMLElement).getByText('provider')).toBeInTheDocument();
+    // A source that needs no warning is joined to its strategy as one tag.
+    expect(within(fresh as HTMLElement).getByText('direct · provider')).toBeInTheDocument();
   });
 
   it('badges only the source that needs explaining and leaves the rest as text', async () => {
@@ -52,8 +54,8 @@ describe('HistoryPanel', () => {
     const [stale, cached] = await screen.findAllByRole('listitem');
     // The badge is the chip class; a neutral source gets the strategy's treatment.
     expect(within(stale as HTMLElement).getByText('stale cache')).toHaveClass('badge');
-    expect(within(cached as HTMLElement).getByText('cache')).not.toHaveClass('badge');
-    expect(within(cached as HTMLElement).getByText('direct')).not.toHaveClass('badge');
+    expect(within(stale as HTMLElement).getByText('direct')).not.toHaveClass('badge');
+    expect(within(cached as HTMLElement).getByText('direct · cache')).not.toHaveClass('badge');
   });
 
   it('says how old the rate was on the rows that need it, and only those', async () => {
@@ -77,8 +79,7 @@ describe('HistoryPanel', () => {
       },
     ]);
 
-    expect(await screen.findByText('triangular')).toBeInTheDocument();
-    expect(screen.getByText('mirror')).toBeInTheDocument();
+    expect(await screen.findByText('triangular · mirror')).toBeInTheDocument();
   });
 
   it('says the list is loading before it says the list is empty', () => {
@@ -125,5 +126,40 @@ describe('HistoryPanel', () => {
     renderWithProviders(<HistoryPanel />, { services: fake.services });
 
     expect(await screen.findByText('The history store is having a lie-down.')).toBeInTheDocument();
+  });
+});
+
+describe('the row the conversion on screen produced', () => {
+  const other: HistoryItem = { ...entry, id: '2', amount: 250, result: 10358.75 };
+
+  it('is tinted, and it is the only one', async () => {
+    renderWithItems([{ ...entry, source: 'provider' }, other], conversionKey(entry));
+
+    const [latest, older] = await screen.findAllByRole('listitem');
+    expect(latest).toHaveClass('bg-accent-soft');
+    expect(older).not.toHaveClass('bg-accent-soft');
+    // Its tag takes the accent with it rather than staying faint on the tint.
+    expect(within(latest as HTMLElement).getByText('direct · provider')).toHaveClass('text-accent');
+  });
+
+  it('takes the warning tint when the rate it used may be out of date', async () => {
+    renderWithItems([entry, other], conversionKey(entry));
+
+    const [latest] = await screen.findAllByRole('listitem');
+    expect(latest).toHaveClass('bg-warn-soft');
+    expect(latest).not.toHaveClass('bg-accent-soft');
+    // A warn pill on a warn ground needs the opposite one (§6.5).
+    expect(within(latest as HTMLElement).getByText('stale cache')).toHaveClass('badge-on-sunken');
+  });
+
+  it('marks nothing when the answer on screen was never recorded', async () => {
+    // What an offline estimate leaves behind: an answer with no row to match.
+    renderWithItems([entry, other], conversionKey({ ...entry, amount: 7 }));
+
+    const rows = await screen.findAllByRole('listitem');
+    for (const row of rows) {
+      expect(row).not.toHaveClass('bg-accent-soft');
+      expect(row).not.toHaveClass('bg-warn-soft');
+    }
   });
 });
