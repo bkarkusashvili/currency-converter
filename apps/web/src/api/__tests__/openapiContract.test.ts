@@ -38,6 +38,7 @@ const SCHEMA_REFS = {
   currencies: `contract#/components/schemas/CurrenciesResponseDto`,
   rates: `contract#/components/schemas/RatesSnapshotResponseDto`,
   history: `contract#/components/schemas/HistoryResponseDto`,
+  rateHistory: `contract#/components/schemas/RatesHistoryResponseDto`,
   // Terminus documents the report inline on the route rather than as a named
   // component, so this one is addressed by pointer.
   health: `contract#/${pointer(
@@ -53,6 +54,17 @@ const SCHEMA_REFS = {
 } as const;
 
 type Route = keyof typeof SCHEMA_REFS;
+
+const document: unknown = JSON.parse(readFileSync(DOCUMENT_PATH, 'utf8'));
+
+/**
+ * Every route, unconditionally. An earlier draft skipped a schema the document
+ * did not carry yet, while `/rates/history` was still on its own branch — but
+ * a check that can silently decide not to run is one nobody notices going
+ * quiet, and a schema that disappears from the contract should fail here
+ * loudly rather than shrink the suite by one case.
+ */
+const CHECKED_ROUTES = Object.keys(SCHEMA_REFS) as Route[];
 
 let validators: Record<Route, ValidateFunction>;
 
@@ -72,8 +84,6 @@ function check(route: Route, body: unknown): void {
 }
 
 beforeAll(() => {
-  const document: unknown = JSON.parse(readFileSync(DOCUMENT_PATH, 'utf8'));
-
   // OpenAPI 3.0 is not quite JSON Schema — `nullable`, `example` and a boolean
   // `exclusiveMinimum` are all things a draft-07 validator does not know — so
   // the meta-schema check is off and unknown keywords are ignored. What is
@@ -84,12 +94,12 @@ beforeAll(() => {
   ajv.addSchema({ ...(document as object), $id: 'contract' });
 
   validators = Object.fromEntries(
-    Object.entries(SCHEMA_REFS).map(([route, ref]) => [route, ajv.compile({ $ref: ref })]),
+    CHECKED_ROUTES.map((route) => [route, ajv.compile({ $ref: SCHEMA_REFS[route] })]),
   ) as Record<Route, ValidateFunction>;
 });
 
 describe('the fixtures the component suites render, against the published contract', () => {
-  it.each(Object.keys(SCHEMA_REFS) as Route[])('accepts the %s sample response', (route) => {
+  it.each(CHECKED_ROUTES)('accepts the %s sample response', (route) => {
     check(route, FAKE_RESPONSES[route]);
   });
 
@@ -101,6 +111,7 @@ describe('the fixtures the component suites render, against the published contra
 
     check('currencies', await services.currencies.list());
     check('rates', await services.rates.getSnapshot());
+    check('rateHistory', await services.rates.getHistory({ base: 'USD', quote: 'UAH', days: 7 }));
     check('history', await services.history.recent(10));
     check('health', await services.health.report());
   });

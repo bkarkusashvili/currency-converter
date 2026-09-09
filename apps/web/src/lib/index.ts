@@ -1,5 +1,5 @@
 /** Cross-feature helpers: formatting, the repository links, the message hooks. */
-export type { AmountSeparators, TimestampKind } from './createFormatters';
+export type { AmountSeparators, ArchivedDayStyle, TimestampKind } from './createFormatters';
 export {
   healthUrl,
   livenessUrl,

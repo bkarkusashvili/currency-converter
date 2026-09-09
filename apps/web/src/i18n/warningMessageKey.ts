@@ -9,6 +9,7 @@ import type { ResponseWarningCode } from '../api';
 const WARNING_MESSAGE_KEYS = {
   CACHE_UNAVAILABLE: 'warnings.CACHE_UNAVAILABLE',
   HISTORY_NOT_RECORDED: 'warnings.HISTORY_NOT_RECORDED',
+  ARCHIVE_NOT_RECORDED: 'warnings.ARCHIVE_NOT_RECORDED',
 } as const satisfies Record<ResponseWarningCode, string>;
 
 export type WarningMessageKey = (typeof WARNING_MESSAGE_KEYS)[keyof typeof WARNING_MESSAGE_KEYS];

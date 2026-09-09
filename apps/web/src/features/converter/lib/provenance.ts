@@ -5,6 +5,14 @@ export const HUB_CURRENCY = 'UAH';
 /** The one source that is not the API's: this client priced it from a stored snapshot. */
 export const OFFLINE_ESTIMATE = 'offline-estimate';
 
+/**
+ * The API's last tier: an archived daily snapshot, days old rather than hours.
+ * It is the one source whose age is a **day** — the archive keeps one snapshot
+ * per day — so everything that says when its rates are from says a date and no
+ * clock time (§3.12).
+ */
+export const ARCHIVE_SOURCE = 'archive';
+
 interface Copy {
   valueKey: string | null;
   noteKey: string;
@@ -49,6 +57,11 @@ const SOURCE_COPY = {
   'stale-cache': {
     valueKey: 'converter.source.stale-cache.value',
     noteKey: 'converter.source.stale-cache.note',
+    tone: 'warn',
+  },
+  [ARCHIVE_SOURCE]: {
+    valueKey: 'converter.source.archive.value',
+    noteKey: 'converter.source.archive.note',
     tone: 'warn',
   },
   [OFFLINE_ESTIMATE]: {

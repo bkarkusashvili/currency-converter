@@ -7,6 +7,8 @@ import type {
   HealthIndicator,
   HealthResponse,
   HistoryResponse,
+  RateHistoryPoint,
+  RateHistoryResponse,
   RatesSnapshotResponse,
 } from '../types';
 import type {
@@ -14,6 +16,7 @@ import type {
   CurrenciesService,
   HealthService,
   HistoryService,
+  RateHistoryQuery,
   RatesService,
   Services,
 } from './services';
@@ -72,6 +75,25 @@ export function createHttpRatesService(): RatesService {
         signal,
       });
     },
+
+    /**
+     * The series is the other response this client computes with rather than
+     * only renders — the chart scales it, and a `points` that is not an array
+     * of numbers divides by an `undefined` somewhere inside an SVG path — so
+     * it is checked here, where the failure can still be reported as one.
+     */
+    getHistory(query: RateHistoryQuery, signal?: AbortSignal): Promise<RateHistoryResponse> {
+      const search = new URLSearchParams({
+        base: query.base,
+        quote: query.quote,
+        days: String(query.days),
+      });
+
+      return request<RateHistoryResponse>(`/api/v1/rates/history?${search.toString()}`, {
+        signal,
+        parse: toRateHistory,
+      });
+    },
   };
 }
 
@@ -105,6 +127,31 @@ function isRatesSnapshot(body: unknown): body is RatesSnapshotResponse {
     typeof body.fetchedAt === 'string' &&
     Array.isArray(body.rates) &&
     body.rates.every(isExchangeRate)
+  );
+}
+
+function toRateHistory(body: unknown): RateHistoryResponse | null {
+  return isRateHistory(body) ? body : null;
+}
+
+function isRateHistory(body: unknown): body is RateHistoryResponse {
+  return (
+    isRecord(body) &&
+    typeof body.base === 'string' &&
+    typeof body.quote === 'string' &&
+    typeof body.days === 'number' &&
+    Array.isArray(body.points) &&
+    body.points.every(isRateHistoryPoint)
+  );
+}
+
+function isRateHistoryPoint(value: unknown): value is RateHistoryPoint {
+  return (
+    isRecord(value) &&
+    typeof value.date === 'string' &&
+    isOptionalNumber(value.buy) &&
+    isOptionalNumber(value.sell) &&
+    isOptionalNumber(value.cross)
   );
 }
 

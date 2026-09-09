@@ -1,7 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { Timestamp, WarningNotes } from '../../../components';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
-import { HUB_CURRENCY, OFFLINE_ESTIMATE, sourceCopy, strategyCopy } from '../lib/provenance';
+import {
+  ARCHIVE_SOURCE,
+  HUB_CURRENCY,
+  OFFLINE_ESTIMATE,
+  sourceCopy,
+  strategyCopy,
+} from '../lib/provenance';
+import { ArchiveDate } from './ArchiveDate';
 import { ConversionPath } from './ConversionPath';
 
 /**
@@ -18,6 +25,9 @@ export function ProvenanceFooter({ outcome }: { outcome: ConversionOutcome }) {
   // and it is where a reader looks for it: the eyebrow beside the path would
   // be the same timestamp a second time, so the card carries one or the other.
   const isEstimate = outcome.source === OFFLINE_ESTIMATE;
+  // The archive's rates are a day, not a moment: its eyebrow and its sentence
+  // both lead with the snapshot's date instead of a clock time (§3.12).
+  const isArchive = outcome.source === ARCHIVE_SOURCE;
 
   return (
     <div className="pane-footer border-line grid gap-2.5 px-5 pt-3.5 pb-5 sm:gap-4 sm:border-t sm:px-6 sm:pt-5 sm:pb-6">
@@ -32,16 +42,24 @@ export function ProvenanceFooter({ outcome }: { outcome: ConversionOutcome }) {
           >
             {/* Board 1i shortens this line to "Fetched 14:32" on a phone.
                 Exactly one of the two is `display: none` at any width, so one
-                of them is in the accessibility tree and the other is not. */}
-            <Timestamp
-              className="sm:hidden"
-              value={outcome.ratesTimestamp}
-              sentenceKey="converter.result.ratesFetchedShort"
-            />
-            <span className="hidden sm:inline">
-              {t('converter.result.ratesFetched')}{' '}
-              <Timestamp value={outcome.ratesTimestamp} withPreposition />
-            </span>
+                of them is in the accessibility tree and the other is not. An
+                archived answer has no clock time to shorten, so it says the
+                one date at both widths. */}
+            {isArchive ? (
+              <ArchiveDate value={outcome.ratesTimestamp} />
+            ) : (
+              <>
+                <Timestamp
+                  className="sm:hidden"
+                  value={outcome.ratesTimestamp}
+                  sentenceKey="converter.result.ratesFetchedShort"
+                />
+                <span className="hidden sm:inline">
+                  {t('converter.result.ratesFetched')}{' '}
+                  <Timestamp value={outcome.ratesTimestamp} withPreposition />
+                </span>
+              </>
+            )}
           </p>
         )}
       </div>
@@ -65,6 +83,12 @@ export function ProvenanceFooter({ outcome }: { outcome: ConversionOutcome }) {
               source.tone === 'warn' ? 'text-warn font-medium' : 'text-muted',
             ].join(' ')}
           >
+            {isArchive && (
+              <>
+                <ArchiveDate className="font-bold" value={outcome.ratesTimestamp} />
+                {' — '}
+              </>
+            )}
             {t(source.noteKey)}
             {isEstimate && (
               <>
