@@ -40,7 +40,12 @@ function crossFolderPatterns(depth) {
   return patterns;
 }
 
-const boundaryConfigs = [0, 1, 2, 3, 4].map((depth) => ({
+// The deepest file in `src/` today sits four folders down, but a rule that
+// stops one level below where the tree happens to end fails open rather than
+// loudly: a file added at depth 5 could reach `api/http/request` and lint
+// would pass. The list runs past any depth this app has a reason to grow to,
+// and a config for a depth nothing occupies costs nothing to carry.
+const boundaryConfigs = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((depth) => ({
   files: [`src/${'*/'.repeat(depth)}*.{ts,tsx}`],
   rules: {
     'no-restricted-imports': [

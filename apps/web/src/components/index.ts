@@ -3,7 +3,6 @@ export { ApiErrorNotice } from './ApiErrorNotice';
 export { AppFooter } from './AppFooter';
 export { AppHeader } from './AppHeader';
 export { EmptyMark } from './EmptyMark';
-export { ExchangeMark } from './ExchangeMark';
 export { InfoBadge } from './InfoBadge';
 export type { BadgeTone } from './InfoBadge';
 export { Skeleton } from './Skeleton';

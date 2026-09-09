@@ -19,15 +19,7 @@ export { queryKeys } from './queryKeys';
 
 export { createHttpServices } from './services/createHttpServices';
 export { ServicesProvider } from './services/ServicesProvider';
-export { useServices } from './services/useServices';
-export type {
-  ConversionService,
-  CurrenciesService,
-  HealthService,
-  HistoryService,
-  RatesService,
-  Services,
-} from './services/services';
+export type { Services } from './services/services';
 
 // The hand-written mirror of the API's DTOs, validated against
 // `docs/openapi.json` by `api/__tests__/openapiContract.test.ts`.
