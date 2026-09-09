@@ -596,7 +596,7 @@ Four suites, all green on this commit:
 
 | Suite           | Command                                  | Result                    | Coverage                                                                 | Gate                       |
 | --------------- | ---------------------------------------- | ------------------------- | ------------------------------------------------------------------------ | -------------------------- |
-| API unit        | `apps/api: npm run test:cov`             | 74 suites, **744** tests  | stmts 98.48% · branches 87.54% · funcs 93.68% · lines 98.65%              | 85% lines + branches       |
+| API unit        | `apps/api: npm run test:cov`             | 74 suites, **744** tests  | stmts 98.97% · branches 87.54% · funcs 98.65% · lines 98.91%              | 85% lines + branches       |
 | API e2e         | `apps/api: npm run test:e2e`             | 9 suites, **158** tests   | not instrumented — see below                                             | none                       |
 | API integration | `apps/api: npm run test:integration`     | 3 suites, **21** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
 | Web             | `apps/web: npm run test:coverage`        | 27 files, **235** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
@@ -611,14 +611,11 @@ are the **unit** suites alone, and the 85% gate is on those. `npm run test:e2e`
 runs uninstrumented, so what only it exercises is missing from the report rather
 than uncovered: `configure-http.ts` and `setup-swagger.util.ts` read 0% while every
 e2e suite boots through both, which is what drags the `src` root row to 52.38%
-and `src/common/swagger` to 94.28%. `main.ts` and every `*.module.ts` are
-excluded outright — a module is wiring, and what a module *decides* lives in a
-file of its own beside it so the gate does see it. The function figure reads
-lower than the statement one because a module's `index.ts` compiles to one
-getter per re-export, and a unit test that never reads a given name never calls
-its getter; the gate is on lines and branches for that reason. Read the two as what they
-are: the unit suites cover the logic, the e2e suites cover the surface, and only
-the first is counted.
+and `src/common/swagger` to 93.1%. `main.ts`, every `*.module.ts` and every
+`index.ts` are excluded outright — a module is wiring and a barrel is a list of
+names, and what a module *decides* lives in a file of its own beside it so the
+gate does see it. Read the two as what they are: the unit suites cover the
+logic, the e2e suites cover the surface, and only the first is counted.
 
 Unit tests never touch the network, Redis or Mongo. The e2e suites do not
 either: the shared factory swaps the Redis client, the Mongo connection, the
@@ -775,7 +772,7 @@ test name, or a live URL; every row was re-verified against this commit.
 | #  | Requirement                        | Status | Evidence                                                                                                                    |
 | -- | ---------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | 5a | Use the fetched rates              | met    | `conversion.service.ts` reads one snapshot via `RatesService`, so two legs cannot straddle a cache expiry. Test: “prices the whole conversion from one snapshot”. The response carries `source` and `ratesTimestamp` |
-| 5b | Convert source → target            | met    | `conversion.service.ts` + `common/money/money.ts` (`big.js`, DP 30) + `round-half-up.util.ts`. Tests: “rounds the money half-up to two decimals”, “computes the result from the unrounded rate”, “rounds a tie up rather than to the nearest float”. No float arithmetic on money |
+| 5b | Convert source → target            | met    | `conversion.service.ts` + `common/money/money.constants.ts` (`big.js`, DP 30) + `round-half-up.util.ts`. Tests: “rounds the money half-up to two decimals”, “computes the result from the unrounded rate”, “rounds a tie up rather than to the nearest float”. No float arithmetic on money |
 | 5c | Cross-currency conversion via UAH  | met    | `strategies/cross-rate.strategy.ts` + `directional-rate.util.ts`, hub `BASE_CURRENCY` in `domain/exchange-rate.types.ts`. Tests: “composes the leg into the base currency with the leg out of it”, “is not the reciprocal of itself across a spread”, “crosses two currencies that only share the hryvnia”, “takes the published pair over the path through the hryvnia”. Live: EUR→GBP → `"strategy":"cross"` |
 
 ### 6. Error handling
@@ -801,8 +798,8 @@ test name, or a live URL; every row was re-verified against this commit.
 | #  | Requirement                              | Status | Evidence                                                                                                                    |
 | -- | ---------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | 8a | Comprehensive README with start instructions | met | This file: quick start in three forms, every root script, the full configuration table, the API reference above, real test numbers, the Railway deploy. Per-app READMEs add scripts and internals |
-| 8b | API documentation                        | met    | Swagger UI at `/docs`, OpenAPI at `/docs-json` (7 operations, 10 schemas, an `admin` scheme) generated from the code and committed as `docs/openapi.json`; `docs/architecture.md` §3 is the written contract. `test/e2e/swagger.e2e-spec.ts` keeps them in step — “documents no route that the API does not serve” — and `openapi-contract.e2e-spec.ts` fails when the committed document drifts from the decorators (`npm run openapi:write` regenerates it) |
-| 8c | Environment configuration                | met    | `apps/api/src/config/env.schema.ts` (zod, fails fast), `apps/api/.env.example` and root `.env.example`; the configuration table above lists all 23 variables |
+| 8b | API documentation                        | met    | Swagger UI at `/docs`, OpenAPI at `/docs-json` (8 operations, 12 schemas, an `admin` scheme) generated from the code and committed as `docs/openapi.json`; `docs/architecture.md` §3 is the written contract. `test/e2e/swagger.e2e-spec.ts` keeps them in step — “documents no route that the API does not serve” — and `openapi-contract.e2e-spec.ts` fails when the committed document drifts from the decorators (`npm run openapi:write` regenerates it) |
+| 8c | Environment configuration                | met    | `apps/api/src/config/env.schema.ts` (zod, fails fast), `apps/api/.env.example` and root `.env.example`; the configuration table above lists all 25 variables |
 
 ### Beyond the task
 
