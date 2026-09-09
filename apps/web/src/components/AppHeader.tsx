@@ -25,9 +25,12 @@ export function AppHeader() {
           </span>
         </NavLink>
 
+        {/* Under 640 the items have no background to space them apart, so the
+            gap funds the width instead: 4px between two 44px targets is what
+            the brand, both items and the theme button fit into at 320. */}
         <nav
           aria-label={t('app.nav.label')}
-          className="ml-auto flex shrink-0 items-center gap-2 sm:gap-0.5"
+          className="ml-auto flex shrink-0 items-center gap-1 sm:gap-0.5"
         >
           {NAV_ITEMS.map((item) => (
             <NavLink
@@ -36,7 +39,7 @@ export function AppHeader() {
               end={item.to === '/'}
               className={({ isActive }) =>
                 [
-                  'inline-flex h-11 shrink-0 items-center rounded-md text-sm no-underline transition-colors sm:h-9 sm:px-3',
+                  'inline-flex h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-sm no-underline transition-colors sm:h-9 sm:min-w-0 sm:px-3',
                   isActive ? 'text-ink font-semibold sm:bg-sunken' : 'text-muted hover:text-ink',
                 ].join(' ')
               }
