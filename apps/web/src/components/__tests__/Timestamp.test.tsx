@@ -31,7 +31,10 @@ describe('Timestamp', () => {
 
   it('takes a sentence that carries the time instead of a preposition', () => {
     renderWithProviders(
-      <Timestamp value="2024-03-05T12:00:00.000Z" sentenceKey="converter.result.ratesFetchedShort" />,
+      <Timestamp
+        value="2024-03-05T12:00:00.000Z"
+        sentenceKey="converter.result.ratesFetchedShort"
+      />,
     );
 
     const time = screen.getByText(/^Fetched .*2024/);
