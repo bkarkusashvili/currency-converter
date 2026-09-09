@@ -1,5 +1,5 @@
 import { HealthIndicatorService } from '@nestjs/terminus';
-import { CircuitBreaker } from '../../../common/resilience/circuit-breaker';
+import { CircuitBreaker } from '../../../common/resilience/circuit-breaker.util';
 import { MonobankHealthIndicator } from '../monobank-health.indicator';
 
 const FAILURE_THRESHOLD = 2;

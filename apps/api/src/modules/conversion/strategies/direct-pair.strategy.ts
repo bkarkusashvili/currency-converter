@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type Big from 'big.js';
-import { CurrencyCode } from '../../../common/currency/currency-code';
-import { ExchangeRate } from '../../rates/domain/exchange-rate';
-import { ConversionStrategy } from './conversion-strategy';
-import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
-import { directionalRate } from './directional-rate';
+import { CurrencyCode } from '../../../common/currency';
+import { ExchangeRate } from '../../rates';
+import { ConversionStrategy } from './conversion-strategy.interface';
+import { ConversionStrategyName } from '../../../common/conversion';
+import { directionalRate } from './directional-rate.util';
 
 // One pair, either way round: USD/UAH prices both USD → UAH and UAH → USD, and
 // EUR/USD prices the pair that never touches the hryvnia. It is tried before
@@ -12,7 +12,7 @@ import { directionalRate } from './directional-rate';
 // through the base currency costs two.
 @Injectable()
 export class DirectPairStrategy implements ConversionStrategy {
-  readonly name: ConversionStrategyName = 'direct';
+  readonly name: ConversionStrategyName = ConversionStrategyName.Direct;
 
   price(
     from: CurrencyCode,

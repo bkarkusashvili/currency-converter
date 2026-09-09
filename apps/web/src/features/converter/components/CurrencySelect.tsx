@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Skeleton } from '../../../components/Skeleton';
-import { WarningIcon } from '../../../components/WarningIcon';
+import { Skeleton, WarningIcon } from '../../../components';
 import { optionName, type CurrencyOption } from '../lib/currencyOptions';
 
 interface CurrencySelectProps {

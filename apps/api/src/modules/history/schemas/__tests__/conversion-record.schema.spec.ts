@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
-import { NewConversionRecord } from '../../domain/conversion-record';
+import { NewConversionRecord } from '../../domain/conversion-record.types';
 import {
   buildConversionRecordSchema,
   ConversionRecordDocument,
   CONVERSIONS_COLLECTION,
 } from '../conversion-record.schema';
+import { ConversionStrategyName } from '../../../../common/conversion/conversion-strategy-name.enum';
+import { RatesSource } from '../../../rates/domain/rates-source.enum';
 
 const TTL_DAYS = 30;
 const SECONDS_PER_DAY = 86_400;
@@ -15,8 +17,8 @@ const ENTRY: NewConversionRecord = {
   amount: 100,
   result: 85.09,
   rate: 0.850942,
-  strategy: 'cross',
-  source: 'cache',
+  strategy: ConversionStrategyName.Cross,
+  source: RatesSource.Cache,
   ratesTimestamp: '2026-09-08T12:00:00.000Z',
 };
 

@@ -1,6 +1,6 @@
 import { TestingModuleBuilder } from '@nestjs/testing';
 import { InMemoryHistoryRepository } from '../../src/modules/history/__tests__/in-memory-history.repository';
-import { HISTORY_REPOSITORY } from '../../src/modules/history/domain/history-repository.port';
+import { HISTORY_REPOSITORY } from '../../src/modules/history/domain/history-repository.interface';
 
 // Every suite converts, and every conversion writes a record, so the store is
 // swapped for one that lives in the process. A suite that wants to watch the

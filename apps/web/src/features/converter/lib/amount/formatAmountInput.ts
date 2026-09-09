@@ -1,10 +1,5 @@
+import type { AmountSeparators } from '../../../../lib';
 import { MAX_AMOUNT } from './parseAmount';
-
-export interface AmountSeparators {
-  /** The thousands separator of the active locale; `''` for a locale that does not group. */
-  group: string;
-  decimal: string;
-}
 
 /** What `en` uses, and what the helper falls back to when no locale is passed. */
 export const DEFAULT_SEPARATORS: AmountSeparators = { group: ',', decimal: '.' };

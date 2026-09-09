@@ -1,8 +1,8 @@
 import Redis from 'ioredis';
 import { createFakePinoLogger } from '../../src/common/logging/__tests__/fake-pino-logger';
 import { fakeConfig } from '../../src/config/__tests__/fake-config';
-import { RatesSnapshot } from '../../src/modules/rates/domain/exchange-rate';
-import { RATES_CACHE_KEYS } from '../../src/modules/rates/infrastructure/rates-cache-keys';
+import { RatesSnapshot } from '../../src/modules/rates/domain/exchange-rate.types';
+import { RATES_CACHE_KEYS } from '../../src/modules/rates/infrastructure/rates-cache-keys.constants';
 import { RedisRatesRepository } from '../../src/modules/rates/infrastructure/redis-rates.repository';
 import { describeAgainst } from './gate';
 

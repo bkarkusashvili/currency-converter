@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router';
-import { REPO_URL } from '../lib/links';
+import { REPO_URL } from '../lib';
 import { ExchangeMark } from './ExchangeMark';
 
 const NAV_ITEMS = [

@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { RedisModule } from '../../infrastructure/redis/redis.module';
-import { RatesModule } from '../rates/rates.module';
+import { RatesModule } from '../rates';
 import { HealthController } from './health.controller';
 import {
   HEALTH_INDICATORS,
   HealthIndicatorPort,
-} from './health-indicator.port';
+} from './health-indicator.interface';
 import { MongoHealthIndicator } from './mongo-health.indicator';
 import { MonobankHealthIndicator } from './monobank-health.indicator';
 import { RedisHealthIndicator } from './redis-health.indicator';

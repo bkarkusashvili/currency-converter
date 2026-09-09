@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ErrorCode } from '../errors/error-code.enum';
+import { ErrorCode } from '../errors';
 
 // A class rather than an interface so @ApiResponse can point at it: an
 // interface is erased before Swagger ever sees it, which left

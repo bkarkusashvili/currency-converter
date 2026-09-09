@@ -1,8 +1,8 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '../../../api/http/ApiError';
-import type { HistoryItem } from '../../../api/types';
-import { createFakeRepositories } from '../../../test/fakes/createFakeRepositories';
+import { ApiError } from '../../../api';
+import type { HistoryItem } from '../../../api';
+import { createFakeServices } from '../../../test/fakes/createFakeServices';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { HISTORY_LIMIT, HistoryPanel } from '../components/HistoryPanel';
 
@@ -20,8 +20,8 @@ const entry: HistoryItem = {
 };
 
 function renderWithItems(items: HistoryItem[]) {
-  const fake = createFakeRepositories({ history: { items } });
-  renderWithProviders(<HistoryPanel />, { repositories: fake.repositories });
+  const fake = createFakeServices({ history: { items } });
+  renderWithProviders(<HistoryPanel />, { services: fake.services });
   return fake;
 }
 
@@ -96,7 +96,7 @@ describe('HistoryPanel', () => {
   });
 
   it('says the panel is unavailable without blocking the converter', async () => {
-    const fake = createFakeRepositories({
+    const fake = createFakeServices({
       history: new ApiError({
         statusCode: 404,
         code: 'NOT_FOUND',
@@ -104,7 +104,7 @@ describe('HistoryPanel', () => {
       }),
     });
 
-    renderWithProviders(<HistoryPanel />, { repositories: fake.repositories });
+    renderWithProviders(<HistoryPanel />, { services: fake.services });
 
     expect(await screen.findByText(/Recent conversions are unavailable/i)).toBeInTheDocument();
     // Translated through the envelope, as every other failure is: the server's
@@ -114,7 +114,7 @@ describe('HistoryPanel', () => {
   });
 
   it('falls back to the server sentence for a code it does not know', async () => {
-    const fake = createFakeRepositories({
+    const fake = createFakeServices({
       history: new ApiError({
         statusCode: 503,
         code: 'HISTORY_ASLEEP',
@@ -122,7 +122,7 @@ describe('HistoryPanel', () => {
       }),
     });
 
-    renderWithProviders(<HistoryPanel />, { repositories: fake.repositories });
+    renderWithProviders(<HistoryPanel />, { services: fake.services });
 
     expect(await screen.findByText('The history store is having a lie-down.')).toBeInTheDocument();
   });

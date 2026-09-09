@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { AppError } from './app-error';
+import { AppError } from './app.error';
 import { ErrorCode } from './error-code.enum';
 
 export class RatesUnavailableError extends AppError {

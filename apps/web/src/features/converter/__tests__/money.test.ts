@@ -1,6 +1,6 @@
 import Big from 'big.js';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { RatesSnapshotResponse } from '../../../api/types';
+import type { RatesSnapshotResponse } from '../../../api';
 import { convertOffline } from '../lib/convertOffline';
 import { inverseRate, Money } from '../lib/money';
 

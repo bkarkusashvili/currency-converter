@@ -1,12 +1,12 @@
 import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ApiError } from '../../../api/http/ApiError';
-import type { HealthResponse } from '../../../api/types';
+import { ApiError } from '../../../api';
+import type { HealthResponse } from '../../../api';
 import {
-  createFakeRepositories,
+  createFakeServices,
   FAKE_RESPONSES,
-  type FakeRepositoriesOptions,
-} from '../../../test/fakes/createFakeRepositories';
+  type FakeServicesOptions,
+} from '../../../test/fakes/createFakeServices';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { AboutPage } from '../components/AboutPage';
 
@@ -21,9 +21,9 @@ const healthy: HealthResponse = {
   details: { ...FAKE_RESPONSES.health.details, monobank: { status: 'up' } },
 };
 
-function renderAbout(options: FakeRepositoriesOptions = {}) {
-  const fake = createFakeRepositories({ health: healthy, ...options });
-  renderWithProviders(<AboutPage />, { repositories: fake.repositories });
+function renderAbout(options: FakeServicesOptions = {}) {
+  const fake = createFakeServices({ health: healthy, ...options });
+  renderWithProviders(<AboutPage />, { services: fake.services });
   return fake;
 }
 
@@ -160,6 +160,21 @@ describe('AboutPage', () => {
     expect(screen.getByText('Two layers of fallback, not one')).toBeInTheDocument();
     expect(screen.getByText('A warning is not an error')).toBeInTheDocument();
     expect(screen.getByText('Liveness and readiness are different questions')).toBeInTheDocument();
+  });
+
+  // "What manages state?" is asked of every React submission, and the answer
+  // here is that nothing global does — which is a decision, not an omission.
+  it('says what owns state, and why there is no global store', () => {
+    renderAbout();
+
+    expect(screen.getByText('State')).toBeInTheDocument();
+    expect(screen.getByText(/TanStack Query owns server state/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/React context provides the service implementations/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no global store because no client state is shared beyond the query cache/),
+    ).toBeInTheDocument();
   });
 
   it('explains both fallbacks and how to see the client one', () => {

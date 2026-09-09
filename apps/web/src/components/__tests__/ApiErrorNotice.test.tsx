@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '../../api/http/ApiError';
+import { ApiError } from '../../api';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import { ApiErrorNotice } from '../ApiErrorNotice';
 

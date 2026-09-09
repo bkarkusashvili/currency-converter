@@ -6,10 +6,12 @@ import {
 } from '../../../../common/logging/__tests__/fake-pino-logger';
 import { fakeConfig } from '../../../../config/__tests__/fake-config';
 import { FakeMongoConnection } from '../../../../infrastructure/mongo/__tests__/fake-mongo-connection';
-import { NewConversionRecord } from '../../domain/conversion-record';
-import { MAX_HISTORY_LIMIT } from '../../domain/history-limits';
+import { NewConversionRecord } from '../../domain/conversion-record.types';
+import { MAX_HISTORY_LIMIT } from '../../domain/history-limits.constants';
 import { ConversionRecordDocument } from '../../schemas/conversion-record.schema';
 import { MongoHistoryRepository } from '../mongo-history.repository';
+import { ConversionStrategyName } from '../../../../common/conversion/conversion-strategy-name.enum';
+import { RatesSource } from '../../../rates/domain/rates-source.enum';
 
 const ENTRY: NewConversionRecord = {
   from: 'EUR',
@@ -17,8 +19,8 @@ const ENTRY: NewConversionRecord = {
   amount: 100,
   result: 85.09,
   rate: 0.850942,
-  strategy: 'cross',
-  source: 'cache',
+  strategy: ConversionStrategyName.Cross,
+  source: RatesSource.Cache,
   ratesTimestamp: '2026-09-08T12:00:00.000Z',
 };
 
@@ -137,8 +139,8 @@ describe('MongoHistoryRepository', () => {
           amount: 100,
           result: 85.09,
           rate: 0.850942,
-          strategy: 'cross',
-          source: 'cache',
+          strategy: ConversionStrategyName.Cross,
+          source: RatesSource.Cache,
           ratesTimestamp: '2026-09-08T12:00:00.000Z',
           createdAt: CREATED_AT.toISOString(),
         },

@@ -1,6 +1,6 @@
 import { HttpStatus, applyDecorators } from '@nestjs/common';
 import { ApiResponse } from '@nestjs/swagger';
-import { ErrorResponseDto } from '../filters/error-response.dto';
+import { ErrorResponseDto } from '../filters';
 
 const DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
   [HttpStatus.BAD_REQUEST, 'The request failed validation.'],

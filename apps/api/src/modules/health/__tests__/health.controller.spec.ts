@@ -9,7 +9,7 @@ import {
 import {
   HealthIndicatorPort,
   HEALTH_INDICATORS,
-} from '../health-indicator.port';
+} from '../health-indicator.interface';
 import { HealthController } from '../health.controller';
 
 async function createController(

@@ -1,10 +1,11 @@
 import { CacheUnavailableError } from '../../../common/errors/cache-unavailable.error';
-import { RatesLookup } from '../domain/exchange-rate';
+import { RatesLookup } from '../domain/exchange-rate.types';
 import { RatesService } from '../application/rates.service';
 import { RatesController } from '../rates.controller';
+import { RatesSource } from '../domain/rates-source.enum';
 
 const LOOKUP: RatesLookup = {
-  source: 'cache',
+  source: RatesSource.Cache,
   cacheDegraded: false,
   snapshot: {
     fetchedAt: '2026-09-08T12:00:00.000Z',
@@ -42,7 +43,7 @@ describe('RatesController', () => {
   describe('GET /rates', () => {
     it('flattens the lookup into the documented response', async () => {
       await expect(controller.getRates()).resolves.toStrictEqual({
-        source: 'cache',
+        source: RatesSource.Cache,
         fetchedAt: LOOKUP.snapshot.fetchedAt,
         rates: LOOKUP.snapshot.rates,
       });
@@ -53,11 +54,11 @@ describe('RatesController', () => {
     it('reports the source the service served the snapshot from', async () => {
       service.getSnapshot.mockResolvedValue({
         ...LOOKUP,
-        source: 'stale-cache',
+        source: RatesSource.StaleCache,
       });
 
       await expect(controller.getRates()).resolves.toMatchObject({
-        source: 'stale-cache',
+        source: RatesSource.StaleCache,
       });
     });
 
@@ -80,7 +81,7 @@ describe('RatesController', () => {
     it('warns without claiming a provenance when a stale answer degraded', async () => {
       service.getSnapshot.mockResolvedValue({
         ...LOOKUP,
-        source: 'stale-cache',
+        source: RatesSource.StaleCache,
         cacheDegraded: true,
       });
 

@@ -4,7 +4,8 @@ import { z } from 'zod';
 import {
   ExchangeRate,
   RatesSnapshot,
-} from '../../../src/modules/rates/domain/exchange-rate';
+} from '../../../src/modules/rates/domain/exchange-rate.types';
+import { ConversionStrategyName } from '../../../src/common/conversion/conversion-strategy-name.enum';
 
 // The rates and the conversions of them both live at the repository root, in
 // JSON, because the web app's offline estimate is tested against exactly the
@@ -38,7 +39,7 @@ const goldenSchema = z.object({
         amount: z.number(),
         rate: z.number(),
         result: z.number(),
-        strategy: z.enum(['identity', 'direct', 'cross']),
+        strategy: z.enum(ConversionStrategyName),
         note: z.string().optional(),
       }),
     )

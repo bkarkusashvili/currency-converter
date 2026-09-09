@@ -1,5 +1,5 @@
-import type { ResponseWarning } from '../api/types';
-import { useWarningMessage } from '../lib/useWarningMessage';
+import type { ResponseWarning } from '../api';
+import { useWarningMessage } from '../lib';
 import { WarningIcon } from './WarningIcon';
 
 interface WarningNotesProps {

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type Big from 'big.js';
-import { CurrencyCode } from '../../../common/currency/currency-code';
-import { BASE_CURRENCY, ExchangeRate } from '../../rates/domain/exchange-rate';
-import { ConversionStrategy } from './conversion-strategy';
-import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
-import { directionalRate } from './directional-rate';
+import { CurrencyCode } from '../../../common/currency';
+import { BASE_CURRENCY, ExchangeRate } from '../../rates';
+import { ConversionStrategy } from './conversion-strategy.interface';
+import { ConversionStrategyName } from '../../../common/conversion';
+import { directionalRate } from './directional-rate.util';
 
 // Two legs through the currency every published pair has in common, which for
 // a Ukrainian bank's rates is the hryvnia: sell the source currency for it,
@@ -17,7 +17,7 @@ import { directionalRate } from './directional-rate';
 // the composition never touches the global precision either.
 @Injectable()
 export class CrossRateStrategy implements ConversionStrategy {
-  readonly name: ConversionStrategyName = 'cross';
+  readonly name: ConversionStrategyName = ConversionStrategyName.Cross;
 
   // A currency has a path to itself through the base currency, and taking it
   // would answer 0.989 for USD to USD. Identity prices that pair, and declining

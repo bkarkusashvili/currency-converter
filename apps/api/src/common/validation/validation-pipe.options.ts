@@ -1,5 +1,5 @@
 import { ValidationPipeOptions } from '@nestjs/common';
-import { validationExceptionFactory } from './validation-exception-factory';
+import { validationExceptionFactory } from './validation-exception.factory';
 
 export const validationPipeOptions: ValidationPipeOptions = {
   whitelist: true,

@@ -1,9 +1,10 @@
 import { RatesService } from '../../rates/application/rates.service';
-import { RatesLookup } from '../../rates/domain/exchange-rate';
+import { RatesLookup } from '../../rates/domain/exchange-rate.types';
 import { CurrenciesController } from '../currencies.controller';
+import { RatesSource } from '../../rates/domain/rates-source.enum';
 
 const LOOKUP: RatesLookup = {
-  source: 'cache',
+  source: RatesSource.Cache,
   cacheDegraded: false,
   snapshot: {
     fetchedAt: '2026-09-08T12:00:00.000Z',

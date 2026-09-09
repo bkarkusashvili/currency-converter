@@ -1,7 +1,7 @@
 import { ArgumentMetadata, ValidationPipe } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { IsInt, IsString, Max } from 'class-validator';
-import { FieldValidationError } from '../field-validation-error';
+import { FieldValidationError } from '../field-validation-error.types';
 import { validationPipeOptions } from '../validation-pipe.options';
 
 // Stands in for the DTOs the later modules bring; the point is the pipe's

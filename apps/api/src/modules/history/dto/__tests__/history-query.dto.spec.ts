@@ -1,10 +1,10 @@
 import { ArgumentMetadata, ValidationPipe } from '@nestjs/common';
-import { FieldValidationError } from '../../../../common/validation/field-validation-error';
+import { FieldValidationError } from '../../../../common/validation/field-validation-error.types';
 import { validationPipeOptions } from '../../../../common/validation/validation-pipe.options';
 import {
   DEFAULT_HISTORY_LIMIT,
   MAX_HISTORY_LIMIT,
-} from '../../domain/history-limits';
+} from '../../domain/history-limits.constants';
 import { HistoryQueryDto } from '../history-query.dto';
 
 const metadata: ArgumentMetadata = {

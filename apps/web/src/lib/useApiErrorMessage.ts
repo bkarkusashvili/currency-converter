@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import type { ApiError } from '../api/http/ApiError';
-import { errorMessageKey } from '../i18n/errorMessageKey';
+import type { ApiError } from '../api';
+import { errorMessageKey } from '../i18n';
 
 /**
  * One reading of the envelope, shared by everything that shows a failure: the

@@ -2,8 +2,8 @@ import { Types } from 'mongoose';
 import type {
   ConversionRecord,
   NewConversionRecord,
-} from '../domain/conversion-record';
-import type { HistoryRepository } from '../domain/history-repository.port';
+} from '../domain/conversion-record.types';
+import type { HistoryRepository } from '../domain/history-repository.interface';
 
 interface InMemoryHistoryOptions {
   // What a broken store does to both paths, so a suite can watch a conversion

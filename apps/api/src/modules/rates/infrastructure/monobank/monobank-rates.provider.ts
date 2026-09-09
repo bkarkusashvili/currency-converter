@@ -3,16 +3,15 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import { firstValueFrom } from 'rxjs';
-import { CircuitBreaker } from '../../../../common/resilience/circuit-breaker';
-import { retry } from '../../../../common/resilience/retry';
-import { withTimeout } from '../../../../common/utils/with-timeout';
+import { CircuitBreaker, retry } from '../../../../common/resilience';
+import { withTimeout } from '../../../../common/utils';
 import type { TypedConfigService } from '../../../../config/typed-config.service';
 import { MONOBANK_CIRCUIT_BREAKER } from './monobank-circuit-breaker.factory';
-import { RatesProvider } from '../../domain/ports';
-import { RatesSnapshot } from '../../domain/exchange-rate';
+import { RatesProvider } from '../../domain/rates-provider.interface';
+import { RatesSnapshot } from '../../domain/exchange-rate.types';
 import { monobankRatesSchema } from './monobank-rate.schema';
 import { mapMonobankRates } from './monobank-rates.mapper';
-import { shouldRetryMonobank } from './should-retry-monobank';
+import { shouldRetryMonobank } from './should-retry-monobank.util';
 
 // Ceiling for the jittered backoff. Monobank allows one request a minute, so
 // retrying is there to ride out a blip, not to wait out an outage: past a

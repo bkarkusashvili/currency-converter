@@ -1,6 +1,8 @@
 import { ConversionController } from '../conversion.controller';
 import { ConversionService } from '../conversion.service';
-import { ConversionOutcome } from '../domain/conversion-outcome';
+import { ConversionOutcome } from '../domain/conversion-outcome.types';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
+import { RatesSource } from '../../rates/domain/rates-source.enum';
 
 const REQUEST = { from: 'EUR', to: 'GBP', amount: 100 };
 
@@ -11,8 +13,8 @@ const OUTCOME: ConversionOutcome = {
     amount: 100,
     result: 84.73,
     rate: 0.847312,
-    strategy: 'cross',
-    source: 'cache',
+    strategy: ConversionStrategyName.Cross,
+    source: RatesSource.Cache,
     ratesTimestamp: '2026-09-08T12:00:00.000Z',
   },
   cacheDegraded: false,

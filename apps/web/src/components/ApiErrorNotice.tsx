@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import type { ApiError } from '../api/http/ApiError';
-import type { FieldError } from '../api/http/fieldErrors';
-import { useApiErrorMessage } from '../lib/useApiErrorMessage';
+import type { ApiError, FieldError } from '../api';
+import { useApiErrorMessage } from '../lib';
 import { WarningIcon } from './WarningIcon';
 
 interface ApiErrorNoticeProps {

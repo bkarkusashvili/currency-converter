@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { LoggingModule } from '../../common/logging/logging.module';
-import { HISTORY_REPOSITORY } from './domain/history-repository.port';
+import { LoggingModule } from '../../common/logging';
+import { HISTORY_REPOSITORY } from './domain/history-repository.interface';
 import { HistoryController } from './history.controller';
 import { HistoryService } from './history.service';
-import { HistoryIndexes } from './infrastructure/history-indexes';
+import { HistoryIndexes } from './infrastructure/history-indexes.provider';
 import { MongoHistoryRepository } from './infrastructure/mongo-history.repository';
 import { buildConfiguredConversionRecordSchema } from './schemas/conversion-record-schema.factory';
 import { CONVERSION_RECORD_MODEL } from './schemas/conversion-record.schema';

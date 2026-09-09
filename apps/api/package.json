@@ -87,7 +87,8 @@
       "**/*.ts",
       "!**/__tests__/**",
       "!main.ts",
-      "!**/*.module.ts"
+      "!**/*.module.ts",
+      "!**/index.ts"
     ],
     "coverageDirectory": "../coverage",
     "coverageThreshold": {

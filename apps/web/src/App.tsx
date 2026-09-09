@@ -1,9 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes } from 'react-router';
-import { AppFooter } from './components/AppFooter';
-import { AppHeader } from './components/AppHeader';
-import { AboutPage } from './features/about/components/AboutPage';
-import { ConverterPage } from './features/converter/components/ConverterPage';
+import { AppFooter, AppHeader } from './components';
+import { AboutPage } from './features/about';
+import { ConverterPage } from './features/converter';
 
 export function App() {
   const { t } = useTranslation();

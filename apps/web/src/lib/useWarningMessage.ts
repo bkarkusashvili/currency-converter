@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import type { ResponseWarning } from '../api/types';
-import { warningMessageKey } from '../i18n/warningMessageKey';
+import type { ResponseWarning } from '../api';
+import { warningMessageKey } from '../i18n';
 
 /**
  * One reading of a `warnings` entry, shared by everything that shows one: the

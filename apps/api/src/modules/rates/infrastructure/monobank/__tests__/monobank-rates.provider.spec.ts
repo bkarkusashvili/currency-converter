@@ -5,7 +5,7 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../../../common/logging/__tests__/fake-pino-logger';
-import { CircuitBreaker } from '../../../../../common/resilience/circuit-breaker';
+import { CircuitBreaker } from '../../../../../common/resilience/circuit-breaker.util';
 import { CircuitOpenError } from '../../../../../common/resilience/circuit-open.error';
 import { TimeoutError } from '../../../../../common/utils/timeout.error';
 import { fakeConfig } from '../../../../../config/__tests__/fake-config';

@@ -28,3 +28,10 @@ syncDocumentLanguage();
 i18next.on('languageChanged', syncDocumentLanguage);
 
 export const i18nInstance: i18n = i18next;
+
+/**
+ * The two code → message-key maps a component reaches for through this index,
+ * so nothing outside `i18n/` names a file inside it.
+ */
+export { errorMessageKey } from './errorMessageKey';
+export { warningMessageKey } from './warningMessageKey';

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useHealth } from '../../../api/hooks/useHealth';
+import { useHealth } from '../../../api';
 
 /** Display names only; an indicator the API adds later is shown under its own name. */
 const INDICATOR_LABELS: Record<string, string> = {

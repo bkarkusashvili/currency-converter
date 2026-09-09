@@ -3,13 +3,13 @@ import { render, type RenderResult } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { MemoryRouter } from 'react-router';
-import { RepositoriesProvider } from '../api/repositories/RepositoriesProvider';
-import type { Repositories } from '../api/repositories/repositories';
+import { ServicesProvider } from '../api';
+import type { Services } from '../api';
 import { i18nInstance } from '../i18n';
-import { createFakeRepositories } from './fakes/createFakeRepositories';
+import { createFakeServices } from './fakes/createFakeServices';
 
 interface RenderOptions {
-  repositories?: Repositories;
+  services?: Services;
   /**
    * A client seeded with query data, which is what the persisted cache
    * hydrates into: a test that needs data a failing request cannot produce
@@ -28,16 +28,16 @@ export function createTestQueryClient(): QueryClient {
 }
 
 export function renderWithProviders(ui: ReactElement, options: RenderOptions = {}): RenderResult {
-  const repositories = options.repositories ?? createFakeRepositories().repositories;
+  const services = options.services ?? createFakeServices().services;
   const queryClient = options.queryClient ?? createTestQueryClient();
 
   return render(
     <I18nextProvider i18n={i18nInstance}>
-      <RepositoriesProvider repositories={repositories}>
+      <ServicesProvider services={services}>
         <QueryClientProvider client={queryClient}>
           <MemoryRouter>{ui}</MemoryRouter>
         </QueryClientProvider>
-      </RepositoriesProvider>
+      </ServicesProvider>
     </I18nextProvider>,
   );
 }

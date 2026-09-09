@@ -1,6 +1,6 @@
 import { Controller, Get, HttpStatus, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../common/swagger/api-error-responses.decorator';
+import { ApiErrorResponses } from '../../common/swagger';
 import { HistoryQueryDto } from './dto/history-query.dto';
 import { HistoryResponseDto } from './dto/history-response.dto';
 import { HistoryService } from './history.service';

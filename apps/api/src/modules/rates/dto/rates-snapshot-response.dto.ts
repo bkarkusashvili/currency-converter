@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ResponseWarningDto } from '../../../common/warnings/response-warning.dto';
-import { RATES_SOURCES } from '../domain/exchange-rate';
-import type { RatesSource } from '../domain/exchange-rate';
+import { ResponseWarningDto } from '../../../common/warnings';
+import { RatesSource } from '../domain/rates-source.enum';
 import { ExchangeRateDto } from './exchange-rate.dto';
 
 export class RatesSnapshotResponseDto {
@@ -10,8 +9,8 @@ export class RatesSnapshotResponseDto {
       'Where this snapshot came from. `stale-cache` means the upstream could ' +
       'not be reached and the fallback copy was served instead, so the rates ' +
       'are older than the cache TTL.',
-    enum: RATES_SOURCES,
-    example: 'cache',
+    enum: RatesSource,
+    example: RatesSource.Cache,
   })
   source!: RatesSource;
 

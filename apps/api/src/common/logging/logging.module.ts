@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
-import { buildLoggerParams } from './build-logger-params';
+import { buildLoggerParams } from './build-logger-params.util';
 
 @Module({
   imports: [

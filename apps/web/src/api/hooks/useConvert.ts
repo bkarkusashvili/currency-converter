@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import type { ApiError } from '../http/ApiError';
 import { queryKeys } from '../queryKeys';
-import { useRepositories } from '../repositories/useRepositories';
+import { useServices } from '../services/useServices';
 import type { ConvertRequest, ConvertResponse } from '../types';
 
 export function useConvert(): UseMutationResult<ConvertResponse, ApiError, ConvertRequest> {
-  const { conversion } = useRepositories();
+  const { conversion } = useServices();
   const queryClient = useQueryClient();
 
   return useMutation<ConvertResponse, ApiError, ConvertRequest>({

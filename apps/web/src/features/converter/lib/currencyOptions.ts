@@ -1,4 +1,4 @@
-import type { Currency } from '../../../api/types';
+import type { Currency } from '../../../api';
 
 /**
  * What the form opens on, and the only codes it can offer when no currency

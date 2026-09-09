@@ -1,9 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Schema as MongooseSchema } from 'mongoose';
-import { CONVERSION_STRATEGY_NAMES } from '../../../common/conversion/conversion-strategy-name';
-import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name';
-import { RATES_SOURCES } from '../../rates/domain/exchange-rate';
-import type { RatesSource } from '../../rates/domain/exchange-rate';
+import { ConversionStrategyName } from '../../../common/conversion';
+import { RatesSource } from '../../rates';
 
 export const CONVERSION_RECORD_MODEL = 'ConversionRecord';
 export const CONVERSIONS_COLLECTION = 'conversions';
@@ -34,12 +32,17 @@ export class ConversionRecordDocument {
   @Prop({ required: true })
   rate!: number;
 
-  // A union erases to no single runtime type, so these two name theirs: the
-  // enum is what keeps a value §3 does not publish out of the collection.
-  @Prop({ required: true, type: String, enum: CONVERSION_STRATEGY_NAMES })
+  // A string enum erases to a plain string at runtime, so these two name the
+  // set themselves: it is what keeps a value §3 does not publish out of the
+  // collection.
+  @Prop({
+    required: true,
+    type: String,
+    enum: Object.values(ConversionStrategyName),
+  })
   strategy!: ConversionStrategyName;
 
-  @Prop({ required: true, type: String, enum: RATES_SOURCES })
+  @Prop({ required: true, type: String, enum: Object.values(RatesSource) })
   source!: RatesSource;
 
   // A Date, like `createdAt`, rather than the ISO string the domain publishes:

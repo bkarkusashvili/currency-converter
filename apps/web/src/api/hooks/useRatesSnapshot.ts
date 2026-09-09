@@ -1,7 +1,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { ApiError } from '../http/ApiError';
 import { queryKeys } from '../queryKeys';
-import { useRepositories } from '../repositories/useRepositories';
+import { useServices } from '../services/useServices';
 import type { RatesSnapshotResponse } from '../types';
 
 /**
@@ -16,7 +16,7 @@ const REFETCH_INTERVAL_MS = 5 * 60 * 1000;
  * conversion from when the API cannot be reached.
  */
 export function useRatesSnapshot(): UseQueryResult<RatesSnapshotResponse, ApiError> {
-  const { rates } = useRepositories();
+  const { rates } = useServices();
 
   return useQuery<RatesSnapshotResponse, ApiError>({
     queryKey: queryKeys.rates,

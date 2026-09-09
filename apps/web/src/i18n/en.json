@@ -131,7 +131,7 @@
         "Every module the architecture describes is in: rates, conversion through three strategies, currencies, history, the health endpoints and this client.",
         "The API and this client are two independent images, built by one CI workflow that runs lint, formatting, typecheck, tests with coverage thresholds, the build and the image build per app — plus a job that validates the shared conversion fixtures, boots the whole Docker Compose stack, probes it, and runs the integration suites against the Redis and MongoDB it started.",
         "Both run on Railway behind the platform edge, each on its own hostname; the panel above reads the live health endpoint every 30 seconds.",
-        "1031 tests pass: 661 API unit, 124 API end-to-end, 12 integration against a real Redis and MongoDB, and 234 in this client, with coverage gates of 85% on the API and 90% here."
+        "1032 tests pass: 661 API unit, 124 API end-to-end, 12 integration against a real Redis and MongoDB, and 235 in this client, with coverage gates of 85% on the API and 90% here."
       ]
     },
     "whatWasBuilt": {
@@ -175,7 +175,7 @@
         },
         {
           "term": "This client",
-          "description": "React 19, Vite, TanStack Query and Tailwind v4 with a dark-aware token palette. Components depend on repository interfaces, never on HTTP; every string comes from an i18n dictionary, and a key that is not in that dictionary fails the typecheck. Vitest and Testing Library cover the repositories, the amount field, the form, the result card, the history panel and the offline estimate."
+          "description": "React 19, Vite, TanStack Query and Tailwind v4 with a dark-aware token palette. Components depend on service interfaces, never on HTTP; every string comes from an i18n dictionary, and a key that is not in that dictionary fails the typecheck. Vitest and Testing Library cover the services, the amount field, the form, the result card, the history panel and the offline estimate."
         }
       ]
     },
@@ -191,7 +191,11 @@
       "points": [
         {
           "term": "Interfaces before infrastructure",
-          "description": "Depending on ports keeps the conversion rules testable without Redis, Mongo or the network, and it keeps infrastructure concerns from leaking into the part of the code that has the actual business rules in it. The client does the same thing: components take a repository interface, and the tests hand them an in-memory one."
+          "description": "Depending on ports keeps the conversion rules testable without Redis, Mongo or the network, and it keeps infrastructure concerns from leaking into the part of the code that has the actual business rules in it. The client does the same thing: components take a service interface, and the tests hand them an in-memory one."
+        },
+        {
+          "term": "State",
+          "description": "TanStack Query owns server state (with persistence for rates and currencies); React context provides the service implementations (swapped for fakes in tests); form state is local to the converter; there is no global store because no client state is shared beyond the query cache."
         },
         {
           "term": "Three strategies instead of one branch",

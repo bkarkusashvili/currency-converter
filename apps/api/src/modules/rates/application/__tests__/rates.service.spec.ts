@@ -4,8 +4,8 @@ import {
   createFakePinoLogger,
   FakePinoLogger,
 } from '../../../../common/logging/__tests__/fake-pino-logger';
-import { CachedSnapshot } from '../../domain/ports';
-import { RatesSnapshot } from '../../domain/exchange-rate';
+import { CachedSnapshot } from '../../domain/rates-repository.interface';
+import { RatesSnapshot } from '../../domain/exchange-rate.types';
 import { RatesService } from '../rates.service';
 
 const FRESH: RatesSnapshot = {

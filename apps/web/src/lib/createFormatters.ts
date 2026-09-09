@@ -1,4 +1,13 @@
-import type { AmountSeparators } from '../features/converter/lib/amount/formatAmountInput';
+/**
+ * The grouping and decimal marks of a locale. Declared here because
+ * `createFormatters` is what reads them off `Intl`; the converter's amount
+ * field is a consumer of them, not their owner.
+ */
+export interface AmountSeparators {
+  /** The thousands separator of the active locale; `''` for a locale that does not group. */
+  group: string;
+  decimal: string;
+}
 
 /** §3 publishes an effective rate to six places; a rate never needs more. */
 const RATE_DECIMALS = 6;

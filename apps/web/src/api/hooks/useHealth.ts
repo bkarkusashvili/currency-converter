@@ -1,13 +1,13 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { ApiError } from '../http/ApiError';
 import { queryKeys } from '../queryKeys';
-import { useRepositories } from '../repositories/useRepositories';
+import { useServices } from '../services/useServices';
 import type { HealthResponse } from '../types';
 
 const REFETCH_INTERVAL_MS = 30_000;
 
 export function useHealth(): UseQueryResult<HealthResponse, ApiError> {
-  const { health } = useRepositories();
+  const { health } = useServices();
 
   return useQuery<HealthResponse, ApiError>({
     queryKey: queryKeys.health,

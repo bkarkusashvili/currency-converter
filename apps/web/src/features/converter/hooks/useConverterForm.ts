@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ConvertRequest } from '../../../api/types';
-import { useFormatters } from '../../../lib/useFormatters';
+import type { ConvertRequest } from '../../../api';
+import { useFormatters } from '../../../lib';
 import { canonicalAmount } from '../lib/amount/formatAmountInput';
 import { DEFAULT_FROM, DEFAULT_TO } from '../lib/currencyOptions';
 import { MAX_AMOUNT, parseAmount, type AmountErrorCode } from '../lib/amount/parseAmount';

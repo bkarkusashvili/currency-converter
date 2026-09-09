@@ -1,13 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { useHistory } from '../../../api/hooks/useHistory';
-import type { HistoryItem } from '../../../api/types';
-import { EmptyMark } from '../../../components/EmptyMark';
-import { InfoBadge } from '../../../components/InfoBadge';
-import { Skeleton } from '../../../components/Skeleton';
-import { Timestamp } from '../../../components/Timestamp';
-import { WarningIcon } from '../../../components/WarningIcon';
-import { useApiErrorMessage } from '../../../lib/useApiErrorMessage';
-import { useFormatters } from '../../../lib/useFormatters';
+import { useHistory } from '../../../api';
+import type { HistoryItem } from '../../../api';
+import { EmptyMark, InfoBadge, Skeleton, Timestamp, WarningIcon } from '../../../components';
+import { useApiErrorMessage, useFormatters } from '../../../lib';
 import { sourceCopy, strategyCopy } from '../lib/provenance';
 
 export const HISTORY_LIMIT = 10;

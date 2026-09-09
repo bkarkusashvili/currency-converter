@@ -40,7 +40,7 @@ to `main` directly. Those pull requests built:
   Monobank; one error envelope for every failure; a `warnings` array that says
   what degraded on a request that still succeeded.
 - **Web** (`apps/web`) — React 19, Vite, TanStack Query, i18next. Converter and
-  `/about` pages, a repository layer mirroring the API's ports, and a persisted
+  `/about` pages, a services layer mirroring the API's ports, and a persisted
   rates snapshot that keeps the converter answering when the API is unreachable.
 - **Orchestration** — Docker Compose for `api`, `web`, `redis` and `mongo`; a
   dev overlay that runs the backing services alone; GitHub Actions running
@@ -511,7 +511,7 @@ apps/
 │   ├── Dockerfile      multi-stage, prod deps only, runs as `node`
 │   └── railway.json
 └── web/                React 19 + Vite + TypeScript, own package + lockfile
-    ├── src/            api (http, repositories, persistence, hooks),
+    ├── src/            api (http, services, persistence, hooks),
     │                   components, features (converter, about), i18n, lib, test
     ├── nginx/          config template + shared security-headers snippet
     ├── docker/         entrypoint that writes config.js from API_URL
@@ -533,12 +533,12 @@ Four suites, all green on this commit:
 
 | Suite           | Command                                  | Result                    | Coverage                                                                 | Gate                       |
 | --------------- | ---------------------------------------- | ------------------------- | ------------------------------------------------------------------------ | -------------------------- |
-| API unit        | `apps/api: npm run test:cov`             | 65 suites, **661** tests  | stmts 98.13% · branches 88.78% · funcs 98.40% · lines 98.02%              | 85% lines + branches       |
+| API unit        | `apps/api: npm run test:cov`             | 65 suites, **661** tests  | stmts 98.79% · branches 88.28% · funcs 98.43% · lines 98.72%              | 85% lines + branches       |
 | API e2e         | `apps/api: npm run test:e2e`             | 8 suites, **124** tests   | not instrumented — see below                                             | none                       |
 | API integration | `apps/api: npm run test:integration`     | 2 suites, **12** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
-| Web             | `apps/web: npm run test:coverage`        | 27 files, **234** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
+| Web             | `apps/web: npm run test:coverage`        | 27 files, **235** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
 
-**1031 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
+**1032 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
 `npm run typecheck`, `npm run format:check` and `npm run build` run the same
 checks across both apps and let both report, so a failure in one does not hide
 the other. Coverage gates and the e2e suite stay per-app.
@@ -546,13 +546,13 @@ the other. Coverage gates and the e2e suite stay per-app.
 **How e2e coverage relates to the unit report.** The API coverage numbers above
 are the **unit** suites alone, and the 85% gate is on those. `npm run test:e2e`
 runs uninstrumented, so what only it exercises is missing from the report rather
-than uncovered: `configure-http.ts` and `setup-swagger.ts` read 0% while every
+than uncovered: `configure-http.ts` and `setup-swagger.util.ts` read 0% while every
 e2e suite boots through both, which is what drags the `src` root row to 52.38%
-and `src/common/swagger` to 71.42%. `main.ts` and every `*.module.ts` are
-excluded outright — a module is wiring, and what a module *decides* lives in a
-file of its own beside it so the gate does see it. Read the two as what they
-are: the unit suites cover the logic, the e2e suites cover the surface, and only
-the first is counted.
+and `src/common/swagger` to 93.1%. `main.ts`, every `*.module.ts` and every
+`index.ts` are excluded outright — a module is wiring and a barrel is a list of
+names, and what a module *decides* lives in a file of its own beside it so the
+gate does see it. Read the two as what they are: the unit suites cover the
+logic, the e2e suites cover the surface, and only the first is counted.
 
 Unit tests never touch the network, Redis or Mongo. The e2e suites do not
 either: the shared factory swaps the Redis client, the Mongo connection and the
@@ -672,15 +672,15 @@ test name, or a live URL; every row was re-verified against this commit.
 | ------ | -------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1a     | Node.js backend exposing a conversion endpoint | met | `apps/api/src/main.ts`, `apps/api/src/modules/conversion/conversion.controller.ts`. Node 24 pinned (`.nvmrc`, `engines.node>=24`). Live: `POST /api/v1/convert` → `200`                                                       |
 | 1b     | NestJS and TypeScript      | met    | `apps/api/package.json` (`@nestjs/*` 11), `apps/api/tsconfig.json` strict; `npm run typecheck` exits 0 with `typescript-eslint` `no-unsafe-*` on and `--max-warnings 0`                                                                  |
-| 1c-i   | Repository pattern         | met    | Ports `modules/rates/domain/ports.ts` (`RatesRepository`), `modules/history/domain/history-repository.port.ts`; adapters `modules/rates/infrastructure/redis-rates.repository.ts`, `modules/history/infrastructure/mongo-history.repository.ts`. Bound by token; no service imports an adapter |
+| 1c-i   | Repository pattern         | met    | Ports `modules/rates/domain/rates-repository.interface.ts` (`RatesRepository`), `modules/history/domain/history-repository.interface.ts`; adapters `modules/rates/infrastructure/redis-rates.repository.ts`, `modules/history/infrastructure/mongo-history.repository.ts`. Bound by token; no service imports an adapter |
 | 1c-ii  | Dependency injection       | met    | Tokens `RATES_PROVIDER`, `RATES_REPOSITORY`, `HISTORY_REPOSITORY`, `CONVERSION_STRATEGIES`, `HEALTH_INDICATORS`, `MONOBANK_CIRCUIT_BREAKER`, `REDIS_CLIENT`, each declared in the file that declares the contract it injects. Every unit spec substitutes a fake through the same token the runtime uses |
-| 1c-iii | Strategy pattern           | met    | `modules/conversion/strategies/` — `conversion-strategy.ts`, `identity`, `direct-pair`, `cross-rate`, `conversion-strategy.resolver.ts`; order declared in `conversion.module.ts`. Tests: “takes the first strategy that prices the pair”, “falls through the ones that decline”, “fails when no registered strategy prices the pair”, “resolves the chain in the order §5 gives it” |
+| 1c-iii | Strategy pattern           | met    | `modules/conversion/strategies/` — `conversion-strategy.interface.ts`, `identity`, `direct-pair`, `cross-rate`, `conversion-strategy.resolver.ts`; order declared in `conversion.module.ts`. Tests: “takes the first strategy that prices the pair”, “falls through the ones that decline”, “fails when no registered strategy prices the pair”, “resolves the chain in the order §5 gives it” |
 
 ### 2. POST conversion route
 
 | #  | Requirement                        | Status | Evidence                                                                                                                        |
 | -- | ---------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| 2a | POST route                         | met    | `conversion.controller.ts` `@Post()` + `@HttpCode(200)`, prefix from `common/http/paths.ts`. Test: “answers 200, not 201, with exactly the fields §3 lists” |
+| 2a | POST route                         | met    | `conversion.controller.ts` `@Post()` + `@HttpCode(200)`, prefix from `common/http/paths.constants.ts`. Test: “answers 200, not 201, with exactly the fields §3 lists” |
 | 2b | Accepts source, target, amount     | met    | `modules/conversion/dto/convert-request.dto.ts`. Tests: “takes a well formed body as it was sent”, “normalises the codes to upper case”, “reports every missing field at once”, “rejects a property the request has no business sending” |
 
 ### 3. Data fetching from Monobank
@@ -688,16 +688,16 @@ test name, or a live URL; every row was re-verified against this commit.
 | #  | Requirement                    | Status | Evidence                                                                                                                                        |
 | -- | ------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 3a | Latest rates from Monobank     | met    | `config/env.schema.ts` (`MONOBANK_API_URL`), `modules/rates/infrastructure/monobank/` (provider, zod schema, mapper). Test: “requests the configured url and maps the payload into a snapshot”. Live: `GET /api/v1/rates` returns real pairs |
-| 3b | Error handling for API requests | met   | `application/describe-rates-failure.ts`, `rates.service.ts` `serveStale`, `RatesUnavailableError`. Tests: “never leaks the upstream failure into the envelope”, “never names the upstream in the envelope it answers with” |
-| 3c | Retry mechanism                | met    | `common/resilience/retry.ts` (exponential backoff, full jitter), `should-retry-monobank.ts`. Tests: “doubles the jitter window on every attempt”, “caps the window at maxDelayMs”, “never retries a 429, because the upstream allows one request a minute”. Bounded by `MONOBANK_TOTAL_BUDGET_MS` via `common/utils/with-timeout.ts` |
-| 3d | Circuit breaker                | met    | `common/resilience/circuit-breaker.ts` (CLOSED/OPEN/HALF_OPEN), wired in `monobank.module.ts`. Tests: “rejects a second caller while the trial is in flight”, “reopens on a failed trial and starts the window again”, “counts one breaker failure per exhausted call, not one per attempt”. Live: `/health` reports the breaker state |
+| 3b | Error handling for API requests | met   | `application/describe-rates-failure.util.ts`, `rates.service.ts` `serveStale`, `RatesUnavailableError`. Tests: “never leaks the upstream failure into the envelope”, “never names the upstream in the envelope it answers with” |
+| 3c | Retry mechanism                | met    | `common/resilience/retry.util.ts` (exponential backoff, full jitter), `should-retry-monobank.util.ts`. Tests: “doubles the jitter window on every attempt”, “caps the window at maxDelayMs”, “never retries a 429, because the upstream allows one request a minute”. Bounded by `MONOBANK_TOTAL_BUDGET_MS` via `common/utils/with-timeout.util.ts` |
+| 3d | Circuit breaker                | met    | `common/resilience/circuit-breaker.util.ts` (CLOSED/OPEN/HALF_OPEN), wired in `monobank.module.ts`. Tests: “rejects a second caller while the trial is in flight”, “reopens on a failed trial and starts the window again”, “counts one breaker failure per exhausted call, not one per attempt”. Live: `/health` reports the breaker state |
 
 ### 4. Caching layer
 
 | #  | Requirement                     | Status | Evidence                                                                                                                             |
 | -- | ------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | 4a | Cache rates for a set duration  | met    | `redis-rates.repository.ts` `save()` writes `rates:latest` with `EX RATES_CACHE_TTL_SECONDS`. Tests: “writes both keys with the configured expiries”, “answers the second call from the cache without calling out again”, and against a real Redis “writes both keys with their TTLs” (`test/integration/`) |
-| 4b | Use Redis                       | met    | `infrastructure/redis/create-redis-client.ts` (ioredis), `redis.module.ts`, `redis-connection.ts`; `docker-compose.yml` `redis:7.4-alpine`; managed Redis on Railway. Live: `/health` → `"redis":{"status":"up"}` |
+| 4b | Use Redis                       | met    | `infrastructure/redis/create-redis-client.factory.ts` (ioredis), `redis.module.ts`, `redis-connection.provider.ts`; `docker-compose.yml` `redis:7.4-alpine`; managed Redis on Railway. Live: `/health` → `"redis":{"status":"up"}` |
 | 4c | Configurable expiry             | met    | `RATES_CACHE_TTL_SECONDS` (300) and `RATES_STALE_TTL_SECONDS` (86400) in `env.schema.ts`, both in the table above and in `.env.example` |
 | 4d | Cache-aside pattern             | met    | `rates.service.ts` `getSnapshot()`: `getFresh()` → miss → `fetchRates()` → `save()`. Tests: “answers from the cache without reaching the upstream”, “fetches, caches and reports the provider as the source”, “serves concurrent callers from one upstream call” (single-flight) |
 | 4e | Cache invalidation strategies   | met    | TTL expiry plus `DELETE /api/v1/rates/cache` (`rates.controller.ts`, `redis-rates.repository.ts` `clear`), guarded by `common/guards/api-key.guard.ts`. Tests: “empties the cache so the next read reaches the upstream again”, “refuses a request that carries no key”, “refuses to report an invalidation it could not perform”. Live: without a key → `401 UNAUTHORIZED` |
@@ -707,8 +707,8 @@ test name, or a live URL; every row was re-verified against this commit.
 | #  | Requirement                        | Status | Evidence                                                                                                                    |
 | -- | ---------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | 5a | Use the fetched rates              | met    | `conversion.service.ts` reads one snapshot via `RatesService`, so two legs cannot straddle a cache expiry. Test: “prices the whole conversion from one snapshot”. The response carries `source` and `ratesTimestamp` |
-| 5b | Convert source → target            | met    | `conversion.service.ts` + `common/money/money.ts` (`big.js`, DP 30) + `round-half-up.ts`. Tests: “rounds the money half-up to two decimals”, “computes the result from the unrounded rate”, “rounds a tie up rather than to the nearest float”. No float arithmetic on money |
-| 5c | Cross-currency conversion via UAH  | met    | `strategies/cross-rate.strategy.ts` + `directional-rate.ts`, hub `BASE_CURRENCY` in `domain/exchange-rate.ts`. Tests: “composes the leg into the base currency with the leg out of it”, “is not the reciprocal of itself across a spread”, “crosses two currencies that only share the hryvnia”, “takes the published pair over the path through the hryvnia”. Live: EUR→GBP → `"strategy":"cross"` |
+| 5b | Convert source → target            | met    | `conversion.service.ts` + `common/money/money.constants.ts` (`big.js`, DP 30) + `round-half-up.util.ts`. Tests: “rounds the money half-up to two decimals”, “computes the result from the unrounded rate”, “rounds a tie up rather than to the nearest float”. No float arithmetic on money |
+| 5c | Cross-currency conversion via UAH  | met    | `strategies/cross-rate.strategy.ts` + `directional-rate.util.ts`, hub `BASE_CURRENCY` in `domain/exchange-rate.types.ts`. Tests: “composes the leg into the base currency with the leg out of it”, “is not the reciprocal of itself across a spread”, “crosses two currencies that only share the hryvnia”, “takes the published pair over the path through the hryvnia”. Live: EUR→GBP → `"strategy":"cross"` |
 
 ### 6. Error handling
 
@@ -716,10 +716,10 @@ test name, or a live URL; every row was re-verified against this commit.
 | -- | ------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
 | 6a | Graceful, informative responses      | met    | One envelope in `common/filters/error-response.dto.ts`. Tests: “answers with the documented error envelope”, “reports the same request id in the envelope and the header” |
 | 6b | Global exception filters             | met    | `common/filters/global-exception.filter.ts` (`@Catch()`, `APP_FILTER`) and `modules/health/health-exception.filter.ts`. Test: “does not leak the message of a 5xx HttpException” |
-| 6c | Meaningful message — invalid request | met    | `common/validation/` (`validation-exception-factory.ts`, which flattens the nested errors, and `validation-pipe.options.ts` with `whitelist`, `forbidNonWhitelisted`, no implicit conversion). Tests: “rejects an amount sent as a string”, “reports a code of the wrong length once”. Live: one message per field |
+| 6c | Meaningful message — invalid request | met    | `common/validation/` (`validation-exception.factory.ts`, which flattens the nested errors, and `validation-pipe.options.ts` with `whitelist`, `forbidNonWhitelisted`, no implicit conversion). Tests: “rejects an amount sent as a string”, “reports a code of the wrong length once”. Live: one message per field |
 | 6d | Meaningful message — conversion      | met    | `UnsupportedCurrencyError` (422) and `RateNotAvailableError` (422), split in `conversion-strategy.resolver.ts`. Tests: “reports a code the snapshot never mentions as unsupported”, “reports two quoted currencies with no path between them”. Live: `422 UNSUPPORTED_CURRENCY` with `details.currency` |
 | 6e | Meaningful message — API unavailable | met    | `RatesUnavailableError` (`503 RATES_UNAVAILABLE`) from `rates.service.ts`, `HistoryUnavailableError` (`503 HISTORY_UNAVAILABLE`). Tests: “answers 503 in the documented envelope with nothing cached”, “answers 503 with its own code rather than a 500”, “falls back to the stale copy once the fresh key has expired” |
-| 6f | Meaningful message — cache failure   | met    | Two answers for two situations. On a read path the request still succeeds and carries a `CACHE_UNAVAILABLE` warning (`common/warnings/collect-warnings.ts`, `RatesLookup.cacheDegraded`); on `DELETE /rates/cache` it answers `503 CACHE_UNAVAILABLE`. Tests: “prices the conversion from the upstream and warns”, “answers the snapshot from the upstream and warns”, “lists the currencies and warns on the same terms”, “refuses to report an invalidation it could not perform”. Also `/health` → `redis: down` with a sanitised reason |
+| 6f | Meaningful message — cache failure   | met    | Two answers for two situations. On a read path the request still succeeds and carries a `CACHE_UNAVAILABLE` warning (`common/warnings/collect-warnings.util.ts`, `RatesLookup.cacheDegraded`); on `DELETE /rates/cache` it answers `503 CACHE_UNAVAILABLE`. Tests: “prices the conversion from the upstream and warns”, “answers the snapshot from the upstream and warns”, “lists the currencies and warns on the same terms”, “refuses to report an invalidation it could not perform”. Also `/health` → `redis: down` with a sanitised reason |
 
 ### 7. Docker
 
@@ -744,10 +744,10 @@ is implemented and covered:
 | Requirement | Where |
 | ----------- | ----- |
 | Production readiness | helmet, CORS allowlist, `trust proxy`, `@nestjs/throttler`, graceful shutdown, non-root multi-stage image, `ADMIN_API_KEY` required in production. `test/e2e/http-hardening.e2e-spec.ts`, `test/e2e/throttling.e2e-spec.ts` |
-| Structured logging | `common/logging/` — nestjs-pino, `request-id.ts` (header, sanitiser, assigner, middleware), `serializers.ts`, level resolver, once-per-outage reporter. Credentials and connection strings never reach a client or a log line |
+| Structured logging | `common/logging/` — nestjs-pino, `request-id.util.ts` (header, sanitiser, assigner, middleware), `serializers.util.ts`, level resolver, once-per-outage reporter. Credentials and connection strings never reach a client or a log line |
 | React frontend | `apps/web/` — React 19 + Vite + TanStack Query + React Router, converter and `/about` pages |
 | MongoDB history | `infrastructure/mongo/`, `modules/history/`, TTL index from `HISTORY_TTL_DAYS`, `GET /api/v1/history` |
-| Repository pattern on the web | `apps/web/src/api/repositories/` — five interfaces in `repositories.ts`, their HTTP implementations in `createHttpRepositories.ts`, `RepositoriesProvider` / `useRepositories`; tests inject fakes through the same provider |
+| Service layer on the web | `apps/web/src/api/services/` — five interfaces in `services.ts`, their HTTP implementations in `createHttpServices.ts`, `ServicesProvider` / `useServices`; tests inject fakes through the same provider. It is a *service* layer and not a repository one because the client stores nothing; the API keeps the Repository pattern, where the stores are |
 | Offline fallback | `features/converter/lib/convertOffline.ts` + `api/persistence/` — a persisted snapshot re-priced in the browser, labelled `offline-estimate` and never written to history. Priced against the same `fixtures/golden-conversions.json` the API's e2e suite asserts |
 | Container-backed integration tests | `apps/api/test/integration/` — the Redis and Mongo adapters against real servers, run by CI's `orchestration` job against the stack it starts |
 | Client/contract check | `docs/openapi.json` committed and regenerated by an e2e test; the web suite validates every sample response it renders against those schemas with `ajv` |
@@ -772,7 +772,8 @@ argues it.
 - **No gateway** — the platform edge publishes each service; CORS is the check a gateway would have been added to perform. [§10](docs/architecture.md#10-web-app)
 - **Two-layer fallback** — the API survives Monobank with a stale Redis copy, the browser survives the API with a persisted one. [§10](docs/architecture.md#10-web-app)
 - **Internationalisation** — every user-visible string in a dictionary, keys type-checked against it. [§12](docs/architecture.md#12-conventions)
-- **Repository layer on the web** — one interface per resource behind a provider, so a component test never touches the transport. [§10](docs/architecture.md#10-web-app)
+- **Service layer on the web** — one interface per resource behind a provider, so a component test never touches the transport. [§10](docs/architecture.md#10-web-app)
+- **Public surfaces with lint-enforced boundaries** — each API module and `common/` package, and each top-level web folder, publishes an `index.ts`; `no-restricted-imports` fails the build on an import that reaches inside one. [§9](docs/architecture.md#9-api-module-layout), [§10](docs/architecture.md#10-web-app)
 
 Known limitations and follow-ups are listed honestly in
 [`docs/architecture.md` §14](docs/architecture.md#14-known-limitations-and-follow-ups).

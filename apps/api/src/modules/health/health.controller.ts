@@ -12,8 +12,8 @@ import {
 } from '@nestjs/terminus';
 import { seconds, SkipThrottle, Throttle } from '@nestjs/throttler';
 import { HealthExceptionFilter } from './health-exception.filter';
-import { HEALTH_INDICATORS } from './health-indicator.port';
-import type { HealthIndicatorPort } from './health-indicator.port';
+import { HEALTH_INDICATORS } from './health-indicator.interface';
+import type { HealthIndicatorPort } from './health-indicator.interface';
 
 // The dependency report is not exempt, only generous: it runs a Redis PING and
 // a Mongo ping per request, so an unauthenticated route with no limit at all is

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '../../../api/http/ApiError';
+import { ApiError } from '../../../api';
 import { splitServerFieldErrors } from '../lib/serverFieldErrors';
 
 describe('splitServerFieldErrors', () => {

@@ -1,6 +1,5 @@
-import { useConvert } from '../../../api/hooks/useConvert';
-import { useRatesSnapshot } from '../../../api/hooks/useRatesSnapshot';
-import type { ConvertRequest } from '../../../api/types';
+import { useConvert, useRatesSnapshot } from '../../../api';
+import type { ConvertRequest } from '../../../api';
 import { resolveConversionOutcome, type ConversionOutcomeState } from '../lib/conversionOutcome';
 
 export interface ConversionState extends ConversionOutcomeState {

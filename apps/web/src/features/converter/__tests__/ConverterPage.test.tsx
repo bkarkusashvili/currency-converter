@@ -1,20 +1,19 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '../../../api/http/ApiError';
+import { ApiError, queryKeys } from '../../../api';
 import type {
   ConvertResponse,
   CurrenciesResponse,
   RatesSnapshotResponse,
   ResponseWarningCode,
-} from '../../../api/types';
+} from '../../../api';
 import {
-  createFakeRepositories,
+  createFakeServices,
   FAKE_RESPONSES,
-  type FakeRepositoriesOptions,
-} from '../../../test/fakes/createFakeRepositories';
+  type FakeServicesOptions,
+} from '../../../test/fakes/createFakeServices';
 import { createTestQueryClient, renderWithProviders } from '../../../test/renderWithProviders';
-import { queryKeys } from '../../../api/queryKeys';
 import { ConverterPage } from '../components/ConverterPage';
 
 /**
@@ -31,9 +30,9 @@ const currencies = FAKE_RESPONSES.currencies;
 const conversion: ConvertResponse = { ...FAKE_RESPONSES.convert };
 delete conversion.warnings;
 
-function renderPage(options: FakeRepositoriesOptions = {}) {
-  const fake = createFakeRepositories({ currencies, convert: conversion, ...options });
-  renderWithProviders(<ConverterPage />, { repositories: fake.repositories });
+function renderPage(options: FakeServicesOptions = {}) {
+  const fake = createFakeServices({ currencies, convert: conversion, ...options });
+  renderWithProviders(<ConverterPage />, { services: fake.services });
   return fake;
 }
 
@@ -326,9 +325,9 @@ describe('the currency list', () => {
     const queryClient = createTestQueryClient();
     // Hydrated from storage, so it is stale on arrival and the page refetches it.
     queryClient.setQueryData(queryKeys.currencies, currencies, { updatedAt: STALE_AT });
-    const fake = createFakeRepositories({ currencies: unreachable });
+    const fake = createFakeServices({ currencies: unreachable });
 
-    renderWithProviders(<ConverterPage />, { repositories: fake.repositories, queryClient });
+    renderWithProviders(<ConverterPage />, { services: fake.services, queryClient });
 
     const from = await screen.findByLabelText('From');
     expect(
@@ -383,10 +382,10 @@ describe('the currency list', () => {
 
 describe('while the currency list is loading', () => {
   it('stands the selects in a status region rather than labelling nothing', () => {
-    const fake = createFakeRepositories({ convert: conversion });
+    const fake = createFakeServices({ convert: conversion });
     renderWithProviders(<ConverterPage />, {
-      repositories: {
-        ...fake.repositories,
+      services: {
+        ...fake.services,
         currencies: { list: () => new Promise<CurrenciesResponse>(() => undefined) },
       },
     });
@@ -615,10 +614,10 @@ describe('the amount field', () => {
 describe('while a conversion is in flight', () => {
   it('says so on the button and stops a second submission', async () => {
     const user = userEvent.setup();
-    const fake = createFakeRepositories({ currencies });
+    const fake = createFakeServices({ currencies });
     renderWithProviders(<ConverterPage />, {
-      repositories: {
-        ...fake.repositories,
+      services: {
+        ...fake.services,
         conversion: { convert: () => new Promise<ConvertResponse>(() => undefined) },
       },
     });

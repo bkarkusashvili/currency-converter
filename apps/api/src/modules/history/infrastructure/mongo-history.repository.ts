@@ -3,18 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, ConnectionStates, Model, Types } from 'mongoose';
 import { PinoLogger } from 'nestjs-pino';
-import { HistoryUnavailableError } from '../../../common/errors/history-unavailable.error';
-import {
-  createOutageReporter,
-  OutageReporter,
-} from '../../../common/logging/outage-reporter';
-import { TimeoutError } from '../../../common/utils/timeout.error';
-import { withTimeout } from '../../../common/utils/with-timeout';
+import { HistoryUnavailableError } from '../../../common/errors';
+import { OutageReporter, createOutageReporter } from '../../../common/logging';
+import { TimeoutError, withTimeout } from '../../../common/utils';
 import type { TypedConfigService } from '../../../config/typed-config.service';
-import { ConversionRecord } from '../domain/conversion-record';
-import type { NewConversionRecord } from '../domain/conversion-record';
-import { MAX_HISTORY_LIMIT } from '../domain/history-limits';
-import { HistoryRepository } from '../domain/history-repository.port';
+import { ConversionRecord } from '../domain/conversion-record.types';
+import type { NewConversionRecord } from '../domain/conversion-record.types';
+import { MAX_HISTORY_LIMIT } from '../domain/history-limits.constants';
+import { HistoryRepository } from '../domain/history-repository.interface';
 import {
   CONVERSION_RECORD_MODEL,
   ConversionRecordDocument,

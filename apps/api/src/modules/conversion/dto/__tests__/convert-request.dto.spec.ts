@@ -1,5 +1,5 @@
 import { ArgumentMetadata, ValidationPipe } from '@nestjs/common';
-import { FieldValidationError } from '../../../../common/validation/field-validation-error';
+import { FieldValidationError } from '../../../../common/validation/field-validation-error.types';
 import { validationPipeOptions } from '../../../../common/validation/validation-pipe.options';
 import { ConvertRequestDto, toUpperCase } from '../convert-request.dto';
 
