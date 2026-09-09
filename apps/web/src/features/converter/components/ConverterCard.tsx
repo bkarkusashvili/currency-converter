@@ -9,7 +9,7 @@ import { currencyOptions } from '../lib/currencyOptions';
 import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../lib/amount/formatAmountInput';
 import type { FormFieldErrors } from '../lib/serverFieldErrors';
 import { AmountField } from './AmountField';
-import { CurrencySelect } from './CurrencySelect';
+import { CurrencyCombobox } from './CurrencyCombobox';
 import { ProvenanceFooter } from './ProvenanceFooter';
 import { ResultBadges } from './ResultBadges';
 import { ResultDisplay } from './ResultDisplay';
@@ -19,12 +19,15 @@ interface ConverterCardProps {
   /** Undefined until the list loads, and after a failure that no persisted copy answered. */
   currencies: Currency[] | undefined;
   currenciesError: ApiError | null;
-  /** No list has arrived and none was stored, so the selects have nothing to offer yet. */
+  /** No list has arrived and none was stored, so the pickers have nothing to offer yet. */
   currenciesLoading: boolean;
   /** What degraded while the lists behind this form were fetched (§3); usually nothing. */
   warnings: ResponseWarning[];
   serverErrors: FormFieldErrors;
-  /** A conversion is in flight. Only the Convert button says so; nothing else moves. */
+  /**
+   * A conversion is in flight. The button is the only thing that says so out
+   * loud; the pickers stop taking changes but keep every box they had.
+   */
   isSubmitting: boolean;
   /** The answer, which the output pane holds until the next one replaces it. */
   outcome: ConversionOutcome | undefined;
@@ -71,12 +74,15 @@ export function ConverterCard({
   return (
     <form className="card converter-card" onSubmit={form.handleSubmit} noValidate>
       <div className="pane-input grid content-start gap-3 p-5 pb-6 sm:gap-3.5 sm:p-6 sm:pb-0">
-        <CurrencySelect
+        <CurrencyCombobox
           id="from"
           label={t('converter.form.from')}
+          sheetTitle={t('converter.form.sheetFrom')}
           value={form.from}
           currencies={options}
+          otherValue={form.to}
           isLoading={currenciesLoading}
+          disabled={isSubmitting}
           error={form.errors.from}
           onChange={form.setFrom}
         />
@@ -117,12 +123,15 @@ export function ConverterCard({
       </div>
 
       <div className="pane-output bg-sunken border-line grid content-start gap-3 p-5 pt-8 sm:gap-3.5 sm:border-l sm:p-6">
-        <CurrencySelect
+        <CurrencyCombobox
           id="to"
           label={t('converter.form.to')}
+          sheetTitle={t('converter.form.sheetTo')}
           value={form.to}
           currencies={options}
+          otherValue={form.from}
           isLoading={currenciesLoading}
+          disabled={isSubmitting}
           error={form.errors.to}
           onChange={form.setTo}
         />

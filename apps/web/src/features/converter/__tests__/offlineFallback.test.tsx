@@ -9,6 +9,7 @@ import {
   FAKE_RESPONSES,
   type FakeServicesOptions,
 } from '../../../test/fakes/createFakeServices';
+import { listedCurrencies, openPicker } from '../../../test/pickCurrency';
 import { createTestQueryClient, renderWithProviders } from '../../../test/renderWithProviders';
 import { ConverterPage } from '../components/ConverterPage';
 
@@ -236,6 +237,7 @@ describe('converting from a browser that reports itself offline', () => {
   });
 
   it('keeps loading the currency list the form offers', async () => {
+    const user = userEvent.setup();
     const options: FakeServicesOptions = { convert: unreachable(), rates: snapshot };
     const page = renderPage(options);
     await loaded(page);
@@ -246,7 +248,9 @@ describe('converting from a browser that reports itself offline', () => {
     };
     void page.queryClient.invalidateQueries({ queryKey: queryKeys.currencies });
 
-    // One option in each select: the list the query loaded, not the two defaults.
-    expect(await screen.findAllByRole('option', { name: 'GBP — Pound Sterling' })).toHaveLength(2);
+    // One option in the picker: the list the query loaded, not the two defaults.
+    await waitFor(async () => {
+      expect(listedCurrencies(await openPicker(user, 'From'))).toEqual(['GBP Pound Sterling']);
+    });
   });
 });

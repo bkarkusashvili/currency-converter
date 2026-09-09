@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router';
 import { AppFooter, AppHeader } from './components';
 import { AboutPage } from './features/about';
 import { ConverterPage } from './features/converter';
+import { OpsPage } from './features/ops';
 
 export function App() {
   const { t } = useTranslation();
@@ -17,6 +18,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<ConverterPage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/ops" element={<OpsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

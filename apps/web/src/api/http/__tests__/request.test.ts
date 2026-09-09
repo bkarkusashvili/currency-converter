@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../ApiError';
-import { request } from '../request';
+import { request, requestCommand } from '../request';
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -157,5 +157,73 @@ describe('request', () => {
       'http://localhost:3000/api/v1/history?limit=10',
       expect.anything(),
     );
+  });
+});
+
+describe('requestCommand', () => {
+  it('sends the method and the headers it was given, and reads back the request id', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(null, { status: 204, headers: { 'x-request-id': 'req-9' } }),
+    );
+
+    await expect(
+      requestCommand('/api/v1/rates/cache', {
+        method: 'DELETE',
+        headers: { 'x-api-key': 'secret' },
+      }),
+    ).resolves.toEqual({ status: 204, requestId: 'req-9' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.test/api/v1/rates/cache',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: { Accept: 'application/json', 'x-api-key': 'secret' },
+      }),
+    );
+  });
+
+  it('reports no request id rather than inventing one when the header is absent', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(requestCommand('/api/v1/rates/cache', { method: 'DELETE' })).resolves.toEqual({
+      status: 204,
+      requestId: undefined,
+    });
+  });
+
+  it('turns a refusal into the ApiError its envelope describes', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        { statusCode: 401, code: 'UNAUTHORIZED', message: 'Unauthorized', requestId: 'req-3' },
+        401,
+      ),
+    );
+
+    const error = await requestCommand('/api/v1/rates/cache', { method: 'DELETE' }).catch(
+      (thrown: unknown) => thrown,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ statusCode: 401, code: 'UNAUTHORIZED', requestId: 'req-3' });
+  });
+
+  it('reports a status with no envelope behind it rather than an empty message', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 502 }));
+
+    const error = await requestCommand('/api/v1/rates/cache', { method: 'DELETE' }).catch(
+      (thrown: unknown) => thrown,
+    );
+
+    expect(error).toMatchObject({ statusCode: 502, code: 'INTERNAL_ERROR' });
+  });
+
+  it('reports an unreachable API as a network failure', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const error = await requestCommand('/api/v1/rates/cache', { method: 'DELETE' }).catch(
+      (thrown: unknown) => thrown,
+    );
+
+    expect(error).toMatchObject({ code: 'NETWORK_ERROR' });
   });
 });
