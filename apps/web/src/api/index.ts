@@ -4,6 +4,7 @@
  * fetch client behind them (`http/`), the persistence wiring (`persistence/`)
  * and the HTTP implementations are this folder's own business.
  */
+export { useClearRatesCache } from './hooks/useClearRatesCache';
 export { useConvert } from './hooks/useConvert';
 export { useCurrencies } from './hooks/useCurrencies';
 export { useHealth } from './hooks/useHealth';
@@ -11,6 +12,7 @@ export { useHistory } from './hooks/useHistory';
 export { useRatesSnapshot } from './hooks/useRatesSnapshot';
 
 export { ApiError } from './http/ApiError';
+export type { CommandOutcome } from './http/request';
 export { extractFieldErrors } from './http/fieldErrors';
 export type { FieldError } from './http/fieldErrors';
 

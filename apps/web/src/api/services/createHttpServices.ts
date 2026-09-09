@@ -1,4 +1,4 @@
-import { request } from '../http/request';
+import { request, requestCommand } from '../http/request';
 import type {
   ConvertRequest,
   ConvertResponse,
@@ -62,10 +62,20 @@ export function createHttpHistoryService(): HistoryService {
 export function createHttpRatesService(): RatesService {
   return {
     getSnapshot(signal?: AbortSignal): Promise<RatesSnapshotResponse> {
-      return request<RatesSnapshotResponse>('/api/v1/rates', { signal, parse: toRatesSnapshot });
+      return request<RatesSnapshotResponse>(RATES_PATH, { signal, parse: toRatesSnapshot });
+    },
+
+    clearCache(apiKey: string, signal?: AbortSignal) {
+      return requestCommand(`${RATES_PATH}/cache`, {
+        method: 'DELETE',
+        headers: { 'x-api-key': apiKey },
+        signal,
+      });
     },
   };
 }
+
+const RATES_PATH = '/api/v1/rates';
 
 const HEALTH_PATH = '/health';
 

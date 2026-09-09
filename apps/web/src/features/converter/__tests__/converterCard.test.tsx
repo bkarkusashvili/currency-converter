@@ -49,9 +49,9 @@ function block(name: string): HTMLElement {
   return found;
 }
 
-/** The two select triggers' own glyphs, which nothing on the card takes away. */
+/** The two pickers' own glyphs, which nothing on the card takes away. */
 function chevrons(): Element[] {
-  return [...card().querySelectorAll('.control-select + svg')];
+  return [...card().querySelectorAll('.combobox-trigger .combobox-chevron')];
 }
 
 describe('the two-pane card', () => {
