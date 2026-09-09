@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { HistoryUnavailableError } from '../../common/errors/history-unavailable.error';
+import { HistoryUnavailableError } from '../../common/errors';
 import { ConversionRecord } from './domain/conversion-record.types';
 import type { NewConversionRecord } from './domain/conversion-record.types';
 import { HISTORY_REPOSITORY } from './domain/history-repository.interface';

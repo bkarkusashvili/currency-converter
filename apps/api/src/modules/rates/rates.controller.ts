@@ -13,10 +13,9 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { ApiKeyGuard } from '../../common/guards/api-key.guard';
-import { collectWarnings } from '../../common/warnings/collect-warnings.util';
-import { ADMIN_SECURITY_SCHEME } from '../../common/swagger/build-swagger-config.util';
-import { ApiErrorResponses } from '../../common/swagger/api-error-responses.decorator';
+import { ApiKeyGuard } from '../../common/guards';
+import { collectWarnings } from '../../common/warnings';
+import { ADMIN_SECURITY_SCHEME, ApiErrorResponses } from '../../common/swagger';
 import { RatesService } from './application/rates.service';
 import { RatesSnapshotResponseDto } from './dto/rates-snapshot-response.dto';
 

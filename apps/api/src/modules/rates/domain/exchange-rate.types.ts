@@ -1,4 +1,4 @@
-import { CurrencyCode } from '../../../common/currency/currency-code.types';
+import { CurrencyCode } from '../../../common/currency';
 import { RatesSource } from './rates-source.enum';
 
 // Monobank is a Ukrainian bank: every pair it publishes is either against the

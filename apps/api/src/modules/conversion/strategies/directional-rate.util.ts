@@ -1,7 +1,7 @@
 import type Big from 'big.js';
-import { Money } from '../../../common/money/money.constants';
-import { CurrencyCode } from '../../../common/currency/currency-code.types';
-import { ExchangeRate } from '../../rates/domain/exchange-rate.types';
+import { Money } from '../../../common/money';
+import { CurrencyCode } from '../../../common/currency';
+import { ExchangeRate } from '../../rates';
 import { findRate } from './find-rate.util';
 
 // A rate the snapshot cannot be trusted to price with. The upstream payload is

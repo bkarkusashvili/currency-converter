@@ -1,4 +1,4 @@
-import { CircuitOpenError } from '../../../common/resilience/circuit-open.error';
+import { CircuitOpenError } from '../../../common/resilience';
 
 // The reason travels to the client in the error envelope, so it names the
 // resilience decision and nothing else. An upstream message is not safe to

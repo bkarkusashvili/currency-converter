@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import {
+  Money,
   RATE_DECIMALS,
   RESULT_DECIMALS,
-} from '../../common/money/money-decimals.constants';
-import { Money } from '../../common/money/money.constants';
-import { roundHalfUp } from '../../common/money/round-half-up.util';
-import { HistoryService } from '../history/history.service';
-import { RatesService } from '../rates/application/rates.service';
+  roundHalfUp,
+} from '../../common/money';
+import { HistoryService } from '../history';
+import { RatesService } from '../rates';
 import { ConversionOutcome } from './domain/conversion-outcome.types';
 import { ConversionRequest } from './domain/conversion-request.types';
 import { ConversionResult } from './domain/conversion-result.types';

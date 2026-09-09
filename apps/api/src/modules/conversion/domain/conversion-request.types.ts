@@ -1,4 +1,4 @@
-import { CurrencyCode } from '../../../common/currency/currency-code.types';
+import { CurrencyCode } from '../../../common/currency';
 
 // A conversion as the application layer takes it: codes already normalised to
 // upper case and an amount already known to be a finite positive number. The

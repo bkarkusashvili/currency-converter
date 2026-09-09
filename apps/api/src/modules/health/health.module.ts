@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { RedisModule } from '../../infrastructure/redis/redis.module';
-import { RatesModule } from '../rates/rates.module';
+import { RatesModule } from '../rates';
 import { HealthController } from './health.controller';
 import {
   HEALTH_INDICATORS,

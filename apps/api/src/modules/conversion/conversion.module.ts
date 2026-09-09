@@ -1,7 +1,7 @@
 import { Module, Provider } from '@nestjs/common';
-import { LoggingModule } from '../../common/logging/logging.module';
-import { HistoryModule } from '../history/history.module';
-import { RatesModule } from '../rates/rates.module';
+import { LoggingModule } from '../../common/logging';
+import { HistoryModule } from '../history';
+import { RatesModule } from '../rates';
 import { ConversionController } from './conversion.controller';
 import { ConversionService } from './conversion.service';
 import {

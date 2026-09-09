@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { RatesModule } from '../rates/rates.module';
+import { RatesModule } from '../rates';
 import { CurrenciesController } from './currencies.controller';
 
 @Module({

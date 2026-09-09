@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type Big from 'big.js';
-import { Money } from '../../../common/money/money.constants';
-import { CurrencyCode } from '../../../common/currency/currency-code.types';
+import { Money } from '../../../common/money';
+import { CurrencyCode } from '../../../common/currency';
 import { ConversionStrategy } from './conversion-strategy.interface';
-import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
+import { ConversionStrategyName } from '../../../common/conversion';
 
 // A currency converted to itself is worth itself. It is first in the chain
 // rather than an early return in the service because the snapshot does hold a

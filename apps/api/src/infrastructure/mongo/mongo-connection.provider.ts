@@ -8,10 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, ConnectionStates } from 'mongoose';
 import { PinoLogger } from 'nestjs-pino';
-import {
-  createOutageReporter,
-  OutageReporter,
-} from '../../common/logging/outage-reporter.factory';
+import { OutageReporter, createOutageReporter } from '../../common/logging';
 import type { TypedConfigService } from '../../config/typed-config.service';
 import { buildMongoConnectOptions } from './mongo-connect.options';
 

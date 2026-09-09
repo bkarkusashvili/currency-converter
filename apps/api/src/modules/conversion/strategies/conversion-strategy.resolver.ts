@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type Big from 'big.js';
-import { CurrencyCode } from '../../../common/currency/currency-code.types';
-import { RateNotAvailableError } from '../../../common/errors/rate-not-available.error';
-import { UnsupportedCurrencyError } from '../../../common/errors/unsupported-currency.error';
-import { ExchangeRate } from '../../rates/domain/exchange-rate.types';
+import { CurrencyCode } from '../../../common/currency';
+import {
+  RateNotAvailableError,
+  UnsupportedCurrencyError,
+} from '../../../common/errors';
+import { ExchangeRate } from '../../rates';
 import { CONVERSION_STRATEGIES } from './conversion-strategy.interface';
 import type { ConversionStrategy } from './conversion-strategy.interface';
 

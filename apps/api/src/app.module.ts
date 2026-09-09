@@ -1,17 +1,17 @@
 import { Module, ValidationPipe } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
-import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import { LoggingModule } from './common/logging/logging.module';
-import { ThrottlingModule } from './common/throttling/throttling.module';
-import { validationPipeOptions } from './common/validation/validation-pipe.options';
+import { GlobalExceptionFilter } from './common/filters';
+import { LoggingModule } from './common/logging';
+import { ThrottlingModule } from './common/throttling';
+import { validationPipeOptions } from './common/validation';
 import { AppConfigModule } from './config/app-config.module';
 import { MongoModule } from './infrastructure/mongo/mongo.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
-import { ConversionModule } from './modules/conversion/conversion.module';
-import { CurrenciesModule } from './modules/currencies/currencies.module';
-import { HealthModule } from './modules/health/health.module';
-import { HistoryModule } from './modules/history/history.module';
-import { RatesModule } from './modules/rates/rates.module';
+import { ConversionModule } from './modules/conversion';
+import { CurrenciesModule } from './modules/currencies';
+import { HealthModule } from './modules/health';
+import { HistoryModule } from './modules/history';
+import { RatesModule } from './modules/rates';
 
 @Module({
   imports: [

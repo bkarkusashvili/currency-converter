@@ -3,9 +3,8 @@ import {
   HealthIndicatorResult,
   HealthIndicatorService,
 } from '@nestjs/terminus';
-import { CircuitBreaker } from '../../common/resilience/circuit-breaker.util';
-import { CircuitState } from '../../common/resilience/circuit-state.enum';
-import { MONOBANK_CIRCUIT_BREAKER } from '../rates/infrastructure/monobank/monobank-circuit-breaker.factory';
+import { CircuitBreaker, CircuitState } from '../../common/resilience';
+import { MONOBANK_CIRCUIT_BREAKER } from '../rates';
 import { HealthIndicatorPort } from './health-indicator.interface';
 
 const INDICATOR_KEY = 'monobank';

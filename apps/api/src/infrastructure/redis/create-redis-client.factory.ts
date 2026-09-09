@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
-import { createOutageReporter } from '../../common/logging/outage-reporter.factory';
+import { createOutageReporter } from '../../common/logging';
 import type { TypedConfigService } from '../../config/typed-config.service';
 
 // The injection token for the client this factory builds. One connection is

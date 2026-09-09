@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { LoggingModule } from '../../common/logging/logging.module';
+import { LoggingModule } from '../../common/logging';
 import { MongoConnection } from './mongo-connection.provider';
 import { buildMongooseOptions } from './mongoose.options';
 

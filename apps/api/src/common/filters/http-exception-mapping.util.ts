@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { ErrorCode } from '../errors/error-code.enum';
+import { ErrorCode } from '../errors';
 
 // Everything that turns a Nest HttpException into the two envelope fields the
 // filter cannot read off it directly: the code a client switches on, and the

@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Schema as MongooseSchema } from 'mongoose';
-import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
-import { RatesSource } from '../../rates/domain/rates-source.enum';
+import { ConversionStrategyName } from '../../../common/conversion';
+import { RatesSource } from '../../rates';
 
 export const CONVERSION_RECORD_MODEL = 'ConversionRecord';
 export const CONVERSIONS_COLLECTION = 'conversions';

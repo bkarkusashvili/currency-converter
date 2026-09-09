@@ -1,7 +1,7 @@
 import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { LoggingModule } from '../../../../common/logging/logging.module';
+import { LoggingModule } from '../../../../common/logging';
 import {
   MONOBANK_CIRCUIT_BREAKER,
   buildMonobankCircuitBreaker,

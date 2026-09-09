@@ -1,10 +1,9 @@
-import { Currency } from '../../common/currency/currency.types';
-import { CurrencyCode } from '../../common/currency/currency-code.types';
-import { describeCurrency } from '../../common/currency/iso-4217.util';
 import {
-  BASE_CURRENCY,
-  ExchangeRate,
-} from '../rates/domain/exchange-rate.types';
+  Currency,
+  CurrencyCode,
+  describeCurrency,
+} from '../../common/currency';
+import { BASE_CURRENCY, ExchangeRate } from '../rates';
 
 // Both sides of every pair, plus the base currency: a snapshot can consist of
 // crosses between two foreign currencies, and UAH would then be convertible

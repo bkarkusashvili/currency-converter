@@ -1,8 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CONVERSION_PROPERTIES } from '../../../common/conversion/conversion-api-properties.constants';
-import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
-import { ResponseWarningDto } from '../../../common/warnings/response-warning.dto';
-import { RatesSource } from '../../rates/domain/rates-source.enum';
+import { CONVERSION_PROPERTIES } from '../../../common/conversion';
+import type { ConversionStrategyName } from '../../../common/conversion';
+import { ResponseWarningDto } from '../../../common/warnings';
+import { RatesSource } from '../../rates';
 import { ConversionResult } from '../domain/conversion-result.types';
 
 // The conversion as the client receives it: the domain result, plus what

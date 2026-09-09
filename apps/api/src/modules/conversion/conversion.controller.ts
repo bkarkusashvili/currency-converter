@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiErrorResponses } from '../../common/swagger/api-error-responses.decorator';
-import { collectWarnings } from '../../common/warnings/collect-warnings.util';
+import { ApiErrorResponses } from '../../common/swagger';
+import { collectWarnings } from '../../common/warnings';
 import { ConversionService } from './conversion.service';
 import { ConvertRequestDto } from './dto/convert-request.dto';
 import { ConvertResponseDto } from './dto/convert-response.dto';

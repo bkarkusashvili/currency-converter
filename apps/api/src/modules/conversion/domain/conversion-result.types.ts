@@ -1,5 +1,5 @@
-import { RatesSource } from '../../rates/domain/rates-source.enum';
-import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
+import { RatesSource } from '../../rates';
+import { ConversionStrategyName } from '../../../common/conversion';
 import { ConversionRequest } from './conversion-request.types';
 
 // A whole conversion: the request it answered, the numbers it produced, and the

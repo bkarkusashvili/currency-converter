@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import { RatesUnavailableError } from '../../../common/errors/rates-unavailable.error';
+import { RatesUnavailableError } from '../../../common/errors';
 import { RatesLookup, RatesSnapshot } from '../domain/exchange-rate.types';
 import { RatesSource } from '../domain/rates-source.enum';
 import { RATES_PROVIDER } from '../domain/rates-provider.interface';

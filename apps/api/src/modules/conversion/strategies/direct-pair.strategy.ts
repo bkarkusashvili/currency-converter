@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type Big from 'big.js';
-import { CurrencyCode } from '../../../common/currency/currency-code.types';
-import { ExchangeRate } from '../../rates/domain/exchange-rate.types';
+import { CurrencyCode } from '../../../common/currency';
+import { ExchangeRate } from '../../rates';
 import { ConversionStrategy } from './conversion-strategy.interface';
-import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
+import { ConversionStrategyName } from '../../../common/conversion';
 import { directionalRate } from './directional-rate.util';
 
 // One pair, either way round: USD/UAH prices both USD → UAH and UAH → USD, and

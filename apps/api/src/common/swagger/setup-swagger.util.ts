@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
-import { DOCS_JSON_PATH, DOCS_PATH } from '../http/paths.constants';
-import { ErrorResponseDto } from '../filters/error-response.dto';
+import { DOCS_JSON_PATH, DOCS_PATH } from '../http';
+import { ErrorResponseDto } from '../filters';
 import { buildSwaggerConfig } from './build-swagger-config.util';
 import { readPackageMetadata } from './read-package-metadata.util';
 

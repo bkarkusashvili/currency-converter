@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ResponseWarningDto } from '../../../common/warnings/response-warning.dto';
+import { ResponseWarningDto } from '../../../common/warnings';
 import { RatesSource } from '../domain/rates-source.enum';
 import { ExchangeRateDto } from './exchange-rate.dto';
 

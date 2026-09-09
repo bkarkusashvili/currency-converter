@@ -7,8 +7,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import type { TypedConfigService } from '../../config/typed-config.service';
-import { UnauthorizedError } from '../errors/unauthorized.error';
-import { timingSafeCompare } from '../utils/timing-safe-compare.util';
+import { UnauthorizedError } from '../errors';
+import { timingSafeCompare } from '../utils';
 
 // The header the admin key travels in, named here beside the guard that reads
 // it: the OpenAPI security scheme has to publish the same name.
