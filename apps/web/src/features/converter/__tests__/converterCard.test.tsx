@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { ConvertResponse } from '../../../api';
 import { createFakeServices, FAKE_RESPONSES } from '../../../test/fakes/createFakeServices';
+import { pickCurrency } from '../../../test/pickCurrency';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { ConverterPage } from '../components/ConverterPage';
 
@@ -309,5 +310,104 @@ describe('the two-pane card', () => {
     // colour as its ground (§6.4).
     expect(await screen.findByText('cross')).toHaveClass('badge', 'badge-on-sunken');
     expect(screen.getByText('stale cache')).toHaveClass('badge-warn', 'badge-on-sunken');
+  });
+});
+
+/**
+ * The pair is the other half of the question, so changing it asks the question
+ * again: the answer on screen is never left describing a pair the controls no
+ * longer hold. The amount is not — it is typed a character at a time, and a
+ * request per keystroke is not what any of them meant.
+ */
+describe('changing the pair', () => {
+  it('converts the swapped pair, once, on the press of Swap', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+
+    await screen.findByLabelText('From');
+    await user.click(screen.getByRole('button', { name: 'Swap the two currencies' }));
+
+    await waitFor(() => {
+      expect(fake.convertCalls).toEqual([{ from: 'UAH', to: 'USD', amount: 100 }]);
+    });
+    expect(screen.getByLabelText('From')).toHaveTextContent('UAH');
+  });
+
+  it('converts the new pair, once, on a currency picked in either list', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+
+    await pickCurrency(user, 'To', 'PLN');
+
+    await waitFor(() => {
+      expect(fake.convertCalls).toEqual([{ from: 'USD', to: 'PLN', amount: 100 }]);
+    });
+  });
+
+  it('swaps in silence when there is no amount to convert', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+
+    await screen.findByLabelText('From');
+    await user.clear(screen.getByLabelText('Amount'));
+    await user.click(screen.getByRole('button', { name: 'Swap the two currencies' }));
+
+    // The swap still happened; nothing was sent, and nothing was said about an
+    // amount the user has not finished typing.
+    expect(screen.getByLabelText('From')).toHaveTextContent('UAH');
+    expect(screen.getByLabelText('To')).toHaveTextContent('USD');
+    expect(fake.convertCalls).toEqual([]);
+    expect(screen.queryByText('Enter an amount to convert.')).not.toBeInTheDocument();
+  });
+
+  it('sends nothing while the amount is being typed', async () => {
+    const user = userEvent.setup();
+    const fake = renderPage();
+
+    await screen.findByLabelText('From');
+    await user.clear(screen.getByLabelText('Amount'));
+    await user.type(screen.getByLabelText('Amount'), '2500');
+
+    expect(screen.getByLabelText('Amount')).toHaveValue('2,500');
+    expect(fake.convertCalls).toEqual([]);
+  });
+
+  it('lands the swapped answer in the pane already standing', async () => {
+    const user = userEvent.setup();
+    const fake = createFakeServices({ currencies: FAKE_RESPONSES.currencies });
+    const answers: ConvertResponse[] = [
+      conversion,
+      { ...conversion, from: 'PLN', to: 'EUR', result: 23.49, rate: 0.234901 },
+    ];
+    renderWithProviders(<ConverterPage />, {
+      services: {
+        ...fake.services,
+        conversion: { convert: () => Promise.resolve(answers.shift() ?? conversion) },
+      },
+    });
+
+    await screen.findByLabelText('From');
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const pane = await screen.findByRole('group', { name: 'Result' });
+    await waitFor(() => {
+      expect(pane).toHaveTextContent('425.71 PLN');
+    });
+    const figure = within(pane)
+      .getByText(/425\.71/)
+      .closest('p.figure');
+
+    await user.click(screen.getByRole('button', { name: 'Swap the two currencies' }));
+
+    await waitFor(() => {
+      expect(pane).toHaveTextContent('23.49 EUR');
+    });
+    // The same pane and the same row, with the figure replaced inside them —
+    // the swap moves no part of the card, and the span that carries the new
+    // number is the new node `result-rise` replays on.
+    expect(screen.getByRole('group', { name: 'Result' })).toBe(pane);
+    const next = within(pane).getByText(/23\.49/);
+    expect(next.closest('p.figure')).toBe(figure);
+    expect(next).toHaveClass('result-rise');
   });
 });

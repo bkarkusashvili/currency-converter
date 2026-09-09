@@ -48,7 +48,9 @@ to `main` directly. Those pull requests built:
   mirroring the API's ports, and a persisted rates snapshot that keeps the
   converter answering when the API is unreachable. The currency pickers are
   searchable comboboxes — a popover under the trigger above 640px, a modal
-  bottom sheet below it — and the archived series for the pair on screen is
+  bottom sheet below it — and swapping or picking a currency re-converts the
+  amount already in the field straight away, so the answer never describes a
+  pair the controls no longer hold. The archived series for the pair on screen is
   drawn beside them as an inline SVG chart, with an `archive` badge on an answer
   the API priced from that same archive. `/ops` is the operations surface: the
   health report on a 30-second poll, the rate snapshot with the two cache

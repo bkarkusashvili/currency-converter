@@ -1124,6 +1124,17 @@ rather than constrain it.
   rather than between them. The `grid-template-areas` that do it are in
   `index.css`; the component only names the areas. Recent conversions move to a
   320px aside beside the card, and below it when there is no room for one.
+- **Changing the pair re-asks the question.** Pressing Swap, or picking a
+  currency in either combobox, converts again immediately with the amount
+  already in the field, through the same `convert` path as the button — so the
+  answer on screen never describes a pair the controls no longer hold. An
+  amount that would not submit (empty, unparseable, not positive) sends
+  nothing and says nothing: the swap or the pick still happens, and Convert is
+  still what reports what is wrong with it. Typing the amount stays manual —
+  Convert or Enter — because a request per keystroke is not what any of them
+  meant, and a re-conversion supersedes one already in flight exactly as a
+  second press of Convert does, held outcome and all, so nothing on the card
+  moves around it.
 - Runtime configuration: `public/config.js` sets `window.__APP_CONFIG__.apiUrl`;
   the Docker image regenerates it from `API_URL` at container start so the same
   image runs locally and on Railway. The value is JSON-escaped as it is written,

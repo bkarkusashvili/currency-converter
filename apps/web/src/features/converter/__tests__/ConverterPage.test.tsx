@@ -104,8 +104,10 @@ describe('ConverterPage', () => {
     await user.type(screen.getByLabelText('Amount'), '1,250.50');
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
+    // Each pick already converted the pair it made, on the amount standing at
+    // the time; the press is the one that carries the amount just typed.
     await waitFor(() => {
-      expect(fake.convertCalls).toEqual([{ from: 'EUR', to: 'PLN', amount: 1250.5 }]);
+      expect(fake.convertCalls.at(-1)).toEqual({ from: 'EUR', to: 'PLN', amount: 1250.5 });
     });
   });
 
@@ -268,6 +270,9 @@ describe('ConverterPage', () => {
     // The untouched field still carries what the server said about it.
     expect(screen.getByLabelText('To')).toHaveAttribute('aria-invalid', 'true');
 
+    // Emptied first, so the pick is only a pick: with an amount to convert it
+    // would send the new pair straight back and earn a fresh answer about it.
+    await user.clear(amount);
     await pickCurrency(user, 'To', 'PLN');
 
     expect(screen.getByLabelText('To')).toHaveAttribute('aria-invalid', 'false');
