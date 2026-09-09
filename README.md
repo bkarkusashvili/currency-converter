@@ -266,6 +266,17 @@ while `result` is computed from the **unrounded** rate, so on a large amount the
 two differ in the last cent — see
 [`docs/architecture.md` §5](docs/architecture.md#5-conversion-semantics).
 
+**On `from`/`to` rather than `source`/`target`.** The task statement names the
+three parameters `source`, `target` and `amount`; the request body here is
+`from`, `to` and `amount`, because `source` is already the provenance field on
+the *response* — `"source": "cache"` above — and one name meaning the currency
+you are converting from on the way in and where the rates came from on the way
+out is a contract that has to be read twice. The rename is the only deviation
+from the stated field names, and it is not silent: the DTO rejects unknown
+properties, so a body sent with `source` and `target` answers `400
+VALIDATION_ERROR` naming both, rather than converting something else or
+ignoring them.
+
 ### `GET /api/v1/rates`
 
 ```bash
@@ -759,7 +770,7 @@ test name, or a live URL; every row was re-verified against this commit.
 | #  | Requirement                        | Status | Evidence                                                                                                                        |
 | -- | ---------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | 2a | POST route                         | met    | `conversion.controller.ts` `@Post()` + `@HttpCode(200)`, prefix from `common/http/paths.constants.ts`. Test: “answers 200, not 201, with exactly the fields §3 lists” |
-| 2b | Accepts source, target, amount     | met    | `modules/conversion/dto/convert-request.dto.ts`. Tests: “takes a well formed body as it was sent”, “normalises the codes to upper case”, “reports every missing field at once”, “rejects a property the request has no business sending” |
+| 2b | Accepts source, target, amount     | met    | `modules/conversion/dto/convert-request.dto.ts`, as `from`, `to` and `amount`: `source` is already the provenance field on the response, so the two request codes are named for the direction instead — the only deviation from the task's field names, documented in the API reference above and in the `from` property's own OpenAPI description. It is not a silent one, because the DTO rejects unknown properties: a body sent with `source` and `target` answers `400 VALIDATION_ERROR` naming both. Tests: “takes a well formed body as it was sent”, “normalises the codes to upper case”, “reports every missing field at once”, “rejects a property the request has no business sending” |
 
 ### 3. Data fetching from Monobank
 

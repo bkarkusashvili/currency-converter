@@ -90,7 +90,7 @@
             "type": "number"
           },
           "from": {
-            "description": "ISO 4217 alpha-3 code to convert from. Case-insensitive; the response echoes it upper-cased.",
+            "description": "ISO 4217 alpha-3 code to convert from. Case-insensitive; the response echoes it upper-cased. The task names this field and its pair `source` and `target`; they are `from` and `to` here because `source` is already the provenance field on the response, and the DTO rejects unknown properties, so a body sent with `source` and `target` is a validation error rather than a silent no-op.",
             "example": "EUR",
             "maxLength": 3,
             "minLength": 3,
