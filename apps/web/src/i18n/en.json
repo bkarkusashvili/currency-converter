@@ -340,7 +340,7 @@
     "key": {
       "label": "Admin API key",
       "header": "x-api-key",
-      "hint": "Kept in this tab only; never written to storage.",
+      "hint": "Kept in this tab only; never written to storage. One shared key for every operator is a convenience for this demo, not how the credential would be issued in production.",
       "forget": "Forget",
       "placeholder": "Paste the key to enable actions",
       "reveal": "Show the key",

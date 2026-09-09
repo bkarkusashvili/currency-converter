@@ -64,9 +64,12 @@ export function ClearCacheAnswer({ answer }: { answer: ClearAnswer }) {
         <span className="font-semibold text-pretty">
           {answer.error === null ? t('ops.clear.success') : messageOf(answer.error)}
         </span>
+        {/* Not uppercased: the status and the error code arrive that way
+            already, and the request id is a value read back off a header —
+            the action log below prints the same id in the same case. */}
         <span
           className={[
-            'font-mono text-[0.6875rem] tracking-[0.12em] uppercase',
+            'font-mono text-[0.6875rem] tracking-[0.12em]',
             succeeded ? 'opacity-80' : 'text-faint',
           ].join(' ')}
         >

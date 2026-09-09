@@ -4,7 +4,14 @@ import { useCurrencies, useRatesSnapshot } from '../../../api';
 import type { RateSource } from '../../../api';
 import { InfoBadge, WarningIcon, type BadgeTone } from '../../../components';
 import { useApiErrorMessage, useFormatters } from '../../../lib';
-import { durationParts, formatCountdown, snapshotTtl, type SnapshotTtl } from '../lib/snapshotTtl';
+import { useSecondsTicker } from '../hooks/useSecondsTicker';
+import {
+  durationParts,
+  FALLBACK_TTL_MS,
+  formatCountdown,
+  snapshotTtl,
+  type SnapshotTtl,
+} from '../lib/snapshotTtl';
 
 interface SnapshotCardProps {
   /** Monobank is refusing calls, so the fallback key is the only thing answering. */
@@ -50,7 +57,11 @@ export function SnapshotCard({ upstreamDown, hasKey, clearRef, onClear }: Snapsh
   const currencies = useCurrencies();
 
   const durationText = useDurationText();
-  const ttl = data === undefined ? null : snapshotTtl(data.fetchedAt);
+  // A countdown that only moves when something else re-renders the page is a
+  // still photograph of a countdown. It runs to the moment the fallback key
+  // expires and then stops, because after that there is nothing counting.
+  const now = useSecondsTicker(expiryOf(data?.fetchedAt));
+  const ttl = data === undefined ? null : snapshotTtl(data.fetchedAt, new Date(now));
   // Only when the fallback really is the last thing standing. A derived TTL
   // that has run out is not that: the API is still answering `cache`, and only
   // it knows what its keys are doing.
@@ -213,6 +224,20 @@ function Meter({ ttl }: { ttl: SnapshotTtl }) {
       />
     </div>
   );
+}
+
+/**
+ * When the last of the two keys is gone, as epoch milliseconds — `null` for a
+ * snapshot that has not arrived or a timestamp that is not one, which is also
+ * how the ticker is told there is nothing to count.
+ */
+function expiryOf(fetchedAt: string | undefined): number | null {
+  if (fetchedAt === undefined) {
+    return null;
+  }
+
+  const fetched = new Date(fetchedAt).getTime();
+  return Number.isNaN(fetched) ? null : fetched + FALLBACK_TTL_MS;
 }
 
 /** `44 s`, `2 min`, `1 h 27 min` — the shapes the boards write an age in. */

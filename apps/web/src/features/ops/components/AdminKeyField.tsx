@@ -62,7 +62,7 @@ export function AdminKeyField({ value, invalid, inputRef, onChange }: AdminKeyFi
 
           <button
             type="button"
-            className="text-faint hover:text-ink flex h-11 w-9 shrink-0 items-center justify-center rounded-md"
+            className="text-faint hover:text-ink flex h-11 w-11 shrink-0 items-center justify-center rounded-md"
             aria-label={revealed ? t('ops.key.hide') : t('ops.key.reveal')}
             aria-pressed={revealed}
             disabled={empty}

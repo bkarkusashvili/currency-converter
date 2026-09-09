@@ -195,6 +195,25 @@ describe('OpsPage snapshot card', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('counts the fresh key down rather than freezing it at the first render', async () => {
+    renderOps();
+
+    const stat = (await screen.findByText('Fresh key expires')).parentElement;
+    expect(stat).not.toBeNull();
+    const countdown = () => within(stat as HTMLElement).getByText(/^\d+:\d\d$/).textContent;
+    const first = countdown();
+    expect(first).toMatch(/^4:5\d$/);
+
+    // One real second of wall clock. Nothing else re-renders this page, so the
+    // number only moves if the countdown is running on its own.
+    await waitFor(
+      () => {
+        expect(countdown()).not.toBe(first);
+      },
+      { timeout: 3000 },
+    );
+  });
+
   it('cannot send the command without a key', async () => {
     renderOps();
 
@@ -295,7 +314,10 @@ describe('OpsPage clear-cache dialog', () => {
     expect(
       await screen.findByText('Cache cleared. The next conversion fetches from Monobank.'),
     ).toBeInTheDocument();
-    expect(screen.getByText('204 · request req-42')).toBeInTheDocument();
+    const meta = screen.getByText('204 · request req-42');
+    expect(meta).toBeInTheDocument();
+    // The id is a value, and it reads the same here as it does in the log.
+    expect(meta).not.toHaveClass('uppercase');
     expect(fake.clearCacheKeys).toEqual([SECRET]);
 
     const log = screen.getByRole('region', { name: 'Actions this session' });
@@ -385,6 +407,9 @@ describe('the admin key', () => {
     await user.click(screen.getByRole('button', { name: 'Show the key' }));
     expect(field).toHaveAttribute('type', 'text');
     expect(field).toHaveValue(SECRET);
+
+    // §6.14: a control drawn flat still gets the 44px square a thumb needs.
+    expect(screen.getByRole('button', { name: 'Hide the key' })).toHaveClass('h-11', 'w-11');
 
     await user.click(screen.getByRole('button', { name: 'Forget' }));
     expect(field).toHaveValue('');
