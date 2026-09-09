@@ -179,10 +179,16 @@ old. Both are §5's job on a live snapshot, where the response names the
 `strategy` that priced them, and neither belongs in a chart of published quotes.
 
 Two 422s, drawn where `/convert` draws them: `UNSUPPORTED_CURRENCY` when a code
-appears on neither side of any pair in the window — an empty archive answers
-this rather than an empty series, because nothing in the window says the code
-exists — and `RATE_NOT_AVAILABLE` when both codes are archived and this pair is
-not, which is what a reversed orientation and a same-currency request both are.
+appears on neither side of any pair in the window — but only once the window
+has a day to ask that of — and `RATE_NOT_AVAILABLE` when both codes are
+archived and this pair is not, which is what a reversed orientation and a
+same-currency request both are. A window with **no archived day at all** — a
+freshly deployed instance, or a pair asked for before the first fetch —
+answers `200` with `points: []` instead of either 422: nothing in an empty
+window says a code doesn't exist, so the honest reading is the same empty
+series a gap-filled window already returns, not a verdict reached by
+consulting nothing. That is the empty state the web already renders
+("History starts collecting from the first fetch").
 
 While MongoDB is unreachable this route answers `503 ARCHIVE_UNAVAILABLE` with a
 `details.reason`, never an empty series — "never published" and "the store is
@@ -1421,14 +1427,6 @@ project were taken further.
   day, but it means the series cannot answer "what was the rate at 09:00" and
   that a day the API was only up in the morning is represented by a morning
   quote. A time series would key by fetch instead and roll up on read.
-- **An empty archive answers `UNSUPPORTED_CURRENCY`.** Both of
-  `/rates/history`'s 422s are decided from the window that was read, so a
-  deployment whose archive holds no day at all — the first minutes after a
-  deploy, or a collection the TTL has swept — answers `422
-  UNSUPPORTED_CURRENCY` for every pair, naming `base`, because nothing in the
-  window says the code exists. It is the honest reading of what was read and it
-  is indistinguishable from a misspelt code; a distinct `ARCHIVE_EMPTY` would
-  separate the two at the cost of a fourth outcome on a route that has three.
 - **A day is a UTC day, which is not the reader's day.** The archive keys on
   UTC and nothing else, so the point labelled `2026-09-09` closes at 03:00 Kyiv
   on the 10th — a chart drawn in local time puts the last three hours of a Kyiv
