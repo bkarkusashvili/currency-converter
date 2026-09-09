@@ -4,8 +4,11 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-// Raised to what the suite actually reaches (99.4% statements, 97.0% branches),
-// so a change that stops covering a path fails here rather than merging quietly.
+// The floor every metric has to clear, on all four. It is deliberately below
+// what the suite actually reaches — see the README's table for that — because
+// this is the line a change may not cross, not a record of where the suite
+// stands: pinning it to the current number turns every honest refactor that
+// deletes a covered branch into a red build.
 const COVERAGE_THRESHOLD = 90;
 
 // The persisted query cache is busted by this, so the version the package

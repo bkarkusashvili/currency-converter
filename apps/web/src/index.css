@@ -979,6 +979,112 @@
       grid-area: footer;
     }
   }
+
+  /* The chart's lines drawing themselves in when the range changes: a clip
+     rect wiped across the plot, rather than a dash slid along the path. A
+     dash would be the usual way to say this, but its length is resolved
+     against the SVG's rendered size and not its user units, so the same
+     `stroke-dasharray` that draws a 7-day line whole cuts a 30-day one off
+     a third of the way across. A wipe scales with the plot by construction. */
+  .chart-wipe {
+    transform-box: fill-box;
+    transform-origin: left center;
+    animation: chart-draw 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  }
+
+  /* Whether the rate-history panel puts its table beside the chart or under it
+     is a question about the panel's own width, and only a container query can
+     ask it. A viewport one gets it wrong exactly where it matters: at 1024 the
+     recent-conversions aside takes 320px out of the page, the panel is 600px
+     wide, and a `min-width: 56rem` media query splits it anyway — leaving the
+     chart 254px to draw a 400-unit viewBox in, at which the 10-unit type board
+     3a sets renders at 6.4 CSS px. Below the threshold the chart takes the
+     panel's full width and the same type renders at 13.8.
+
+     48rem is where the split still leaves the chart 472px — the narrowest it
+     can be drawn and keep every label above 11 CSS px. Board 3a puts the table
+     beside a 352px chart, and that is the layout this gives up to keep the
+     numbers readable. */
+  .history-body {
+    container-type: inline-size;
+  }
+
+  .history-layout {
+    display: grid;
+    align-items: start;
+    gap: 1.25rem;
+  }
+
+  @container (min-width: 48rem) {
+    .history-layout {
+      grid-template-columns: minmax(0, 1fr) 17rem;
+      gap: 1.5rem;
+    }
+  }
+
+  .code-block {
+    background-color: var(--surface-sunken);
+    border: 1px solid var(--line);
+    border-radius: 0.625rem;
+    padding: 0.875rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.78125rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  @media (min-width: 40rem) {
+    .shell {
+      padding-inline: 1.5rem;
+    }
+
+    .page-title {
+      font-size: 2.5rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+    }
+
+    .control-select {
+      height: 2.75rem;
+    }
+
+    .control-amount {
+      height: 4rem;
+      padding: 0 1rem;
+      font-size: 1.875rem;
+    }
+
+    .figure {
+      font-size: 2.5rem;
+    }
+
+    .converter-card {
+      grid-template-columns: 1fr 1fr;
+      grid-template-areas:
+        'input output'
+        'action output'
+        'footer footer';
+    }
+
+    .converter-card > .pane-input {
+      grid-area: input;
+    }
+
+    .converter-card > .pane-action {
+      grid-area: action;
+    }
+
+    .converter-card > .pane-output {
+      grid-area: output;
+    }
+
+    .converter-card > .pane-footer {
+      grid-area: footer;
+    }
+  }
 }
 
 @keyframes spin {
@@ -994,6 +1100,15 @@
   }
   50% {
     opacity: 0.5;
+  }
+}
+
+@keyframes chart-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }
 

@@ -5,6 +5,7 @@ import type {
   CurrenciesResponse,
   HealthResponse,
   HistoryResponse,
+  RateHistoryResponse,
   RatesSnapshotResponse,
 } from '../types';
 
@@ -28,8 +29,22 @@ export interface CurrenciesService {
   list(signal?: AbortSignal): Promise<CurrenciesResponse>;
 }
 
+/**
+ * The window `GET /rates/history` is asked for. The pair is the one the
+ * upstream publishes — this route derives nothing — and `days` is validated
+ * `1..90` by the API rather than clamped, so what the panel offers is what the
+ * archive can answer.
+ */
+export interface RateHistoryQuery {
+  base: string;
+  quote: string;
+  days: number;
+}
+
 export interface RatesService {
   getSnapshot(signal?: AbortSignal): Promise<RatesSnapshotResponse>;
+  getHistory(query: RateHistoryQuery, signal?: AbortSignal): Promise<RateHistoryResponse>;
+
   /**
    * Drops both cache keys. The key is passed in rather than read from
    * anywhere: it lives in the Operations page's React state for the length of

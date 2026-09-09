@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../http/ApiError';
-import type { ConvertResponse, HealthResponse, RatesSnapshotResponse } from '../../types';
+import type {
+  ConvertResponse,
+  HealthResponse,
+  RateHistoryResponse,
+  RatesSnapshotResponse,
+} from '../../types';
 import {
   createHttpConversionService,
   createHttpCurrenciesService,
@@ -36,6 +41,16 @@ const snapshot: RatesSnapshotResponse = {
   rates: [
     { base: 'USD', quote: 'UAH', buy: 44.35, sell: 44.831, date: '2026-09-08T11:00:00.000Z' },
     { base: 'GBP', quote: 'UAH', cross: 60.7562, date: '2026-09-08T11:00:00.000Z' },
+  ],
+};
+
+const series: RateHistoryResponse = {
+  base: 'USD',
+  quote: 'UAH',
+  days: 30,
+  points: [
+    { date: '2026-09-08', buy: 44.3, sell: 44.79 },
+    { date: '2026-09-09', buy: 44.35, sell: 44.83 },
   ],
 };
 
@@ -136,6 +151,46 @@ describe('createHttpRatesService', () => {
     await expect(createHttpRatesService().getSnapshot()).rejects.toMatchObject({
       code: 'INTERNAL_ERROR',
     });
+  });
+
+  it('gets /api/v1/rates/history for one pair and window', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(series));
+
+    await expect(
+      createHttpRatesService().getHistory({ base: 'USD', quote: 'UAH', days: 30 }),
+    ).resolves.toEqual(series);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.test/api/v1/rates/history?base=USD&quote=UAH&days=30',
+      {
+        method: 'GET',
+        signal: undefined,
+        headers: { Accept: 'application/json' },
+        body: undefined,
+      },
+    );
+  });
+
+  it('refuses a series it cannot chart rather than drawing an undefined', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ...series, days: '30' }));
+
+    await expect(
+      createHttpRatesService().getHistory({ base: 'USD', quote: 'UAH', days: 30 }),
+    ).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
+
+    fetchMock.mockResolvedValue(jsonResponse({ ...series, points: [{ buy: 44.35 }] }));
+
+    await expect(
+      createHttpRatesService().getHistory({ base: 'USD', quote: 'UAH', days: 30 }),
+    ).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
+
+    fetchMock.mockResolvedValue(
+      jsonResponse({ ...series, points: [{ date: '2026-09-09', buy: '44.35' }] }),
+    );
+
+    await expect(
+      createHttpRatesService().getHistory({ base: 'USD', quote: 'UAH', days: 30 }),
+    ).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
   });
 });
 

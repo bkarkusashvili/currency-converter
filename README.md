@@ -635,9 +635,9 @@ Four suites, all green on this commit:
 | API unit        | `apps/api: npm run test:cov`             | 74 suites, **767** tests  | stmts 98.99% · branches 87.84% · funcs 98.67% · lines 98.93%              | 85% lines + branches       |
 | API e2e         | `apps/api: npm run test:e2e`             | 9 suites, **163** tests   | not instrumented — see below                                             | none                       |
 | API integration | `apps/api: npm run test:integration`     | 3 suites, **25** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
-| Web             | `apps/web: npm run test:coverage`        | 49 files, **409** tests   | stmts 99.1% (1113/1123) · branches 95.8% (845/882) · funcs 99.7% (342/343) · lines 99.17% (1087/1096) | 90% on all four            |
+| Web             | `apps/web: npm run test:coverage`        | 51 files, **467** tests   | stmts 98.93% (1398/1413) · branches 95.43% (1151/1206) · funcs 99.53% (426/428) · lines 98.98% (1364/1378) | 90% on all four            |
 
-**1364 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
+**1422 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
 `npm run typecheck`, `npm run format:check` and `npm run build` run the same
 checks across both apps and let both report, so a failure in one does not hide
 the other. Coverage gates and the e2e suite stay per-app.
