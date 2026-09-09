@@ -6,7 +6,15 @@
       "label": "Main",
       "converter": "Converter",
       "about": "About",
-      "repository": "GitHub"
+      "repository": "GitHub",
+      "ops": "Ops"
+    },
+    "theme": {
+      "label": "Theme",
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark",
+      "current": "Theme: {{mode}}"
     },
     "footer": {
       "rates": "Rates from Monobank, crossed through UAH",
@@ -17,7 +25,9 @@
     "unknownTime": "—",
     "timeAt": "at {{time}}",
     "timeOn": "on {{time}}",
-    "timeWhen": "{{time}}"
+    "timeWhen": "{{time}}",
+    "cancel": "Cancel",
+    "tryAgain": "Try again"
   },
   "converter": {
     "eyebrow": "Monobank rates",
@@ -50,9 +60,10 @@
       "ratesFetched": "Rates fetched",
       "announcement": "{{amount}} {{from}} is {{result}} {{to}}",
       "pathLabel": "Conversion path: {{path}}",
-      "provenanceHeading": "Where this rate came from",
       "strategyTerm": "Strategy",
-      "sourceTerm": "Source"
+      "sourceTerm": "Source",
+      "placeholder": "Rate, strategy and source appear here once you convert.",
+      "ratesFrom": "Rates from {{date}}"
     },
     "badge": {
       "strategy": "strategy",
@@ -106,12 +117,14 @@
       "emptyHeading": "No conversions yet",
       "empty": "The last {{count}} appear here, each with the rate it used and where that rate came from.",
       "unavailable": "Recent conversions are unavailable. Converting still works.",
-      "rate": "1 {{from}} = {{rate}} {{to}}"
+      "rate": "1 {{from}} = {{rate}} {{to}}",
+      "tags": "{{strategy}} · {{source}}"
     }
   },
   "about": {
     "eyebrow": "For the reviewer",
     "heading": "A currency converter, built as a service.",
+    "onThisPage": "On this page",
     "purpose": [
       "Currency Converter turns an amount in one currency into another using Monobank’s published exchange rates. It exists to show a small service built the way a production service is built: a domain that does not know what a database is, a cache that can fail without taking the request down with it, one error shape for every failure, and a client that tells you where each number came from.",
       "The design was written down first, in docs/architecture.md, and that document is the contract: a change to behaviour changes it in the same pull request."
@@ -262,6 +275,7 @@
     },
     "traceability": {
       "title": "Requirements, and where each one is",
+      "navTitle": "Requirements",
       "intro": "The task was eight numbered sections. Each is met; the README carries the full table, one row per atom with the file, the test name and the live URL behind it.",
       "readmeLabel": "Open the traceability table",
       "points": [
@@ -314,7 +328,8 @@
     "ok": "API reports every dependency up",
     "degraded": "API reports a degraded dependency",
     "statusUp": "up",
-    "statusDown": "down"
+    "statusDown": "down",
+    "rechecked": "Rechecked every 30 s"
   },
   "warnings": {
     "CACHE_UNAVAILABLE": "The rates cache could not be reached, so these rates came straight from Monobank and were not cached for the next request.",
