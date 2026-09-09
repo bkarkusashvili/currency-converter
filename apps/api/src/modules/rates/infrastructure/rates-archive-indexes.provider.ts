@@ -1,54 +1,39 @@
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, ConnectionStates, Model } from 'mongoose';
+import { Connection, Model } from 'mongoose';
 import { PinoLogger } from 'nestjs-pino';
+import {
+  createIndexSyncer,
+  IndexSyncer,
+} from '../../../infrastructure/mongo/index-syncer.factory';
 import {
   RATE_SNAPSHOT_MODEL,
   RateSnapshotDocument,
 } from '../schemas/rate-snapshot.schema';
 
-// Mongoose's own automatic index build is off (see the connection options): it
-// runs while the connection is still opening, fails with buffering disabled,
-// and swallows the rejection, which would leave the TTL index quietly missing
-// on a collection nothing else prunes. Doing it here makes the step observable
-// and gives it a connection that is actually open.
+// The `rate_snapshots` collection's half of the index sync, on the same terms
+// as the history's: which model, and the two sentences an operator reads. The
+// expiry here is RATES_ARCHIVE_TTL_DAYS, which is configuration, which is why
+// the factory reconciles rather than creates.
 @Injectable()
 export class RatesArchiveIndexes implements OnApplicationBootstrap {
+  private readonly syncer: IndexSyncer;
+
   constructor(
     @InjectModel(RATE_SNAPSHOT_MODEL)
-    private readonly model: Model<RateSnapshotDocument>,
-    @InjectConnection() private readonly connection: Connection,
+    model: Model<RateSnapshotDocument>,
+    @InjectConnection() connection: Connection,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(RatesArchiveIndexes.name);
-  }
-
-  // Both paths are needed: the connection is normally still opening when the
-  // app finishes booting, and it is already open when a retry got there first.
-  onApplicationBootstrap(): void {
-    this.connection.on('connected', () => {
-      void this.sync();
-    });
-
-    if (this.connection.readyState === ConnectionStates.connected) {
-      void this.sync();
-    }
-  }
-
-  // syncIndexes rather than createIndexes because the expiry is configuration:
-  // changing RATES_ARCHIVE_TTL_DAYS on an existing deployment makes the index
-  // differ from the schema, which createIndexes answers with an options
-  // conflict and this reconciles. The collection belongs to this service alone,
-  // so dropping what the schema no longer declares is the wanted end state.
-  private async sync(): Promise<void> {
-    try {
-      await this.model.syncIndexes();
-      this.logger.info('Rate snapshot archive indexes are in place');
-    } catch (error) {
-      this.logger.warn(
-        { err: error },
+    this.syncer = createIndexSyncer(model, connection, this.logger, {
+      synced: 'Rate snapshot archive indexes are in place',
+      failed:
         'Rate snapshot archive indexes could not be reconciled; snapshots will not expire on their own',
-      );
-    }
+    });
+  }
+
+  onApplicationBootstrap(): void {
+    this.syncer.start();
   }
 }

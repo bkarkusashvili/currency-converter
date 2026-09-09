@@ -910,8 +910,9 @@ apps/api
 │   ├── infrastructure/
 │   │   ├── redis/               create-redis-client.factory.ts (the ioredis client and its REDIS_CLIENT
 │   │   │                        token) and the RedisConnection lifecycle
-│   │   └── mongo/               MongooseModule.forRootAsync, the connect options
-│   │                             and the MongoConnection lifecycle
+│   │   └── mongo/               MongooseModule.forRootAsync, the connect options,
+│   │                             the MongoConnection lifecycle and createIndexSyncer,
+│   │                             which both collections' index providers are built on
 │   └── modules/                 one folder per feature module, each with an index.ts
 │       ├── currencies/
 │       │   ├── dto/             CurrencyDto, CurrenciesResponseDto
@@ -1073,7 +1074,10 @@ down, which is what the Mongo module is built for:
   fails, and swallows the rejection, which would leave the TTL index quietly
   missing. `HistoryIndexes` reconciles with `syncIndexes` once the connection is
   open — the expiry is configuration, and a changed `HISTORY_TTL_DAYS` is an
-  options conflict for `createIndexes`.
+  options conflict for `createIndexes`. The waiting, the reconciling and the two
+  outcomes are `createIndexSyncer` in `infrastructure/mongo`, shared with the
+  archive's provider: each collection's provider is the model it owns and the
+  two sentences it logs.
 
 The collection is `conversions`, with one index: `{ createdAt: -1 }` carrying
 `expireAfterSeconds`. A single-field index is read in either direction, so the
