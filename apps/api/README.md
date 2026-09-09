@@ -178,12 +178,13 @@ curl -s 'http://localhost:3000/api/v1/rates/history?base=USD&quote=UAH&days=7'
   "base": "USD",
   "quote": "UAH",
   "days": 7,
-  "points": [
-    { "date": "2026-09-08", "buy": 44.15, "sell": 44.6512 },
-    { "date": "2026-09-09", "buy": 44.35, "sell": 44.831 }
-  ]
+  "points": [{ "date": "2026-09-09", "buy": 44.43, "sell": 44.831 }]
 }
 ```
+
+Captured from a stack that had been up for minutes against the live upstream, so
+the archive holds the one day it fetched; a deployment up for a week answers
+seven points.
 
 Oldest first, one point per archived day inside the window, counting today as
 the first. A day the archive has no snapshot for is absent rather than null, so

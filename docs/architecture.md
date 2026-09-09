@@ -145,12 +145,14 @@ snapshot — and this route reads a window of them.
   "base": "USD",
   "quote": "UAH",
   "days": 7,
-  "points": [
-    { "date": "2026-09-08", "buy": 44.15, "sell": 44.6512 },
-    { "date": "2026-09-09", "buy": 44.35, "sell": 44.831 }
-  ]
+  "points": [{ "date": "2026-09-09", "buy": 44.43, "sell": 44.831 }]
 }
 ```
+
+Captured from the Docker stack against the live upstream. It had been up for
+minutes, so the archive holds the one day it fetched; a deployment that has been
+up a week answers seven points, and one with a gap answers fewer than the days
+it was up.
 
 `base` and `quote` are validated exactly as `/convert`'s codes are — three
 letters, case-insensitive, echoed upper-cased — and `days` is an integer
@@ -390,7 +392,7 @@ Every non-2xx response has this shape:
 | 422  | `UNSUPPORTED_CURRENCY` | Code is not in the snapshot                          |
 | 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                   |
 | 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                             |
-| 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists             |
+| 503  | `RATES_UNAVAILABLE`    | Upstream failed and nothing inside its age is cached or archived |
 | 503  | `CACHE_UNAVAILABLE`    | The cache could not be reached to invalidate it      |
 | 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read          |
 | 503  | `ARCHIVE_UNAVAILABLE`  | The rate snapshot archive cannot be read             |
@@ -1202,9 +1204,9 @@ rather than constrain it.
 | Layer                | Tool                         | What is covered                                   |
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
-| E2E (api)            | Jest + supertest             | nine suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `rates-archive` (the archive as the fourth tier, the day it leaves behind and its warning, `/rates/history` and its two 422s, the store unreachable), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger`, `openapi-contract` |
+| E2E (api)            | Jest + supertest             | nine suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `rates-archive` (the archive as the fourth tier and the age ceiling that ends it, the day it leaves behind and its warning, `/rates/history` and its two 422s, the store unreachable), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger`, `openapi-contract` |
 | Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, error display, history list and its loading and empty states, health rendering, every HTTP service |
-| Integration (api)    | Jest against real servers    | the three store adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp; the archive's TTL index, a second fetch of a day replacing that day's document rather than adding one, and a window read back oldest first. Each suite runs on its own database — Redis 15, and a Mongo database of its own each — so a URL pointed at a running stack is never flushed and two suites Jest may run in parallel cannot drop each other's collections. Skipped, with a `SKIPPED:` line naming the variable, unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI`, whose `orchestration` job points them at the stack it already starts |
+| Integration (api)    | Jest against real servers    | the three store adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp; the archive's TTL index, a second fetch of a day replacing that day's document rather than adding one, and the projected window read back oldest first — the pair filtered in the server, a mid rate arriving without the spread keys, the two membership flags, and a day dated ahead of the clock left out. Each suite runs on its own database — Redis 15, and a Mongo database of its own each — so a URL pointed at a running stack is never flushed and two suites Jest may run in parallel cannot drop each other's collections. Skipped, with a `SKIPPED:` line naming the variable, unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI`, whose `orchestration` job points them at the stack it already starts |
 | Contract             | Jest (api) + ajv (web)       | `docs/openapi.json` regenerated from the application's decorators and compared with the committed file; on the web side every sample response the suite renders validated against the schema that document publishes for its route |
 
 A `*.module.ts` is wiring and an `index.ts` is a list of names; both are
@@ -1419,6 +1421,29 @@ project were taken further.
   day, but it means the series cannot answer "what was the rate at 09:00" and
   that a day the API was only up in the morning is represented by a morning
   quote. A time series would key by fetch instead and roll up on read.
+- **An empty archive answers `UNSUPPORTED_CURRENCY`.** Both of
+  `/rates/history`'s 422s are decided from the window that was read, so a
+  deployment whose archive holds no day at all — the first minutes after a
+  deploy, or a collection the TTL has swept — answers `422
+  UNSUPPORTED_CURRENCY` for every pair, naming `base`, because nothing in the
+  window says the code exists. It is the honest reading of what was read and it
+  is indistinguishable from a misspelt code; a distinct `ARCHIVE_EMPTY` would
+  separate the two at the cost of a fourth outcome on a route that has three.
+- **A day is a UTC day, which is not the reader's day.** The archive keys on
+  UTC and nothing else, so the point labelled `2026-09-09` closes at 03:00 Kyiv
+  on the 10th — a chart drawn in local time puts the last three hours of a Kyiv
+  day inside the next point, and a fetch at 02:00 Kyiv is filed under the
+  previous day. UTC is what makes the same snapshot key the same document on two
+  instances in two regions, and the upstream publishes in UTC anyway; a series
+  in the reader's timezone would key by fetch and roll up on read.
+- **The fallback age ceiling is a flat number of days.**
+  `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` (7) is what stops the fourth tier
+  pricing a `200` from a rate the market has left behind, and it treats every
+  pair the same: a currency that moves a tenth of a percent in a week and one
+  that moves ten percent get the same seven days. A tolerance on the *rate*
+  rather than on its age would be the better rule, and it needs a reference
+  price the API does not have precisely when it would be used — the upstream is
+  down, which is why the archive is being read at all.
 - **A gap in the series is silent about its cause.** A day the API was down, a
   day it had not been deployed yet and a day the write was dropped are all one
   absent point. `ARCHIVE_NOT_RECORDED` tells the client that *its* request lost

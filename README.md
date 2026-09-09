@@ -444,7 +444,7 @@ curl -sX POST https://api-production-c5b65.up.railway.app/api/v1/convert \
 | 422  | `UNSUPPORTED_CURRENCY` | Code is not in the snapshot                          |
 | 422  | `RATE_NOT_AVAILABLE`   | No path between the two currencies                   |
 | 429  | `TOO_MANY_REQUESTS`    | Throttler limit exceeded                             |
-| 503  | `RATES_UNAVAILABLE`    | Upstream failed and no stale copy exists             |
+| 503  | `RATES_UNAVAILABLE`    | Upstream failed and nothing inside its age is cached or archived |
 | 503  | `CACHE_UNAVAILABLE`    | The cache could not be reached to invalidate it      |
 | 503  | `HISTORY_UNAVAILABLE`  | The conversion history store cannot be read          |
 | 500  | `INTERNAL_ERROR`       | Anything unexpected; the message is generic          |
@@ -597,12 +597,12 @@ Four suites, all green on this commit:
 
 | Suite           | Command                                  | Result                    | Coverage                                                                 | Gate                       |
 | --------------- | ---------------------------------------- | ------------------------- | ------------------------------------------------------------------------ | -------------------------- |
-| API unit        | `apps/api: npm run test:cov`             | 74 suites, **744** tests  | stmts 98.97% · branches 87.54% · funcs 98.65% · lines 98.91%              | 85% lines + branches       |
-| API e2e         | `apps/api: npm run test:e2e`             | 9 suites, **158** tests   | not instrumented — see below                                             | none                       |
-| API integration | `apps/api: npm run test:integration`     | 3 suites, **21** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
+| API unit        | `apps/api: npm run test:cov`             | 74 suites, **767** tests  | stmts 98.99% · branches 87.80% · funcs 98.67% · lines 98.93%              | 85% lines + branches       |
+| API e2e         | `apps/api: npm run test:e2e`             | 9 suites, **161** tests   | not instrumented — see below                                             | none                       |
+| API integration | `apps/api: npm run test:integration`     | 3 suites, **25** tests    | not instrumented; skipped, visibly, unless the two `INTEGRATION_*_URL` are set | none                  |
 | Web             | `apps/web: npm run test:coverage`        | 27 files, **235** tests   | stmts 99.16% (595/600) · branches 96.64% (432/447) · funcs 100% (190/190) · lines 99.14% | 90% on all four            |
 
-**1158 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
+**1188 tests, 0 failures.** From the root, `npm test`, `npm run lint`,
 `npm run typecheck`, `npm run format:check` and `npm run build` run the same
 checks across both apps and let both report, so a failure in one does not hide
 the other. Coverage gates and the e2e suite stay per-app.
@@ -813,7 +813,7 @@ is implemented and covered:
 | Structured logging | `common/logging/` — nestjs-pino, `request-id.util.ts` (header, sanitiser, assigner, middleware), `serializers.util.ts`, level resolver, once-per-outage reporter. Credentials and connection strings never reach a client or a log line |
 | React frontend | `apps/web/` — React 19 + Vite + TanStack Query + React Router, converter and `/about` pages |
 | MongoDB history | `infrastructure/mongo/`, `modules/history/`, TTL index from `HISTORY_TTL_DAYS`, `GET /api/v1/history` |
-| Daily rate archive and history | `modules/rates/schemas/` + `infrastructure/mongo-rates-archive.repository.ts` — one `rate_snapshots` document per UTC day, TTL from `RATES_ARCHIVE_TTL_DAYS`; it is the fourth fallback tier behind the two cache keys (`source: "archive"`) and it is what `GET /api/v1/rates/history` reads. `test/e2e/rates-archive.e2e-spec.ts`, `test/integration/mongo-rates-archive.repository.integration-spec.ts` |
+| Daily rate archive and history | `modules/rates/schemas/` + `infrastructure/mongo-rates-archive.repository.ts` — one `rate_snapshots` document per UTC day, TTL from `RATES_ARCHIVE_TTL_DAYS`; it is the fourth fallback tier behind the two cache keys (`source: "archive"`, up to `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` old and refused past it) and it is what `GET /api/v1/rates/history` reads, one projected pair per day. `test/e2e/rates-archive.e2e-spec.ts`, `test/integration/mongo-rates-archive.repository.integration-spec.ts` |
 | Service layer on the web | `apps/web/src/api/services/` — five interfaces in `services.ts`, their HTTP implementations in `createHttpServices.ts`, `ServicesProvider` / `useServices`; tests inject fakes through the same provider. It is a *service* layer and not a repository one because the client stores nothing; the API keeps the Repository pattern, where the stores are |
 | Offline fallback | `features/converter/lib/convertOffline.ts` + `api/persistence/` — a persisted snapshot re-priced in the browser, labelled `offline-estimate` and never written to history. Priced against the same `fixtures/golden-conversions.json` the API's e2e suite asserts |
 | Container-backed integration tests | `apps/api/test/integration/` — the Redis and the two Mongo adapters against real servers, run by CI's `orchestration` job against the stack it starts |
