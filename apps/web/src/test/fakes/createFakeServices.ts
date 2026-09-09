@@ -1,5 +1,6 @@
 import { ApiError } from '../../api';
 import type {
+  CommandOutcome,
   ConvertRequest,
   ConvertResponse,
   CurrenciesResponse,
@@ -18,12 +19,15 @@ export interface FakeServicesOptions {
   rates?: Answer<RatesSnapshotResponse>;
   history?: Answer<HistoryResponse>;
   health?: Answer<HealthResponse>;
+  clearCache?: Answer<CommandOutcome>;
 }
 
 export interface FakeServices {
   services: Services;
   convertCalls: ConvertRequest[];
   historyLimits: number[];
+  /** The keys `clearCache` was called with, so a suite can prove what was sent. */
+  clearCacheKeys: string[];
 }
 
 /**
@@ -96,6 +100,7 @@ export const FAKE_RESPONSES = {
 const EMPTY_CURRENCIES: CurrenciesResponse = { currencies: [] };
 const EMPTY_HISTORY: HistoryResponse = { items: [] };
 const HEALTHY: HealthResponse = { status: 'ok', details: {} };
+const CLEARED: CommandOutcome = { status: 204, requestId: 'req-42' };
 const EMPTY_SNAPSHOT: RatesSnapshotResponse = {
   source: 'cache',
   fetchedAt: '2026-09-08T12:00:00.000Z',
@@ -109,6 +114,7 @@ const EMPTY_SNAPSHOT: RatesSnapshotResponse = {
 export function createFakeServices(options: FakeServicesOptions = {}): FakeServices {
   const convertCalls: ConvertRequest[] = [];
   const historyLimits: number[] = [];
+  const clearCacheKeys: string[] = [];
 
   const services: Services = {
     conversion: {
@@ -122,6 +128,10 @@ export function createFakeServices(options: FakeServicesOptions = {}): FakeServi
     },
     rates: {
       getSnapshot: () => answer(options.rates ?? EMPTY_SNAPSHOT),
+      clearCache(apiKey) {
+        clearCacheKeys.push(apiKey);
+        return answer(options.clearCache ?? CLEARED);
+      },
     },
     history: {
       recent(limit) {
@@ -134,7 +144,7 @@ export function createFakeServices(options: FakeServicesOptions = {}): FakeServi
     },
   };
 
-  return { services, convertCalls, historyLimits };
+  return { services, convertCalls, historyLimits, clearCacheKeys };
 }
 
 function answer<T>(value: Answer<T>): Promise<T> {

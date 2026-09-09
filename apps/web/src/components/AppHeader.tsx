@@ -7,6 +7,9 @@ import { ThemeSwitcher } from './ThemeSwitcher';
 const NAV_ITEMS = [
   { to: '/', labelKey: 'app.nav.converter' },
   { to: '/about', labelKey: 'app.nav.about' },
+  // Section 1 of the design was drawn before this page existed; §6.8 resolves
+  // the inconsistency by shipping the three-item nav everywhere.
+  { to: '/ops', labelKey: 'app.nav.ops' },
 ] as const;
 
 export function AppHeader() {
