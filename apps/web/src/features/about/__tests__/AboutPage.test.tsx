@@ -162,6 +162,21 @@ describe('AboutPage', () => {
     expect(screen.getByText('Liveness and readiness are different questions')).toBeInTheDocument();
   });
 
+  // "What manages state?" is asked of every React submission, and the answer
+  // here is that nothing global does — which is a decision, not an omission.
+  it('says what owns state, and why there is no global store', () => {
+    renderAbout();
+
+    expect(screen.getByText('State')).toBeInTheDocument();
+    expect(screen.getByText(/TanStack Query owns server state/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/React context provides the service implementations/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/no global store because no client state is shared beyond the query cache/),
+    ).toBeInTheDocument();
+  });
+
   it('explains both fallbacks and how to see the client one', () => {
     renderAbout();
 

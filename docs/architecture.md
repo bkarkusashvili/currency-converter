@@ -377,7 +377,7 @@ interface RatesProvider { fetchRates(): Promise<RatesSnapshot>; }
 
 const RATES_REPOSITORY = Symbol('RATES_REPOSITORY');
 
-// domain/ports.ts — what a cache operation did, and whether the cache
+// domain/rates-repository.interface.ts — what a cache operation did, and whether the cache
 // was there to do it. A read that answers `null` alone cannot tell a miss from
 // an outage, and the two are different answers on the response.
 interface CachedSnapshot { snapshot: RatesSnapshot | null; degraded: boolean; }
@@ -496,9 +496,13 @@ than the six a rate is published to, so composing the two legs of a cross rate
 cannot move the answer either.
 
 ```ts
-// common/conversion/conversion-strategy-name.ts — shared vocabulary, because a
+// common/conversion/conversion-strategy-name.enum.ts — shared vocabulary, because a
 // stored record names a strategy too (§9).
-type ConversionStrategyName = 'identity' | 'direct' | 'cross';
+enum ConversionStrategyName {
+  Identity = 'identity',
+  Direct = 'direct',
+  Cross = 'cross',
+}
 
 interface ConversionStrategy {
   readonly name: ConversionStrategyName;
@@ -684,79 +688,85 @@ grows without bound, and nothing reads a conversion from a month ago.
 apps/api
 ├── src
 │   ├── main.ts                  bootstrap: pino logger, swagger, shutdown hooks
-│   ├── listen-or-exit.ts        listen, or flush the buffered logs, name the port and exit 1
+│   ├── listen-or-exit.util.ts   listen, or flush the buffered logs, name the port and exit 1
 │   ├── configure-http.ts        trust proxy, request id, helmet, CORS and the api/v1 prefix, shared with the e2e suite
 │   ├── app.module.ts
 │   ├── config/                  zod schema, typed AppConfig, ConfigModule setup
-│   ├── common/
+│   ├── common/                  one folder per package, each with an index.ts
 │   │   ├── http/                the paths the process serves: the api prefix, the two probe routes, the docs —
 │   │   │                        read by configure-http, setup-swagger and the request log level alike
-│   │   ├── conversion/          ConversionStrategyName and the OpenAPI option objects a conversion response
-│   │   │                        and a stored record of one publish identically
-│   │   ├── warnings/            ResponseWarning, its DTO and collectWarnings — the §3 codes
+│   │   ├── conversion/          ConversionStrategyName (a string enum) and the OpenAPI option objects a
+│   │   │                        conversion response and a stored record of one publish identically
+│   │   ├── warnings/            ResponseWarning, the WarningCode enum, its DTO and collectWarnings — the §3 codes
 │   │   ├── currency/            CurrencyCode, Currency and the ISO 4217 table, read by the
 │   │   │                        Monobank mapper and the currencies projection alike
-│   │   ├── errors/              AppError, ErrorCode, concrete errors
+│   │   ├── errors/              AppError, the ErrorCode enum, concrete errors
 │   │   ├── filters/             GlobalExceptionFilter and ErrorResponseDto, with the status → code
-│   │   │                        and payload → message mapping beside them in http-exception-mapping.ts
+│   │   │                        and payload → message mapping beside them in http-exception-mapping.util.ts
 │   │   ├── guards/              ApiKeyGuard and the x-api-key header it reads
-│   │   ├── logging/             nestjs-pino setup, log level, request-id.ts (the header, the
-│   │   │                        sanitiser, the assigner, the middleware), serializers.ts (what
+│   │   ├── logging/             nestjs-pino setup, log level, request-id.util.ts (the header, the
+│   │   │                        sanitiser, the assigner, the middleware), serializers.util.ts (what
 │   │   │                        reaches a log line, errorStack included) and createOutageReporter
 │   │   ├── validation/          ValidationPipe options and the exception factory that flattens
 │   │   ├── throttling/          buildThrottlerOptions and the global guard
 │   │   ├── swagger/             OpenAPI document, ApiErrorResponses decorator
-│   │   ├── resilience/          retry, CircuitBreaker, CircuitOpenError
+│   │   ├── resilience/          retry, CircuitBreaker, the CircuitState enum, CircuitOpenError
 │   │   ├── money/               the Money constructor, roundHalfUp and the decimal scales §3 publishes (big.js)
 │   │   └── utils/               constant-time compare, withTimeout, TimeoutError
 │   ├── infrastructure/
-│   │   ├── redis/               create-redis-client.ts (the ioredis client and its REDIS_CLIENT
+│   │   ├── redis/               create-redis-client.factory.ts (the ioredis client and its REDIS_CLIENT
 │   │   │                        token) and the RedisConnection lifecycle
 │   │   └── mongo/               MongooseModule.forRootAsync, the connect options
 │   │                             and the MongoConnection lifecycle
-│   └── modules/
+│   └── modules/                 one folder per feature module, each with an index.ts
 │       ├── currencies/
 │       │   ├── dto/             CurrencyDto, CurrenciesResponseDto
-│       │   ├── collect-currencies.ts  snapshot → sorted currency list
+│       │   ├── collect-currencies.util.ts  snapshot → sorted currency list
 │       │   ├── currencies.controller.ts  GET /currencies
-│       │   └── currencies.module.ts
+│       │   ├── currencies.module.ts
+│       │   └── index.ts         CurrenciesModule
 │       ├── rates/
-│       │   ├── domain/          exchange-rate.ts — ExchangeRate, RatesSnapshot, RatesSource,
-│       │   │                    BASE_CURRENCY and the RatesLookup a caller reads `cacheDegraded`
-│       │   │                    off; ports.ts — the provider and cache seams with their tokens
+│       │   ├── domain/          exchange-rate.types.ts — ExchangeRate, RatesSnapshot, BASE_CURRENCY
+│       │   │                    and the RatesLookup a caller reads `cacheDegraded` off;
+│       │   │                    rates-source.enum.ts — RatesSource; rates-provider.interface.ts and
+│       │   │                    rates-repository.interface.ts — the two seams with their tokens
 │       │   │                    and CachedSnapshot / CacheWrite
 │       │   ├── dto/             ExchangeRateDto, RatesSnapshotResponseDto
 │       │   ├── infrastructure/
 │       │   │   ├── monobank/    provider, zod payload schema, mapper, retry predicate
 │       │   │   ├── cached-rates-snapshot.schema.ts  zod schema for a cached value
-│       │   │   ├── rates-cache-keys.ts
+│       │   │   ├── rates-cache-keys.constants.ts
 │       │   │   └── redis-rates.repository.ts
 │       │   ├── application/     RatesService, describeRatesFailure
 │       │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
-│       │   └── rates.module.ts
+│       │   ├── rates.module.ts
+│       │   └── index.ts         RatesModule, RatesService, the domain types, RatesSource,
+│       │                        RATES_PROVIDER and MONOBANK_CIRCUIT_BREAKER
 │       ├── conversion/
 │       │   ├── domain/          ConversionRequest, ConversionResult and the ConversionOutcome that
 │       │   │                    carries it out of the service with what degraded beside it
 │       │   ├── dto/             ConvertRequestDto, ConvertResponseDto (class-validator + swagger)
-│       │   ├── strategies/      conversion-strategy.ts (the interface and its
+│       │   ├── strategies/      conversion-strategy.interface.ts (the interface and its
 │       │   │                    CONVERSION_STRATEGIES token), identity, direct, cross,
 │       │   │                    the resolver, findRate and directionalRate, which is the §5
 │       │   │                    table in one function
 │       │   ├── conversion.service.ts
 │       │   ├── conversion.controller.ts  POST /convert
-│       │   └── conversion.module.ts
+│       │   ├── conversion.module.ts
+│       │   └── index.ts         ConversionModule
 │       ├── history/
-│       │   ├── domain/          ConversionRecord, the HistoryRepository port and its token
+│       │   ├── domain/          ConversionRecord, the HistoryRepository interface and its token
 │       │   ├── schemas/         the Mongoose schema and its TTL index, built
 │       │   │                    per deployment from HISTORY_TTL_DAYS
 │       │   ├── infrastructure/  MongoHistoryRepository, HistoryIndexes
 │       │   ├── dto/             HistoryQueryDto, ConversionRecordDto, HistoryResponseDto
 │       │   ├── history.service.ts
 │       │   ├── history.controller.ts  GET /history
-│       │   └── history.module.ts
+│       │   ├── history.module.ts
+│       │   └── index.ts         HistoryModule, HistoryService
 │       └── health/              controller, HealthExceptionFilter, pingIndicator with the probe
 │                             budget, HealthIndicatorPort and its HEALTH_INDICATORS token,
-│                             Redis / Mongo / Monobank indicators
+│                             Redis / Mongo / Monobank indicators, index.ts exporting HealthModule
 └── test
     ├── e2e/                     supertest suites over the real HTTP surface
     │   ├── create-e2e-app.ts    boots through the same configureHttp and setupSwagger main.ts uses
@@ -785,14 +795,27 @@ them:
 | `conversion → rates` | `RatesModule` and `RatesService` for the snapshot, `ExchangeRate` and `BASE_CURRENCY` for the strategies, `RatesSource` on the result |
 | `conversion → history` | `HistoryModule` and `HistoryService.record`, the side effect of a conversion (§2) |
 | `currencies → rates` | `RatesModule` and `RatesService` for the snapshot, `ExchangeRate` and `BASE_CURRENCY` for the projection |
-| `health → rates` | `MONOBANK_CIRCUIT_BREAKER`, taken from that module's exports rather than from its infrastructure folder |
+| `health → rates` | `MONOBANK_CIRCUIT_BREAKER`, taken from that module's index rather than from its infrastructure folder |
 | `history → rates` | `RatesSource`, because a record carries the provenance the conversion was answered with (§3) |
 
 Every one of them points at `rates`, or from `conversion` at `history`, and
 `rates` imports from no other feature module: the graph has no cycle, which is
-what makes "one way" a fact rather than an intention. `apps/api` has no test
-that enforces it; a grep of the relative imports under `modules/` is what
-reproduces the table.
+what makes "one way" a fact rather than an intention.
+
+**The public surface.** Every feature module and every package under `common/`
+publishes an `index.ts`, and that index is the only way in from outside it.
+`conversion` imports `../rates`, never `../rates/domain/exchange-rate.types`;
+what one module may take from another is therefore a list in one file rather
+than whatever a relative path happens to reach, and the table above is read off
+those nineteen files instead of off a grep. Inside a module the imports stay
+direct — a barrel per folder would be a hop with nothing on the other side of
+it — and an index exports what another module actually uses, not the folder.
+The rule is enforced rather than stated: `no-restricted-imports` in
+`apps/api/eslint.config.mjs` fails the build on a specifier that reaches one
+level or more inside another module or `common/` package, with a second clause
+that keeps `common/` free of any import from `modules/` at all. It is off
+inside `__tests__` and `test/`, where a fake or a fixture one suite reaches for
+is not part of anything's published surface.
 
 What is shared by more than one of them is vocabulary, and vocabulary lives in
 `common/`: the ISO 4217 table and `CurrencyCode` the Monobank mapper and the
@@ -801,8 +824,8 @@ as well as a conversion, and the `@ApiProperty` option objects the convert
 response and the record DTO publish their eight common fields with. Nothing
 under `common/` imports from `modules/`, which is what keeps that a one-way
 street too — the `docs` and probe paths moved there for the same reason, so
-`setup-swagger.ts` and `resolve-log-level.ts` no longer reach back into the
-application root for them.
+`setup-swagger.util.ts` and `resolve-log-level.util.ts` no longer reach back
+into the application root for them.
 
 `ConversionRecordDto` declares its own properties rather than inheriting the
 convert response's: a DTO of one module extending another's is an edge like any
@@ -856,17 +879,31 @@ newest-first page and the retention ride on the same key rather than on two.
   the Docker image regenerates it from `API_URL` at container start so the same
   image runs locally and on Railway. The value is JSON-escaped as it is written,
   so a quote in the URL cannot break the file.
-- **Ports and adapters, client side.** `src/api/repositories/repositories.ts`
-  declares one interface per resource (`ConversionRepository`,
-  `CurrenciesRepository`, `RatesRepository`, `HistoryRepository`,
-  `HealthRepository`) and the `Repositories` aggregate;
-  `createHttpRepositories.ts` holds an HTTP implementation factory each, bound
+- **Ports and adapters, client side.** `src/api/services/services.ts`
+  declares one interface per resource (`ConversionService`,
+  `CurrenciesService`, `RatesService`, `HistoryService`,
+  `HealthService`) and the `Services` aggregate;
+  `createHttpServices.ts` holds an HTTP implementation factory each, bound
   through a React context
-  (`RepositoriesProvider` / `useRepositories`). `src/api/hooks` wraps them in
+  (`ServicesProvider` / `useServices`). `src/api/hooks` wraps them in
   TanStack Query hooks (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
   `useHistory`, `useHealth`) that depend only on the interfaces. `src/api/http` is the only place that knows about `fetch`; a
   component imports nothing from it but the `ApiError` and field-error types it
-  renders.
+  renders. They are *services* and not repositories because this side stores
+  nothing: the API has a repository per store, and reusing the word for a
+  client that only calls it made the pattern harder to talk about.
+- **State.** TanStack Query owns server state (with persistence for rates and
+  currencies); React context provides the service implementations (swapped for
+  fakes in tests); form state is local to the converter; there is no global
+  store because no client state is shared beyond the query cache.
+- **The public surface.** `api/`, `components/`, `lib/`, `i18n/` and each
+  folder under `features/` publish an `index.ts`, and that index is how the
+  rest of the app reaches them: `features/converter` imports `../../api`, not
+  `../../api/http/request`. `no-restricted-imports` in
+  `apps/web/eslint.config.js` enforces it — one configuration per relative
+  depth, because what makes `../../components` the shared folder rather than
+  the feature's own is how far up the specifier has climbed — and it is off in
+  the suites, where a fake or a render helper is not a published surface.
 - `GET /health` goes through that same transport, with `[200, 503]` passed as
   its accepted statuses: both carry the terminus report, so a degraded API is
   rendered indicator by indicator instead of as unreachable. A transport
@@ -931,8 +968,8 @@ newest-first page and the retention ride on the same key rather than on two.
   user edits the field they describe.
 - Feature folders carry their own structure (`components/`, `hooks/`, `lib/`,
   `__tests__/`); shared test helpers and fakes live in `src/test/`.
-- Tests: Vitest + Testing Library, rendered through the i18n and repository
-  providers with in-memory repository fakes, plus fetch-level tests asserting
+- Tests: Vitest + Testing Library, rendered through the i18n and services
+  providers with in-memory service fakes, plus fetch-level tests asserting
   the URL, method, headers and body of every endpoint.
 
 ## 11. Testing strategy
@@ -941,7 +978,7 @@ newest-first page and the retention ride on the same key rather than on two.
 | -------------------- | ---------------------------- | ------------------------------------------------- |
 | Unit (api)           | Jest                         | resilience primitives, mapper, provider, repository, rates service flows, every strategy, resolver, conversion service, history, filter, guard, config schema, health indicators |
 | E2E (api)            | Jest + supertest             | eight suites — `app` (envelope, request ids, unparseable bodies, unknown routes, `/health` and `/health/live` while the dependencies report down), `conversion` (pricing, validation, unsupported and no-path, upstream down, cache unreachable), `rates` (cache hit, stale fallback, invalidation and its auth, cache unreachable, `/currencies`), `history` (record, ordering, paging, store unreachable), `http-hardening`, `throttling`, `swagger`, `openapi-contract` |
-| Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, error display, history list and its loading and empty states, health rendering, every HTTP repository |
+| Unit (web)           | Vitest + Testing Library     | amount parsing and input formatting, form validation, per-field server errors, result display, the inverse rate and provenance fallbacks, error display, history list and its loading and empty states, health rendering, every HTTP service |
 | Integration (api)    | Jest against real servers    | the two adapters nothing else exercises for real — the TTLs both cache keys are written with, the round trip through them, `clear`, a corrupt value read back as a miss; the `{ createdAt: -1 }` index and its `expireAfterSeconds` after `syncIndexes`, the record-and-read-back mapping, the newest-first page, the clamp. Each suite runs on its own database — Redis 15, a Mongo database of its own — so a URL pointed at a running stack is never flushed. Skipped, with a `SKIPPED:` line naming the variable, unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI`, whose `orchestration` job points them at the stack it already starts |
 | Contract             | Jest (api) + ajv (web)       | `docs/openapi.json` regenerated from the application's decorators and compared with the committed file; on the web side every sample response the suite renders validated against the schema that document publishes for its route |
 
@@ -958,7 +995,7 @@ Coverage threshold: 85% lines/branches for `apps/api` in the Jest config, and
 90% statements/branches/functions/lines for `apps/web` in the Vitest config; CI
 runs the coverage script, not the plain one, plus `format:check`. The API
 report covers the unit suites alone: `test:e2e` runs uninstrumented, so
-`configure-http.ts` and `setup-swagger.ts` read 0% in it while every e2e suite
+`configure-http.ts` and `setup-swagger.util.ts` read 0% in it while every e2e suite
 boots through both. The gate is on the unit numbers, and the e2e suites are the
 surface they cannot reach.
 Unit tests never touch the network, Redis or Mongo. The e2e suites do not
@@ -1006,11 +1043,51 @@ agree on and both would have wrong.
 - ESLint + Prettier, `noImplicitAny`, `strictNullChecks`, no `any`, no
   non-null assertions outside tests.
 - A file holds one **reason to change**, which is usually but not always one
-  export. A DI token lives in the file that declares the port it injects, a
-  helper used by exactly one caller lives in that caller, and a group of types
-  that change together — the rates domain's `exchange-rate.ts` and `ports.ts`,
-  the web's `repositories.ts` — is one file rather than one per declaration. A
-  file is not free: every one of them is a name to know and a hop to follow.
+  export. A DI token lives in the file that declares the interface it injects,
+  a helper used by exactly one caller lives in that caller, and a group of
+  types that change together — the rates domain's `exchange-rate.types.ts`, the
+  web's `services.ts` — is one file rather than one per declaration. A file is
+  not free: every one of them is a name to know and a hop to follow.
+
+### File names
+
+Every file under `apps/api/src` carries a suffix that names its role, so what a
+file is can be read from a directory listing and a grep for `*.strategy.ts`
+finds the strategies. The dominant export decides when a file has more than one.
+
+| Suffix | What the file holds |
+| ------ | ------------------- |
+| `.module.ts` | a `@Module` — wiring, and excluded from coverage (§11) |
+| `.controller.ts` | a `@Controller`: the HTTP surface of one module |
+| `.service.ts` | an `@Injectable` that holds application logic |
+| `.provider.ts` | any other `@Injectable`, or an array of Nest `Provider`s — an adapter, a lifecycle owner (`RedisConnection`, `MongoConnection`, `HistoryIndexes`) |
+| `.repository.ts` | an adapter implementing a repository interface against one store |
+| `.indicator.ts` | a Terminus health indicator |
+| `.strategy.ts` | one conversion strategy (§5) |
+| `.resolver.ts` | picks between them |
+| `.mapper.ts` | translates an upstream payload into the domain |
+| `.factory.ts` | a function that builds one thing and injects nothing — a schema, a breaker, a client, an exception |
+| `.interface.ts` | a port: the interface a seam is declared as, with its DI token beside it |
+| `.enum.ts` | a string enum: one closed set whose values are the wire form |
+| `.types.ts` | domain shapes — interfaces and type aliases with no behaviour |
+| `.constants.ts` | constants only |
+| `.util.ts` | framework-free code with no Nest role: a pure helper, or a self-contained primitive like `CircuitBreaker` |
+| `.options.ts` | an options object for a framework module, or the function that builds one |
+| `.schema.ts` | a validation or persistence schema (zod, Mongoose) |
+| `.dto.ts` | a request or response DTO, `class-validator` and `@ApiProperty` |
+| `.filter.ts` / `.guard.ts` / `.decorator.ts` | the Nest constructs of those names |
+| `.error.ts` | one error class |
+| `.spec.ts` | a unit test, in the `__tests__` folder beside its subject |
+
+Three files carry no suffix, on purpose: `main.ts` and `configure-http.ts`,
+which are the bootstrap and are named for what they are, and the nineteen
+`index.ts` files, whose name *is* the convention — a directory's public surface
+(§9). `RequestLogLevel` is likewise still a union of literals rather than an
+enum: it narrows pino's `LevelWithSilent`, and a nominal enum is not assignable
+to what `pino-http` asks for.
+
+The web app names files after their default export (`ConverterPage.tsx`,
+`useConverterForm.ts`) as React projects do, and does not take these suffixes.
 
 ### Tests
 
@@ -1055,15 +1132,16 @@ extends it:
   component.
 - Data access is layered and each layer is the only one that knows its concern:
   `src/api/http` is the fetch client (base url, headers, decoding the error
-  envelope), `src/api/repositories` holds one interface per resource
-  (`ConversionRepository`, `CurrenciesRepository`, `RatesRepository`,
-  `HistoryRepository`, `HealthRepository` — together in `repositories.ts`, since
+  envelope), `src/api/services` holds one interface per resource
+  (`ConversionService`, `CurrenciesService`, `RatesService`,
+  `HistoryService`, `HealthService` — together in `services.ts`, since
   a route added to the API is one method in each) with the HTTP implementations
-  in `createHttpRepositories.ts`, handed to the tree through a provider, and
+  in `createHttpServices.ts`, handed to the tree through a provider, and
   `src/api/hooks` exposes the TanStack Query hooks
   components consume (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
-  `useHistory`, `useHealth`). A component never fetches.
-- Tests inject a fake repository through that same provider rather than mocking
+  `useHistory`, `useHealth`). A component never fetches, and it imports the
+  folder's `index.ts` rather than a file inside it.
+- Tests inject a fake service through that same provider rather than mocking
   `fetch` or the network, so a component test never depends on the transport.
 - The persisted query cache is busted by the version in `apps/web/package.json`,
   which is what discards copies written against an older API contract: a release
@@ -1127,7 +1205,7 @@ project were taken further.
 **Testing**
 
 - **No browser end-to-end layer.** There is no Playwright or Cypress suite; the
-  web tests are component-level with repository fakes injected through the real
+  web tests are component-level with service fakes injected through the real
   provider, and the API e2e suites stop at supertest. The one thing nothing
   covers automatically is the two running together in a browser — that path is
   exercised by CI's `orchestration` job as far as `/health` and the two
@@ -1137,7 +1215,7 @@ project were taken further.
   than through a booted app, so what they check is the driver behaviour the
   fakes stand in for. The wiring above them is still e2e's job, against fakes.
 - **E2E coverage is not merged into the unit report.** `test:e2e` runs
-  uninstrumented, so `configure-http.ts` and `setup-swagger.ts` read 0% in a
+  uninstrumented, so `configure-http.ts` and `setup-swagger.util.ts` read 0% in a
   report whose gate they are not the subject of (§11). Merging the two reports
   would make the number honest; leaving them apart keeps the gate on the logic.
 - **Live-deployment smoke is manual.** Nothing polls the Railway services; the

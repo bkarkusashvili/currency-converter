@@ -213,12 +213,33 @@ response fixtures against those schemas.
 The coverage report is the **unit** suites only, and the 85% gate is on those
 numbers. `npm run test:e2e` runs without instrumentation, so what only it
 exercises is missing from the report rather than uncovered: `configure-http.ts`
-and `setup-swagger.ts` read 0% while every e2e suite boots through both, and
+and `setup-swagger.util.ts` read 0% while every e2e suite boots through both, and
 `main.ts` and the `*.module.ts` files are excluded outright — a module is
 wiring, and what a module decides lives in a file of its own beside it so that
 the gate does see it. Read the two numbers as what they are: the unit suites
 cover the logic, the e2e suites cover the surface, and only the first is
 counted.
+
+## Layout and naming
+
+`src/config`, `src/common`, `src/infrastructure` and `src/modules`, one folder
+per feature module (`rates`, `conversion`, `currencies`, `history`, `health`)
+and one per shared package under `common/`. Each of those folders publishes an
+`index.ts` and that index is the only way in from outside it: `conversion`
+imports `../rates`, never `../rates/domain/exchange-rate.types`.
+`no-restricted-imports` in `eslint.config.mjs` fails the build on an import
+that reaches inside another module or `common/` package, with a second clause
+keeping `common/` free of any import from `modules/`. Inside a folder the
+imports stay direct.
+
+Every file carries a suffix naming its role — `.controller.ts`, `.service.ts`,
+`.provider.ts`, `.repository.ts`, `.indicator.ts`, `.strategy.ts`,
+`.resolver.ts`, `.mapper.ts`, `.factory.ts`, `.interface.ts` (a port and its DI
+token), `.enum.ts`, `.types.ts`, `.constants.ts`, `.util.ts`, `.options.ts`,
+`.schema.ts`, `.dto.ts`, `.filter.ts`, `.guard.ts`, `.decorator.ts`,
+`.error.ts`, `.module.ts`, `.spec.ts`. The full table, with what each one
+means, is in [§12 of the architecture](../../docs/architecture.md#12-conventions);
+only `main.ts`, `configure-http.ts` and the `index.ts` files carry none.
 
 ## Errors
 

@@ -25,22 +25,34 @@ npm run test:coverage  # vitest with coverage thresholds (90%)
 src/
 ├── api/
 │   ├── http/           fetch client, ApiError and envelope mapping
-│   ├── repositories/   repositories.ts (one interface per resource + the aggregate),
-│   │                   createHttpRepositories.ts, React context, provider and hook
-│   └── hooks/          useConvert, useCurrencies, useHistory, useHealth
-├── components/         shell and cross-feature presentation
+│   ├── services/       services.ts (one interface per resource + the aggregate),
+│   │                   createHttpServices.ts, React context, provider and hook
+│   ├── persistence/    the query client and its localStorage persister
+│   ├── hooks/          useConvert, useCurrencies, useHistory, useHealth
+│   └── index.ts        what the rest of the app may import from api/
+├── components/         shell and cross-feature presentation (+ index.ts)
 ├── features/
-│   ├── about/          components/, __tests__/
-│   └── converter/      components/, hooks/, lib/ (with lib/amount/), __tests__/
-├── i18n/               en.json, i18next setup, key typings
-├── lib/                formatters and external links
-└── test/               setup, render helper, in-memory repository fakes
+│   ├── about/          components/, __tests__/, index.ts
+│   └── converter/      components/, hooks/, lib/ (with lib/amount/), __tests__/, index.ts
+├── i18n/               en.json, i18next setup, key typings (index.ts)
+├── lib/                formatters and external links (+ index.ts)
+└── test/               setup, render helper, in-memory service fakes
 ```
 
-Components depend on the repository interfaces, never on the HTTP client. The
+Components depend on the service interfaces, never on the HTTP client. The
 provider is wired to the HTTP implementations in `main.tsx`; tests inject
 in-memory fakes through the same provider, so nothing in the suite touches the
-network.
+network. They are called services rather than repositories because this side
+stores nothing — the API keeps the Repository pattern, where the stores are.
+
+Each folder above publishes an `index.ts` and that is the only way in from
+outside it: a feature imports `../../api`, never `../../api/http/request`.
+`no-restricted-imports` in `eslint.config.js` fails the build otherwise.
+
+**State.** TanStack Query owns server state (with persistence for rates and
+currencies); React context provides the service implementations (swapped for
+fakes in tests); form state is local to the converter; there is no global store
+because no client state is shared beyond the query cache.
 
 ## The amount field
 
