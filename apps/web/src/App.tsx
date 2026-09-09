@@ -13,7 +13,7 @@ export function App() {
         {t('app.skipToContent')}
       </a>
       <AppHeader />
-      <main id="main" className="flex-1 pb-20">
+      <main id="main" className="flex-1 pt-7 pb-10 sm:pt-12 sm:pb-20">
         <Routes>
           <Route path="/" element={<ConverterPage />} />
           <Route path="/about" element={<AboutPage />} />
