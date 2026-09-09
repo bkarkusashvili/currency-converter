@@ -6,7 +6,7 @@ import {
   healthUrl,
   livenessUrl,
   swaggerUrl,
-} from '../../../lib/links';
+} from '../../../lib';
 import { BulletList } from './BulletList';
 import { CommandBlock } from './CommandBlock';
 import { ContentSection } from './ContentSection';

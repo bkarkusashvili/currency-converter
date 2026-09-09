@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type { AmountSeparators } from '../../../lib';
 import {
   canonicalAmount,
   DEFAULT_SEPARATORS,
   formatAmountInput,
   MAX_INTEGER_DIGITS,
-  type AmountSeparators,
 } from '../lib/amount/formatAmountInput';
 import { MAX_AMOUNT, parseAmount } from '../lib/amount/parseAmount';
 

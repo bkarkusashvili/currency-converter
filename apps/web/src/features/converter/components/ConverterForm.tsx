@@ -1,11 +1,8 @@
 import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ApiError } from '../../../api/http/ApiError';
-import type { ConvertRequest, Currency, ResponseWarning } from '../../../api/types';
-import { Spinner } from '../../../components/Spinner';
-import { WarningNotes } from '../../../components/WarningNotes';
-import { useApiErrorMessage } from '../../../lib/useApiErrorMessage';
-import { useFormatters } from '../../../lib/useFormatters';
+import type { ApiError, ConvertRequest, Currency, ResponseWarning } from '../../../api';
+import { Spinner, WarningNotes } from '../../../components';
+import { useApiErrorMessage, useFormatters } from '../../../lib';
 import { useConverterForm } from '../hooks/useConverterForm';
 import { currencyOptions } from '../lib/currencyOptions';
 import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../lib/amount/formatAmountInput';

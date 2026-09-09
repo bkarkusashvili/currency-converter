@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../http/ApiError';
 import type { ConvertResponse, HealthResponse, RatesSnapshotResponse } from '../../types';
 import {
-  createHttpConversionRepository,
-  createHttpCurrenciesRepository,
-  createHttpHealthRepository,
-  createHttpHistoryRepository,
-  createHttpRatesRepository,
-  createHttpRepositories,
-} from '../createHttpRepositories';
+  createHttpConversionService,
+  createHttpCurrenciesService,
+  createHttpHealthService,
+  createHttpHistoryService,
+  createHttpRatesService,
+  createHttpServices,
+} from '../createHttpServices';
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -52,12 +52,12 @@ beforeEach(() => {
   fetchMock.mockReset();
 });
 
-describe('createHttpConversionRepository', () => {
+describe('createHttpConversionService', () => {
   it('posts the payload to /api/v1/convert', async () => {
     fetchMock.mockResolvedValue(jsonResponse(conversion));
 
     await expect(
-      createHttpConversionRepository().convert({ from: 'EUR', to: 'GBP', amount: 100 }),
+      createHttpConversionService().convert({ from: 'EUR', to: 'GBP', amount: 100 }),
     ).resolves.toEqual(conversion);
 
     expect(fetchMock).toHaveBeenCalledWith('https://api.test/api/v1/convert', {
@@ -69,11 +69,11 @@ describe('createHttpConversionRepository', () => {
   });
 });
 
-describe('createHttpCurrenciesRepository', () => {
+describe('createHttpCurrenciesService', () => {
   it('gets /api/v1/currencies', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ currencies: [] }));
 
-    await expect(createHttpCurrenciesRepository().list()).resolves.toEqual({ currencies: [] });
+    await expect(createHttpCurrenciesService().list()).resolves.toEqual({ currencies: [] });
 
     expect(fetchMock).toHaveBeenCalledWith('https://api.test/api/v1/currencies', {
       method: 'GET',
@@ -84,11 +84,11 @@ describe('createHttpCurrenciesRepository', () => {
   });
 });
 
-describe('createHttpHistoryRepository', () => {
+describe('createHttpHistoryService', () => {
   it('gets /api/v1/history with the requested limit', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ items: [] }));
 
-    await expect(createHttpHistoryRepository().recent(5)).resolves.toEqual({ items: [] });
+    await expect(createHttpHistoryService().recent(5)).resolves.toEqual({ items: [] });
 
     expect(fetchMock).toHaveBeenCalledWith('https://api.test/api/v1/history?limit=5', {
       method: 'GET',
@@ -99,11 +99,11 @@ describe('createHttpHistoryRepository', () => {
   });
 });
 
-describe('createHttpRatesRepository', () => {
+describe('createHttpRatesService', () => {
   it('gets /api/v1/rates', async () => {
     fetchMock.mockResolvedValue(jsonResponse(snapshot));
 
-    await expect(createHttpRatesRepository().getSnapshot()).resolves.toEqual(snapshot);
+    await expect(createHttpRatesService().getSnapshot()).resolves.toEqual(snapshot);
 
     expect(fetchMock).toHaveBeenCalledWith('https://api.test/api/v1/rates', {
       method: 'GET',
@@ -116,13 +116,13 @@ describe('createHttpRatesRepository', () => {
   it('refuses a body that is not a snapshot rather than converting from it later', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ source: 'cache', fetchedAt: 12, rates: [] }));
 
-    await expect(createHttpRatesRepository().getSnapshot()).rejects.toMatchObject({
+    await expect(createHttpRatesService().getSnapshot()).rejects.toMatchObject({
       code: 'INTERNAL_ERROR',
     });
 
     fetchMock.mockResolvedValue(jsonResponse({ ...snapshot, rates: [{ base: 'USD' }] }));
 
-    await expect(createHttpRatesRepository().getSnapshot()).rejects.toMatchObject({
+    await expect(createHttpRatesService().getSnapshot()).rejects.toMatchObject({
       code: 'INTERNAL_ERROR',
     });
 
@@ -133,19 +133,19 @@ describe('createHttpRatesRepository', () => {
       }),
     );
 
-    await expect(createHttpRatesRepository().getSnapshot()).rejects.toMatchObject({
+    await expect(createHttpRatesService().getSnapshot()).rejects.toMatchObject({
       code: 'INTERNAL_ERROR',
     });
   });
 });
 
-describe('createHttpHealthRepository', () => {
+describe('createHttpHealthService', () => {
   it('gets /health and returns the terminus report', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse({ status: 'ok', details: { redis: { status: 'up' } } }),
     );
 
-    await expect(createHttpHealthRepository().report()).resolves.toEqual({
+    await expect(createHttpHealthService().report()).resolves.toEqual({
       status: 'ok',
       details: { redis: { status: 'up' } },
     });
@@ -161,7 +161,7 @@ describe('createHttpHealthRepository', () => {
   it('returns the report a degraded API answers 503 with', async () => {
     fetchMock.mockResolvedValue(jsonResponse(degradedReport, 503));
 
-    await expect(createHttpHealthRepository().report()).resolves.toEqual(degradedReport);
+    await expect(createHttpHealthService().report()).resolves.toEqual(degradedReport);
   });
 
   it('throws on a status that carries no report', async () => {
@@ -169,7 +169,7 @@ describe('createHttpHealthRepository', () => {
       jsonResponse({ statusCode: 500, code: 'INTERNAL_ERROR', message: 'boom' }, 500),
     );
 
-    const error = await createHttpHealthRepository()
+    const error = await createHttpHealthService()
       .report()
       .catch((thrown: unknown) => thrown);
 
@@ -180,7 +180,7 @@ describe('createHttpHealthRepository', () => {
   it('throws on a transport failure', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
 
-    await expect(createHttpHealthRepository().report()).rejects.toMatchObject({
+    await expect(createHttpHealthService().report()).rejects.toMatchObject({
       code: 'NETWORK_ERROR',
     });
   });
@@ -188,29 +188,29 @@ describe('createHttpHealthRepository', () => {
   it('throws when the body is not a report', async () => {
     fetchMock.mockResolvedValue(new Response('not json', { status: 503 }));
 
-    await expect(createHttpHealthRepository().report()).rejects.toMatchObject({
+    await expect(createHttpHealthService().report()).rejects.toMatchObject({
       code: 'INTERNAL_ERROR',
     });
 
     fetchMock.mockResolvedValue(jsonResponse({ status: 'ok' }));
 
-    await expect(createHttpHealthRepository().report()).rejects.toMatchObject({
+    await expect(createHttpHealthService().report()).rejects.toMatchObject({
       code: 'INTERNAL_ERROR',
     });
 
     fetchMock.mockResolvedValue(jsonResponse({ status: 'ok', details: { redis: 'up' } }));
 
-    await expect(createHttpHealthRepository().report()).rejects.toMatchObject({
+    await expect(createHttpHealthService().report()).rejects.toMatchObject({
       code: 'INTERNAL_ERROR',
     });
   });
 });
 
-describe('createHttpRepositories', () => {
+describe('createHttpServices', () => {
   it('assembles one implementation per resource', () => {
-    const repositories = createHttpRepositories();
+    const services = createHttpServices();
 
-    expect(Object.keys(repositories)).toEqual([
+    expect(Object.keys(services)).toEqual([
       'conversion',
       'currencies',
       'rates',

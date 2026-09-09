@@ -1,11 +1,11 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { ApiError } from '../http/ApiError';
 import { queryKeys } from '../queryKeys';
-import { useRepositories } from '../repositories/useRepositories';
+import { useServices } from '../services/useServices';
 import type { HistoryResponse } from '../types';
 
 export function useHistory(limit: number): UseQueryResult<HistoryResponse, ApiError> {
-  const { history } = useRepositories();
+  const { history } = useServices();
 
   return useQuery<HistoryResponse, ApiError>({
     queryKey: queryKeys.history.list(limit),

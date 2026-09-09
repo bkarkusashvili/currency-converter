@@ -10,26 +10,26 @@ import type {
   RatesSnapshotResponse,
 } from '../types';
 import type {
-  ConversionRepository,
-  CurrenciesRepository,
-  HealthRepository,
-  HistoryRepository,
-  RatesRepository,
-  Repositories,
-} from './repositories';
+  ConversionService,
+  CurrenciesService,
+  HealthService,
+  HistoryService,
+  RatesService,
+  Services,
+} from './services';
 
-/** The implementation the app runs with: every seam in `repositories.ts`, over HTTP. */
-export function createHttpRepositories(): Repositories {
+/** The implementation the app runs with: every seam in `services.ts`, over HTTP. */
+export function createHttpServices(): Services {
   return {
-    conversion: createHttpConversionRepository(),
-    currencies: createHttpCurrenciesRepository(),
-    rates: createHttpRatesRepository(),
-    history: createHttpHistoryRepository(),
-    health: createHttpHealthRepository(),
+    conversion: createHttpConversionService(),
+    currencies: createHttpCurrenciesService(),
+    rates: createHttpRatesService(),
+    history: createHttpHistoryService(),
+    health: createHttpHealthService(),
   };
 }
 
-export function createHttpConversionRepository(): ConversionRepository {
+export function createHttpConversionService(): ConversionService {
   return {
     convert(payload: ConvertRequest, signal?: AbortSignal): Promise<ConvertResponse> {
       return request<ConvertResponse>('/api/v1/convert', { method: 'POST', body: payload, signal });
@@ -37,7 +37,7 @@ export function createHttpConversionRepository(): ConversionRepository {
   };
 }
 
-export function createHttpCurrenciesRepository(): CurrenciesRepository {
+export function createHttpCurrenciesService(): CurrenciesService {
   return {
     list(signal?: AbortSignal): Promise<CurrenciesResponse> {
       return request<CurrenciesResponse>('/api/v1/currencies', { signal });
@@ -45,7 +45,7 @@ export function createHttpCurrenciesRepository(): CurrenciesRepository {
   };
 }
 
-export function createHttpHistoryRepository(): HistoryRepository {
+export function createHttpHistoryService(): HistoryService {
   return {
     recent(limit: number, signal?: AbortSignal): Promise<HistoryResponse> {
       return request<HistoryResponse>(`/api/v1/history?limit=${String(limit)}`, { signal });
@@ -59,7 +59,7 @@ export function createHttpHistoryRepository(): HistoryRepository {
  * is rejected here instead of dividing by an `undefined` in the offline
  * estimate much later.
  */
-export function createHttpRatesRepository(): RatesRepository {
+export function createHttpRatesService(): RatesService {
   return {
     getSnapshot(signal?: AbortSignal): Promise<RatesSnapshotResponse> {
       return request<RatesSnapshotResponse>('/api/v1/rates', { signal, parse: toRatesSnapshot });
@@ -72,7 +72,7 @@ const HEALTH_PATH = '/health';
 /** Both statuses carry the terminus report; only the report itself says what is down. */
 const REPORTED_STATUSES = [200, 503] as const;
 
-export function createHttpHealthRepository(): HealthRepository {
+export function createHttpHealthService(): HealthService {
   return {
     report(signal?: AbortSignal): Promise<HealthResponse> {
       return request<HealthResponse>(HEALTH_PATH, {

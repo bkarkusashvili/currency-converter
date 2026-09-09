@@ -5,8 +5,9 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from 'react';
-import { WarningIcon } from '../../../components/WarningIcon';
-import { formatAmountInput, type AmountSeparators } from '../lib/amount/formatAmountInput';
+import { WarningIcon } from '../../../components';
+import type { AmountSeparators } from '../../../lib';
+import { formatAmountInput } from '../lib/amount/formatAmountInput';
 
 interface AmountFieldProps {
   id: string;

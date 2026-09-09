@@ -4,7 +4,7 @@ import type {
   ConvertRequest,
   ExchangeRate,
   RatesSnapshotResponse,
-} from '../../../api/types';
+} from '../../../api';
 import { Money, RATE_DECIMALS, RESULT_DECIMALS, roundHalfUp } from './money';
 import { HUB_CURRENCY } from './provenance';
 

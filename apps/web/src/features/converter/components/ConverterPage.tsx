@@ -1,9 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { useCurrencies } from '../../../api/hooks/useCurrencies';
-import { useRatesSnapshot } from '../../../api/hooks/useRatesSnapshot';
-import type { ResponseWarning } from '../../../api/types';
-import { ApiErrorNotice } from '../../../components/ApiErrorNotice';
-import { useFormatters } from '../../../lib/useFormatters';
+import { useCurrencies, useRatesSnapshot } from '../../../api';
+import type { ResponseWarning } from '../../../api';
+import { ApiErrorNotice } from '../../../components';
+import { useFormatters } from '../../../lib';
 import { useConvertWithFallback } from '../hooks/useConvertWithFallback';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
 import { splitServerFieldErrors } from '../lib/serverFieldErrors';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Currency } from '../../../api/types';
+import type { Currency } from '../../../api';
 import { currencyOptions, optionName } from '../lib/currencyOptions';
 
 const currencies: Currency[] = [

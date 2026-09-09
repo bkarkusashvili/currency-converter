@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Ajv, { type ValidateFunction } from 'ajv';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createFakeRepositories, FAKE_RESPONSES } from '../../test/fakes/createFakeRepositories';
+import { createFakeServices, FAKE_RESPONSES } from '../../test/fakes/createFakeServices';
 
 /**
  * `api/types.ts` is a hand-written mirror of the API's DTOs, and until now
@@ -97,12 +97,12 @@ describe('the fixtures the component suites render, against the published contra
   // empty page still has to be one the API could have sent — `warnings` absent
   // rather than empty, `details` present on a health report.
   it('accepts the empty answers the fakes default to', async () => {
-    const { repositories } = createFakeRepositories();
+    const { services } = createFakeServices();
 
-    check('currencies', await repositories.currencies.list());
-    check('rates', await repositories.rates.getSnapshot());
-    check('history', await repositories.history.recent(10));
-    check('health', await repositories.health.report());
+    check('currencies', await services.currencies.list());
+    check('rates', await services.rates.getSnapshot());
+    check('history', await services.history.recent(10));
+    check('health', await services.health.report());
   });
 
   /**

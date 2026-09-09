@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ApiError } from '../../../api/http/ApiError';
-import type { ConvertRequest } from '../../../api/types';
+import { ApiError } from '../../../api';
+import type { ConvertRequest } from '../../../api';
 import { isApiUnreachable, resolveConversionOutcome } from '../lib/conversionOutcome';
 
 const request: ConvertRequest = { from: 'USD', to: 'UAH', amount: 100 };

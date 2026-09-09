@@ -1,6 +1,10 @@
 import type { QueryStatus } from '@tanstack/react-query';
-import type { ApiError } from '../../../api/http/ApiError';
-import type { ConvertRequest, ConvertResponse, RatesSnapshotResponse } from '../../../api/types';
+import type {
+  ApiError,
+  ConvertRequest,
+  ConvertResponse,
+  RatesSnapshotResponse,
+} from '../../../api';
 import { convertOffline } from './convertOffline';
 import { OFFLINE_ESTIMATE } from './provenance';
 

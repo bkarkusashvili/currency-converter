@@ -1,5 +1,5 @@
-import type { ApiError } from '../../../api/http/ApiError';
-import { extractFieldErrors, type FieldError } from '../../../api/http/fieldErrors';
+import { extractFieldErrors } from '../../../api';
+import type { ApiError, FieldError } from '../../../api';
 
 const FORM_FIELDS = ['amount', 'from', 'to'] as const;
 

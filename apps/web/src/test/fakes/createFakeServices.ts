@@ -1,5 +1,4 @@
-import { ApiError } from '../../api/http/ApiError';
-import type { Repositories } from '../../api/repositories/repositories';
+import { ApiError } from '../../api';
 import type {
   ConvertRequest,
   ConvertResponse,
@@ -7,12 +6,13 @@ import type {
   HealthResponse,
   HistoryResponse,
   RatesSnapshotResponse,
-} from '../../api/types';
+  Services,
+} from '../../api';
 
-/** Either the value the repository answers with, or the error it rejects with. */
+/** Either the value the service answers with, or the error it rejects with. */
 export type Answer<T> = T | ApiError;
 
-export interface FakeRepositoriesOptions {
+export interface FakeServicesOptions {
   convert?: Answer<ConvertResponse>;
   currencies?: Answer<CurrenciesResponse>;
   rates?: Answer<RatesSnapshotResponse>;
@@ -20,8 +20,8 @@ export interface FakeRepositoriesOptions {
   health?: Answer<HealthResponse>;
 }
 
-export interface FakeRepositories {
-  repositories: Repositories;
+export interface FakeServices {
+  services: Services;
   convertCalls: ConvertRequest[];
   historyLimits: number[];
 }
@@ -103,14 +103,14 @@ const EMPTY_SNAPSHOT: RatesSnapshotResponse = {
 };
 
 /**
- * In-memory stand-in for the repository layer. Tests inject it through
- * RepositoriesProvider instead of mocking the HTTP modules.
+ * In-memory stand-in for the service layer. Tests inject it through
+ * ServicesProvider instead of mocking the HTTP modules.
  */
-export function createFakeRepositories(options: FakeRepositoriesOptions = {}): FakeRepositories {
+export function createFakeServices(options: FakeServicesOptions = {}): FakeServices {
   const convertCalls: ConvertRequest[] = [];
   const historyLimits: number[] = [];
 
-  const repositories: Repositories = {
+  const services: Services = {
     conversion: {
       convert(request) {
         convertCalls.push(request);
@@ -134,7 +134,7 @@ export function createFakeRepositories(options: FakeRepositoriesOptions = {}): F
     },
   };
 
-  return { repositories, convertCalls, historyLimits };
+  return { services, convertCalls, historyLimits };
 }
 
 function answer<T>(value: Answer<T>): Promise<T> {

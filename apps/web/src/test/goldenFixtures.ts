@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { ConversionStrategy, ExchangeRate, RatesSnapshotResponse } from '../api/types';
+import type { ConversionStrategy, ExchangeRate, RatesSnapshotResponse } from '../api';
 
 /**
  * The rates, and the conversions of them, that the API's e2e suite asserts —

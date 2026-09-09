@@ -1,4 +1,4 @@
-import type { BadgeTone } from '../../../components/InfoBadge';
+import type { BadgeTone } from '../../../components';
 
 export const HUB_CURRENCY = 'UAH';
 

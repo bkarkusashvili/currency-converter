@@ -1,4 +1,4 @@
-import type { ResponseWarningCode } from '../api/types';
+import type { ResponseWarningCode } from '../api';
 
 /**
  * The warning codes §3 defines, each with the sentence this client shows for

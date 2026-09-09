@@ -2,14 +2,13 @@ import type { QueryClient } from '@tanstack/react-query';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '../../../api/http/ApiError';
-import { queryKeys } from '../../../api/queryKeys';
-import type { ConvertResponse, RatesSnapshotResponse } from '../../../api/types';
+import { ApiError, queryKeys } from '../../../api';
+import type { ConvertResponse, RatesSnapshotResponse } from '../../../api';
 import {
-  createFakeRepositories,
+  createFakeServices,
   FAKE_RESPONSES,
-  type FakeRepositoriesOptions,
-} from '../../../test/fakes/createFakeRepositories';
+  type FakeServicesOptions,
+} from '../../../test/fakes/createFakeServices';
 import { createTestQueryClient, renderWithProviders } from '../../../test/renderWithProviders';
 import { ConverterPage } from '../components/ConverterPage';
 
@@ -43,10 +42,10 @@ function unreachable(): ApiError {
   return ApiError.network('https://api.test/api/v1/convert', new TypeError('Failed to fetch'));
 }
 
-function renderPage(options: FakeRepositoriesOptions) {
-  const fake = createFakeRepositories(options);
+function renderPage(options: FakeServicesOptions) {
+  const fake = createFakeServices(options);
   const queryClient = createTestQueryClient();
-  renderWithProviders(<ConverterPage />, { repositories: fake.repositories, queryClient });
+  renderWithProviders(<ConverterPage />, { services: fake.services, queryClient });
   return { ...fake, queryClient };
 }
 
@@ -196,14 +195,14 @@ describe('converting from a browser that reports itself offline', () => {
     const card = await screen.findByRole('region', { name: 'Result' });
     expect(within(card).getByText('offline estimate')).toBeInTheDocument();
     expect(card).toHaveTextContent('4,435.00 UAH');
-    // A paused mutation never reaches the repository; this one was rejected by it.
+    // A paused mutation never reaches the service; this one was rejected by it.
     expect(page.convertCalls).toHaveLength(1);
   });
 
   it('keeps refreshing the snapshot the estimate is priced from', async () => {
     // The fake is reachable even when the browser says it is not, so a query
     // that ran answers with the newer rate and one that was paused does not.
-    const options: FakeRepositoriesOptions = { convert: unreachable(), rates: snapshot };
+    const options: FakeServicesOptions = { convert: unreachable(), rates: snapshot };
     const page = renderPage(options);
     await loaded(page);
 
@@ -219,7 +218,7 @@ describe('converting from a browser that reports itself offline', () => {
   });
 
   it('keeps loading the currency list the form offers', async () => {
-    const options: FakeRepositoriesOptions = { convert: unreachable(), rates: snapshot };
+    const options: FakeServicesOptions = { convert: unreachable(), rates: snapshot };
     const page = renderPage(options);
     await loaded(page);
 

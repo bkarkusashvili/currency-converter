@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { InfoBadge } from '../../../components/InfoBadge';
-import { Timestamp } from '../../../components/Timestamp';
-import { WarningNotes } from '../../../components/WarningNotes';
-import { useFormatters } from '../../../lib/useFormatters';
+import { InfoBadge, Timestamp, WarningNotes } from '../../../components';
+import { useFormatters } from '../../../lib';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
 import { inverseRate } from '../lib/money';
 import { HUB_CURRENCY, OFFLINE_ESTIMATE, sourceCopy, strategyCopy } from '../lib/provenance';

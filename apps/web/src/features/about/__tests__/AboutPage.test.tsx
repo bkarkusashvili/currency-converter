@@ -1,12 +1,12 @@
 import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ApiError } from '../../../api/http/ApiError';
-import type { HealthResponse } from '../../../api/types';
+import { ApiError } from '../../../api';
+import type { HealthResponse } from '../../../api';
 import {
-  createFakeRepositories,
+  createFakeServices,
   FAKE_RESPONSES,
-  type FakeRepositoriesOptions,
-} from '../../../test/fakes/createFakeRepositories';
+  type FakeServicesOptions,
+} from '../../../test/fakes/createFakeServices';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { AboutPage } from '../components/AboutPage';
 
@@ -21,9 +21,9 @@ const healthy: HealthResponse = {
   details: { ...FAKE_RESPONSES.health.details, monobank: { status: 'up' } },
 };
 
-function renderAbout(options: FakeRepositoriesOptions = {}) {
-  const fake = createFakeRepositories({ health: healthy, ...options });
-  renderWithProviders(<AboutPage />, { repositories: fake.repositories });
+function renderAbout(options: FakeServicesOptions = {}) {
+  const fake = createFakeServices({ health: healthy, ...options });
+  renderWithProviders(<AboutPage />, { services: fake.services });
   return fake;
 }
 

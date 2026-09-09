@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { RatesSnapshotResponse } from '../../../api/types';
+import type { RatesSnapshotResponse } from '../../../api';
 import { goldenConversions, goldenSnapshot } from '../../../test/goldenFixtures';
 import { convertOffline } from '../lib/convertOffline';
 

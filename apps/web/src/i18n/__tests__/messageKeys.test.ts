@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { WARNING_CODES } from '../../api/types';
+import { WARNING_CODES } from '../../api';
 import en from '../en.json';
 import { API_ERROR_CODES, errorMessageKey } from '../errorMessageKey';
 import { warningMessageKey } from '../warningMessageKey';

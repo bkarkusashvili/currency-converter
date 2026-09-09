@@ -1,13 +1,13 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { ApiError } from '../http/ApiError';
 import { queryKeys } from '../queryKeys';
-import { useRepositories } from '../repositories/useRepositories';
+import { useServices } from '../services/useServices';
 import type { CurrenciesResponse } from '../types';
 
 const STALE_TIME_MS = 5 * 60 * 1000;
 
 export function useCurrencies(): UseQueryResult<CurrenciesResponse, ApiError> {
-  const { currencies } = useRepositories();
+  const { currencies } = useServices();
 
   return useQuery<CurrenciesResponse, ApiError>({
     queryKey: queryKeys.currencies,

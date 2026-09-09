@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import type { TimestampKind } from '../lib/createFormatters';
-import { useFormatters } from '../lib/useFormatters';
+import { useFormatters } from '../lib';
+import type { TimestampKind } from '../lib';
 
 interface TimestampProps {
   value: string;
