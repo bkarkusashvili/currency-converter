@@ -314,13 +314,94 @@
         }
       ]
     },
-    "howItWasBuilt": {
-      "title": "How this was built",
+    "process": {
+      "title": "Process",
+      "navTitle": "Process",
       "paragraphs": [
-        "Specification first. docs/architecture.md was written before the code and describes the module layout, the API contract, the caching and resilience model, the error envelope and the testing strategy. Every pull request was reviewed against it, and behaviour that changed changed the document in the same pull request.",
-        "Then one pull request at a time, every change landing in main that way. Each pull request drew review comments anchored to the lines they concern and a round of commits answering them, and was merged by its author with CI green: lint, formatting, typecheck, build, unit tests against coverage thresholds, the API end-to-end suite, both Docker images, and a job that starts the whole Compose stack and probes it. GitHub does not allow approving your own pull request, so what the record shows is those comments and the commits that answered them rather than an approval decision; nothing was pushed to main directly.",
-        "The implementation was AI-assisted, under human direction and review: the architecture, the scope of each pull request and the decisions listed above were set and reviewed by a person, and a coding assistant wrote much of the code against them. The commits carry a Co-Authored-By trailer saying so, so the record is in the git history rather than in a claim on this page."
-      ]
+        "Specification first. docs/architecture.md was written before any implementation code and describes the module layout, the API contract, the caching and resilience model, the error envelope and the testing strategy. Every pull request was reviewed against it, and behaviour that changed changed the document in the same pull request.",
+        "Then one pull request at a time, every change landing in main that way. Each drew review comments anchored to the lines they concern and a round of commits answering them, and was merged by its author with CI green: lint, formatting, typecheck, build, unit tests against coverage thresholds, the API end-to-end suite, both Docker images, and a job that starts the whole Compose stack and probes it. GitHub does not allow approving your own pull request, so what the record shows is those comments and the commits that answered them rather than an approval decision; nothing was pushed to main directly.",
+        "The implementation was AI-assisted, under human direction and review: the architecture, the scope of each pull request and the decisions listed above were set and reviewed by a person, and coding agents wrote the code against them. The commits carry a Co-Authored-By trailer saying so, so the record is in the git history rather than in a claim on this page."
+      ],
+      "stages": {
+        "title": "In stages",
+        "items": [
+          "The architecture contract, written and committed before any implementation code.",
+          "The API and this client built in parallel against that contract, rather than against each other.",
+          "Stacked feature pull requests: rates with its cache and circuit breaker, then conversion, then history.",
+          "The offline fallback, then a UX pass over the form it answers on.",
+          "Polish, documentation and a consolidation pass that put both implementations of the pricing rules on one shared fixture set, then naming conventions and lint-enforced module boundaries.",
+          "The rate archive as a fourth lookup tier, and a design pass drawn on a Claude Design canvas and implemented as three redesign pull requests.",
+          "Read-only audits over the merged result, each opening a pull request only where it found something."
+        ]
+      },
+      "numbers": {
+        "title": "By the numbers",
+        "caption": "As of 9 September 2026. The rest of this page is written without counts so it stays true as they move; these carry a date instead.",
+        "metricHeading": "What",
+        "valueHeading": "Count",
+        "rows": [
+          {
+            "metric": "Pull requests merged into main",
+            "value": "20"
+          },
+          {
+            "metric": "Review posts on them",
+            "value": "34"
+          },
+          {
+            "metric": "Line-anchored review comments",
+            "value": "59"
+          },
+          {
+            "metric": "Pull requests that went back for a fix round",
+            "value": "13"
+          },
+          {
+            "metric": "Audits over merged code",
+            "value": "5"
+          },
+          {
+            "metric": "API tests — unit · end-to-end · integration",
+            "value": "767 · 163 · 25"
+          },
+          {
+            "metric": "Client tests",
+            "value": "294"
+          },
+          {
+            "metric": "Deploys — API · client",
+            "value": "12 · 7"
+          }
+        ]
+      },
+      "examples": {
+        "title": "Five things the review caught",
+        "intro": "Each was reproduced before it was reported, and each is a line-anchored comment on the pull request that introduced the code.",
+        "points": [
+          {
+            "term": "Redis rejected its own first command",
+            "description": "A lazy connection with the offline queue disabled and no eager connect meant the first command after boot rejected against a healthy Redis. Every cold start would have missed the cache and failed its first save. Fixed by connecting on module init and keeping the offline queue disabled for the genuinely-down case."
+          },
+          {
+            "term": "The offline cache erased itself when it was needed",
+            "description": "The persister kept only queries whose latest fetch had succeeded, and it rewrites the whole store on every cache event — so the first unreachable refetch emptied the snapshot the fallback exists to read. Measured at 15 KB to empty. Fixed by keeping any query that still holds data."
+          },
+          {
+            "term": "The two implementations of the pricing rules had drifted",
+            "description": "The API and the browser each carried their own copy of the rates table, and the copies disagreed on two of five pairs — so both suites were green about different numbers. Both now read one shared snapshot and assert the same golden conversions, which a script re-prices independently."
+          },
+          {
+            "term": "A dangling decimal separator and Enter failed validation",
+            "description": "The amount field trimmed a trailing separator on blur, and Enter submits without blurring — the primary path on a phone. The same thread turned up the worse case behind it: under a locale that groups with a full stop, a thousands separator parsed as a decimal one, a silent thousandfold error. Both closed by canonicalising the value on submit."
+          },
+          {
+            "term": "A test that could not fail",
+            "description": "The Mongo integration suite seeded one row and asserted one row back, so it passed with and without the limit clamp it claimed to cover — verified by deleting the clamp and watching it stay green. Reseeded past the maximum, it fails without it."
+          }
+        ]
+      },
+      "linkLabel": "Read the full process record",
+      "linkIntro": "The whole record — the stages, the loop, the audits, the roles, and the honest limits of a process reviewed by agents rather than by a second person — is in the repository."
     }
   },
   "health": {

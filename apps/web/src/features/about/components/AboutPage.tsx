@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { README_URL, TRACEABILITY_URL } from '../../../lib';
+import { PROCESS_URL, README_URL, TRACEABILITY_URL } from '../../../lib';
 import { useActiveSection } from '../hooks/useActiveSection';
 import { BulletList } from './BulletList';
 import { CommandBlock } from './CommandBlock';
+import { CountTable } from './CountTable';
 import { ContentSection } from './ContentSection';
 import { ExternalLink } from './ExternalLink';
 import { LiveCard } from './LiveCard';
@@ -22,10 +23,18 @@ const SECTIONS = [
   { id: 'two-layer-fallback', titleKey: 'about.fallback.title' },
   { id: 'why-these-decisions', titleKey: 'about.whyTheseDecisions.title' },
   { id: 'how-to-run-it', titleKey: 'about.howToRun.title' },
-  { id: 'how-this-was-built', titleKey: 'about.howItWasBuilt.title' },
+  { id: 'process', titleKey: 'about.process.navTitle' },
 ] as const satisfies readonly IndexEntry[];
 
 const SECTION_IDS = SECTIONS.map((section) => section.id);
+
+/**
+ * The design fixes two type steps and draws no third, so the one heading level
+ * below a section is body copy set bold rather than a size invented for it.
+ */
+function Subheading({ children }: { children: string }) {
+  return <h3 className="mt-2 font-semibold">{children}</h3>;
+}
 
 export function AboutPage() {
   const { t } = useTranslation();
@@ -39,7 +48,10 @@ export function AboutPage() {
   const tracePoints = t('about.traceability.points', { returnObjects: true });
   const runBlocks = t('about.howToRun.blocks', { returnObjects: true });
   const runNotes = t('about.howToRun.notes', { returnObjects: true });
-  const builtParagraphs = t('about.howItWasBuilt.paragraphs', { returnObjects: true });
+  const processParagraphs = t('about.process.paragraphs', { returnObjects: true });
+  const processStages = t('about.process.stages.items', { returnObjects: true });
+  const processNumbers = t('about.process.numbers.rows', { returnObjects: true });
+  const processExamples = t('about.process.examples.points', { returnObjects: true });
 
   return (
     <div className="shell lg:grid lg:grid-cols-[12.5rem_minmax(0,1fr)] lg:items-start lg:gap-16">
@@ -97,8 +109,28 @@ export function AboutPage() {
           </div>
         </ContentSection>
 
-        <ContentSection id="how-this-was-built" title={t('about.howItWasBuilt.title')}>
-          <ParagraphList paragraphs={builtParagraphs} />
+        <ContentSection id="process" title={t('about.process.title')}>
+          <ParagraphList paragraphs={processParagraphs} />
+
+          <Subheading>{t('about.process.stages.title')}</Subheading>
+          <BulletList items={processStages} />
+
+          <Subheading>{t('about.process.numbers.title')}</Subheading>
+          <CountTable
+            caption={t('about.process.numbers.caption')}
+            metricHeading={t('about.process.numbers.metricHeading')}
+            valueHeading={t('about.process.numbers.valueHeading')}
+            rows={processNumbers}
+          />
+
+          <Subheading>{t('about.process.examples.title')}</Subheading>
+          <p className="text-muted text-sm text-pretty">{t('about.process.examples.intro')}</p>
+          <PointList points={processExamples} />
+
+          <p className="text-muted text-sm text-pretty">
+            {t('about.process.linkIntro')}{' '}
+            <ExternalLink href={PROCESS_URL} label={t('about.process.linkLabel')} />
+          </p>
         </ContentSection>
       </div>
     </div>

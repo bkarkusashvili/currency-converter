@@ -3,6 +3,7 @@ export type { AmountSeparators, TimestampKind } from './createFormatters';
 export {
   healthUrl,
   livenessUrl,
+  PROCESS_URL,
   README_URL,
   REPO_URL,
   swaggerUrl,

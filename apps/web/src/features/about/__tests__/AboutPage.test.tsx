@@ -120,7 +120,7 @@ describe('AboutPage', () => {
     expect(screen.getByRole('heading', { name: 'Two-layer fallback' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Why these decisions' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How to run it' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'How this was built' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Process' })).toBeInTheDocument();
   });
 
   // The page a reviewer is pointed at said modules were still to come long after
@@ -151,6 +151,42 @@ describe('AboutPage', () => {
 
     expect(screen.getByText(/AI-assisted, under human direction and review/i)).toBeInTheDocument();
     expect(screen.getByText(/Co-Authored-By trailer/i)).toBeInTheDocument();
+  });
+
+  it('describes the process in stages and links the full record', () => {
+    renderAbout();
+
+    expect(screen.getByRole('heading', { name: 'In stages' })).toBeInTheDocument();
+    expect(
+      screen.getByText(/architecture contract, written and committed before any implementation/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Read the full process record/i })).toHaveAttribute(
+      'href',
+      'https://github.com/bkarkusashvili/currency-converter/blob/main/docs/process.md',
+    );
+  });
+
+  // Counts rot. The page keeps them in one table with a date on it, and nowhere
+  // else, so a stale number is visible as a stale date rather than as prose.
+  it('carries its counts in one dated table', () => {
+    renderAbout();
+
+    const table = screen.getByRole('table');
+    expect(table).toHaveAccessibleName(expect.stringMatching(/As of 9 September 2026/));
+    expect(
+      screen.getByRole('rowheader', { name: 'Line-anchored review comments' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Count' })).toBeInTheDocument();
+  });
+
+  it('names what the review loop caught, not only that there was one', () => {
+    renderAbout();
+
+    expect(
+      screen.getByRole('heading', { name: 'Five things the review caught' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Redis rejected its own first command')).toBeInTheDocument();
+    expect(screen.getByText('A test that could not fail')).toBeInTheDocument();
   });
 
   it('names the decisions a reviewer is most likely to ask about', () => {
