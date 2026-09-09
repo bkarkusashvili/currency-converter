@@ -40,11 +40,12 @@ export class ConversionController {
   async convert(
     @Body() request: ConvertRequestDto,
   ): Promise<ConvertResponseDto> {
-    const { result, cacheDegraded, recorded } =
+    const { result, cacheDegraded, archiveDegraded, recorded } =
       await this.conversion.convert(request);
     const warnings = collectWarnings({
       CACHE_UNAVAILABLE: cacheDegraded,
       HISTORY_NOT_RECORDED: !recorded,
+      ARCHIVE_NOT_RECORDED: archiveDegraded,
     });
 
     // Spread rather than assigned undefined: an answer nothing degraded is

@@ -69,6 +69,16 @@ export const envSchema = z
     CIRCUIT_BREAKER_RESET_TIMEOUT_MS: positiveInt.default(30000),
     RATES_CACHE_TTL_SECONDS: positiveInt.default(300),
     RATES_STALE_TTL_SECONDS: positiveInt.default(86400),
+    // How long an archived daily snapshot is kept, enforced by a TTL index on
+    // `fetchedAt`. It is the window /rates/history can be asked about as well
+    // as the retention: a day past it is a day the series has no point for.
+    RATES_ARCHIVE_TTL_DAYS: positiveInt.default(90),
+    // Deadline for a single archive upsert or read. Same reasoning as
+    // HISTORY_OPERATION_TIMEOUT_MS and deliberately its own variable: the
+    // archive sits on the rates path, which every route reads, while the
+    // history sits on /convert alone, so the two budgets are not the same
+    // decision even when they hold the same number.
+    RATES_ARCHIVE_OPERATION_TIMEOUT_MS: positiveInt.default(1000),
     THROTTLE_TTL_SECONDS: positiveInt.default(60),
     THROTTLE_LIMIT: positiveInt.default(60),
     // Null rather than undefined so that a validated read stays non-nullable in

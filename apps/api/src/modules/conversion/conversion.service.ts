@@ -44,7 +44,8 @@ export class ConversionService {
     to,
     amount,
   }: ConversionRequest): Promise<ConversionOutcome> {
-    const { snapshot, source, cacheDegraded } = await this.rates.getSnapshot();
+    const { snapshot, source, cacheDegraded, archiveDegraded } =
+      await this.rates.getSnapshot();
     const { strategy, rate } = this.resolver.resolve(from, to, snapshot.rates);
     const converted = roundHalfUp(
       new Money(amount).times(rate),
@@ -79,6 +80,6 @@ export class ConversionService {
     // for itself: /history will not have this conversion in it.
     const recorded = await this.history.record(result);
 
-    return { result, cacheDegraded, recorded };
+    return { result, cacheDegraded, archiveDegraded, recorded };
   }
 }

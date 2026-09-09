@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -16,13 +17,19 @@ import {
 import { ApiKeyGuard } from '../../common/guards';
 import { collectWarnings } from '../../common/warnings';
 import { ADMIN_SECURITY_SCHEME, ApiErrorResponses } from '../../common/swagger';
+import { RateHistoryService } from './application/rate-history.service';
 import { RatesService } from './application/rates.service';
+import { RatesHistoryQueryDto } from './dto/rates-history-query.dto';
+import { RatesHistoryResponseDto } from './dto/rates-history-response.dto';
 import { RatesSnapshotResponseDto } from './dto/rates-snapshot-response.dto';
 
 @ApiTags('rates')
 @Controller('rates')
 export class RatesController {
-  constructor(private readonly rates: RatesService) {}
+  constructor(
+    private readonly rates: RatesService,
+    private readonly history: RateHistoryService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -41,8 +48,12 @@ export class RatesController {
     HttpStatus.INTERNAL_SERVER_ERROR,
   )
   async getRates(): Promise<RatesSnapshotResponseDto> {
-    const { snapshot, source, cacheDegraded } = await this.rates.getSnapshot();
-    const warnings = collectWarnings({ CACHE_UNAVAILABLE: cacheDegraded });
+    const { snapshot, source, cacheDegraded, archiveDegraded } =
+      await this.rates.getSnapshot();
+    const warnings = collectWarnings({
+      CACHE_UNAVAILABLE: cacheDegraded,
+      ARCHIVE_NOT_RECORDED: archiveDegraded,
+    });
     const answer = {
       source,
       fetchedAt: snapshot.fetchedAt,
@@ -52,6 +63,37 @@ export class RatesController {
     // Spread rather than assigned undefined: a healthy answer is exactly the
     // one this route has always given, down to the absent key.
     return warnings === undefined ? answer : { ...answer, warnings };
+  }
+
+  // A literal segment, not a parameter, so nothing above can shadow it and it
+  // shadows nothing: `/rates` and `/rates/history` are two paths.
+  @Get('history')
+  @ApiOperation({
+    summary: 'Return the archived daily rates for one published pair',
+    description:
+      'One point per archived UTC day inside the window that published the ' +
+      'pair, oldest first. The archive holds the last snapshot of each day, ' +
+      'so a point is that day at its close rather than an average of it, and ' +
+      "the orientation is the upstream's own: `base`/`quote` is asked for " +
+      'exactly as published, never inverted or crossed.',
+  })
+  @ApiOkResponse({
+    description:
+      'The archived series, oldest first. Shorter than `days` wherever the ' +
+      'archive has a gap.',
+    type: RatesHistoryResponseDto,
+  })
+  @ApiErrorResponses(
+    HttpStatus.BAD_REQUEST,
+    HttpStatus.UNPROCESSABLE_ENTITY,
+    HttpStatus.TOO_MANY_REQUESTS,
+    HttpStatus.SERVICE_UNAVAILABLE,
+    HttpStatus.INTERNAL_SERVER_ERROR,
+  )
+  getHistory(
+    @Query() query: RatesHistoryQueryDto,
+  ): Promise<RatesHistoryResponseDto> {
+    return this.history.series(query);
   }
 
   @Delete('cache')

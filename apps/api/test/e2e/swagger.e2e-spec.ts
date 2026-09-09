@@ -17,6 +17,7 @@ const EXPECTED_PATHS: ReadonlyArray<readonly [string, string]> = [
   ['/health', 'get'],
   ['/health/live', 'get'],
   ['/api/v1/rates', 'get'],
+  ['/api/v1/rates/history', 'get'],
   ['/api/v1/convert', 'post'],
   ['/api/v1/rates/cache', 'delete'],
   ['/api/v1/currencies', 'get'],
@@ -35,6 +36,8 @@ const EXPECTED_SCHEMAS: readonly string[] = [
   'ResponseWarningDto',
   'ConversionRecordDto',
   'HistoryResponseDto',
+  'RateHistoryPointDto',
+  'RatesHistoryResponseDto',
 ];
 
 describe('OpenAPI document (e2e)', () => {
@@ -263,6 +266,73 @@ describe('OpenAPI document (e2e)', () => {
     expect(Object.keys(record.properties).sort()).toStrictEqual(
       [...record.required].sort(),
     );
+  });
+
+  it('declares every failure the rate history can answer with', () => {
+    expect(
+      Object.keys(
+        document.paths['/api/v1/rates/history']?.get?.responses ?? {},
+      ).sort(),
+    ).toStrictEqual(['200', '400', '422', '429', '500', '503']);
+  });
+
+  // The bounds and the pattern are the contract a client writes its chart
+  // against, and they only exist in the document if the DTO carries them.
+  it('documents the rate history query with its bounds and defaults', () => {
+    const parameters = document.paths['/api/v1/rates/history']?.get?.parameters;
+    const byName = new Map(
+      (parameters ?? []).map((parameter) => [
+        (parameter as { name: string }).name,
+        parameter,
+      ]),
+    );
+
+    expect(byName.get('base')).toMatchObject({
+      in: 'query',
+      required: true,
+      schema: { minLength: 3, maxLength: 3, pattern: '^[A-Za-z]{3}$' },
+    });
+    expect(byName.get('quote')).toMatchObject({ in: 'query', required: true });
+    expect(byName.get('days')).toMatchObject({
+      in: 'query',
+      required: false,
+      schema: { minimum: 1, maximum: 90, default: 7 },
+    });
+  });
+
+  // A point carries either a spread or a mid rate, so all three numbers are
+  // optional and the day is the only field that is always there.
+  it('describes an archived point as a day and whatever was published on it', () => {
+    const point = document.components?.schemas?.RateHistoryPointDto as {
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+
+    expect(Object.keys(point.properties).sort()).toStrictEqual([
+      'buy',
+      'cross',
+      'date',
+      'sell',
+    ]);
+    expect(point.required).toStrictEqual(['date']);
+  });
+
+  it('publishes the archived series as the four fields §3 lists', () => {
+    const series = document.components?.schemas?.RatesHistoryResponseDto as {
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+
+    expect([...series.required].sort()).toStrictEqual([
+      'base',
+      'days',
+      'points',
+      'quote',
+    ]);
+    expect(series.properties.points).toMatchObject({
+      type: 'array',
+      items: { $ref: '#/components/schemas/RateHistoryPointDto' },
+    });
   });
 
   it('puts the cache invalidation behind the admin key scheme', () => {
