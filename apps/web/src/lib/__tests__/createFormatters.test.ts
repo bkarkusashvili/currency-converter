@@ -49,6 +49,16 @@ describe('timestamp formatting', () => {
     expect(stamp?.title).toContain('2026');
   });
 
+  it('reads the clock as 24 hours, which is what the boards show', () => {
+    const evening = new Date(now);
+    evening.setHours(21, 45, 0, 0);
+
+    expect(formatters.timestamp(evening.toISOString(), now)?.text).toBe('21:45');
+    // Even in a locale that would have picked one, there is no am/pm to wrap.
+    expect(formatters.timestamp('2024-03-05T12:00:00.000Z', now)?.text).not.toMatch(/[AP]M/i);
+    expect(formatters.timestamp('2024-03-05T12:00:00.000Z', now)?.title).not.toMatch(/[AP]M/i);
+  });
+
   it('says how many days ago a recent value is', () => {
     expect(formatters.timestamp(daysBefore(1), now)?.text).toBe('yesterday');
     expect(formatters.timestamp(daysBefore(2), now)?.text).toBe('2 days ago');

@@ -40,12 +40,24 @@ export function ProvenanceFooter({ outcome }: { outcome: ConversionOutcome }) {
               source.tone === 'warn' ? 'text-warn' : '',
             ].join(' ')}
           >
+            {/* Board 1i shortens this line to "Fetched 14:32" on a phone.
+                Exactly one of the two is `display: none` at any width, so one
+                of them is in the accessibility tree and the other is not. An
+                archived answer has no clock time to shorten, so it says the
+                one date at both widths. */}
             {isArchive ? (
               <ArchiveDate value={outcome.ratesTimestamp} />
             ) : (
               <>
-                {t('converter.result.ratesFetched')}{' '}
-                <Timestamp value={outcome.ratesTimestamp} withPreposition />
+                <Timestamp
+                  className="sm:hidden"
+                  value={outcome.ratesTimestamp}
+                  sentenceKey="converter.result.ratesFetchedShort"
+                />
+                <span className="hidden sm:inline">
+                  {t('converter.result.ratesFetched')}{' '}
+                  <Timestamp value={outcome.ratesTimestamp} withPreposition />
+                </span>
               </>
             )}
           </p>

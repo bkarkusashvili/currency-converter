@@ -313,7 +313,9 @@ Every non-2xx response uses one envelope:
 that is at most 128 characters of `[A-Za-z0-9._-]`, and a generated UUID
 otherwise. It is echoed back on the response and tags every log line for that
 request, so a report can be traced to its logs. It is assigned before the body
-parser, so even a request whose body cannot be read is traceable.
+parser, so even a request whose body cannot be read is traceable. CORS exposes
+`x-request-id` to browser clients, so a page on an allowed origin can read it
+off the response too.
 
 A 4xx that has no documented code of its own is named after the failure, so a
 406 answers `NOT_ACCEPTABLE`; a 5xx always answers `INTERNAL_ERROR` with a

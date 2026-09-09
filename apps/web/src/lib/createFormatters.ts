@@ -70,9 +70,20 @@ export function createFormatters(locale: string): Formatters {
     minimumFractionDigits: MIN_RATE_DECIMALS,
     maximumFractionDigits: RATE_DECIMALS,
   });
-  const timeOnly = new Intl.DateTimeFormat(locale, { timeStyle: 'short' });
-  const dateAndTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
-  const full = new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'long' });
+  // The clock is 24-hour whatever the locale would have picked: it is what the
+  // design draws, and it is two characters narrower on a line that gets one
+  // line on a phone.
+  const timeOnly = new Intl.DateTimeFormat(locale, { timeStyle: 'short', hour12: false });
+  const dateAndTime = new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    hour12: false,
+  });
+  const full = new Intl.DateTimeFormat(locale, {
+    dateStyle: 'full',
+    timeStyle: 'long',
+    hour12: false,
+  });
   const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
   const utcDay: Record<ArchivedDayStyle, Intl.DateTimeFormat> = {
     day: new Intl.DateTimeFormat(locale, { day: 'numeric', timeZone: 'UTC' }),

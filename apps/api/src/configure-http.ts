@@ -40,7 +40,10 @@ export function configureHttp(
     }),
   );
 
-  app.enableCors({ origin: config.get('CORS_ORIGINS', { infer: true }) });
+  app.enableCors({
+    origin: config.get('CORS_ORIGINS', { infer: true }),
+    exposedHeaders: ['x-request-id'],
+  });
 
   // Health and the docs stay unversioned so probes and tooling keep working
   // across future API versions. The exclusions match a path exactly, so the

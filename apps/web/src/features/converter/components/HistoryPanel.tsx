@@ -3,7 +3,7 @@ import { useHistory } from '../../../api';
 import type { HistoryItem } from '../../../api';
 import { EmptyMark, InfoBadge, Skeleton, Timestamp, WarningIcon } from '../../../components';
 import { useApiErrorMessage, useFormatters } from '../../../lib';
-import { conversionKey } from '../lib/historyHighlight';
+import { conversionIdentity } from '../lib/conversionIdentity';
 import { ARCHIVE_SOURCE, sourceCopy, strategyCopy } from '../lib/provenance';
 import { ArchiveDate } from './ArchiveDate';
 
@@ -27,7 +27,7 @@ export function HistoryPanel({ highlight = null }: HistoryPanelProps) {
   const { data, isPending, error } = useHistory(HISTORY_LIMIT);
   // Only the first match: two identical conversions of one snapshot are two
   // rows, and the newer one is the one on screen.
-  const highlighted = data?.items.find((item) => conversionKey(item) === highlight);
+  const highlighted = data?.items.find((item) => conversionIdentity(item) === highlight);
 
   return (
     <section aria-labelledby="history-heading">

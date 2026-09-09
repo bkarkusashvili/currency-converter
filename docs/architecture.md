@@ -776,7 +776,9 @@ The `requestId` is assigned by a middleware registered first in `configureHttp`,
 before Nest's body parser, so a request that dies in the parser still gets an
 envelope, an `x-request-id` header and a log line. An inbound `x-request-id` is
 honoured when it is at most 128 characters of `[A-Za-z0-9._-]`, and replaced by
-a generated UUID otherwise.
+a generated UUID otherwise. `x-request-id` is also listed in CORS's
+`exposedHeaders`, so a browser script on an allowed origin can read it off a
+cross-origin response.
 
 ## 8. Configuration
 

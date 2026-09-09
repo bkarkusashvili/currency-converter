@@ -67,6 +67,9 @@ export function CurrencySelect({
             );
           })}
         </select>
+        {/* The trigger's own glyph. It is drawn for as long as the trigger is,
+            a conversion in flight included: taking it away and putting it back
+            is a change of shape the press should not cause. */}
         <svg
           viewBox="0 0 12 12"
           aria-hidden="true"

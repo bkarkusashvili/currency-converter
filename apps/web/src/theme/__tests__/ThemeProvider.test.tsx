@@ -86,7 +86,7 @@ describe('ThemeProvider', () => {
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
   });
 
-  it('takes the stored choice on the first render, not in an effect after it', () => {
+  it('has the stored choice on the document before the browser paints', () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
 
     render(
@@ -95,8 +95,9 @@ describe('ThemeProvider', () => {
       </ThemeProvider>,
     );
 
-    // Set during the state initialiser: by the time anything has rendered, the
-    // attribute the pre-paint script wrote is confirmed rather than re-applied.
+    // A layout effect, so by the time the browser could paint anything the
+    // attribute the pre-paint script wrote is confirmed rather than corrected
+    // a frame later.
     expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('light');
     expect(screen.getByText('current light')).toBeInTheDocument();
     expect(metaFor('dark').content).toBe(THEME_COLORS.light);
