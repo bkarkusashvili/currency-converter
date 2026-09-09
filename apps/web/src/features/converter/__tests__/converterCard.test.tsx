@@ -49,7 +49,7 @@ function block(name: string): HTMLElement {
   return found;
 }
 
-/** The two select triggers' own glyphs, which the busy state takes away. */
+/** The two select triggers' own glyphs, which nothing on the card takes away. */
 function chevrons(): Element[] {
   return [...card().querySelectorAll('.control-select + svg')];
 }
@@ -143,7 +143,7 @@ describe('the two-pane card', () => {
     ).toBeInTheDocument();
   });
 
-  it('stands the answer in while one is on its way, and hides the badges until it lands', async () => {
+  it('stands the answer in while the first one is on its way', async () => {
     const user = userEvent.setup();
     const fake = createFakeServices({ currencies: FAKE_RESPONSES.currencies });
     renderWithProviders(<ConverterPage />, {
@@ -182,7 +182,7 @@ describe('the two-pane card', () => {
     expect(footer).toHaveTextContent(/on .*\d{2}:\d{2}$/);
   });
 
-  it('steps the input pane back while the answer is on its way (board 1g)', async () => {
+  it('leaves the form exactly as it was while the answer is on its way', async () => {
     const user = userEvent.setup();
     const fake = createFakeServices({ currencies: FAKE_RESPONSES.currencies });
     renderWithProviders(<ConverterPage />, {
@@ -194,20 +194,102 @@ describe('the two-pane card', () => {
 
     await screen.findByLabelText('From');
     const amount = screen.getByLabelText('Amount');
+    const described = amount.getAttribute('aria-describedby');
     expect(amount).toHaveAccessibleDescription(/Numbers only/);
     expect(chevrons()).toHaveLength(2);
 
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
+    const button = screen.getByRole('button', { name: 'Converting…' });
     await waitFor(() => {
-      expect(amount.parentElement).toHaveClass('opacity-60');
+      expect(button).toHaveAttribute('aria-busy', 'true');
     });
-    // The hint stands down rather than being read out beside a field nobody
-    // is typing in, and a hint that is off the page describes nothing.
-    expect(screen.queryByText(/Numbers only/)).not.toBeInTheDocument();
-    expect(amount).not.toHaveAttribute('aria-describedby');
-    // Nothing is going to open, so neither trigger draws a chevron.
-    expect(chevrons()).toHaveLength(0);
+
+    // Only the button says a conversion is in flight. The field keeps its
+    // size, its hint keeps describing it, and both triggers keep the glyph
+    // that would otherwise be taken away and put back on every press.
+    expect(amount.parentElement).not.toHaveClass('opacity-60');
+    expect(screen.getByText(/Numbers only/)).toBeInTheDocument();
+    expect(amount).toHaveAccessibleDescription(/Numbers only/);
+    expect(amount.getAttribute('aria-describedby')).toBe(described);
+    expect(chevrons()).toHaveLength(2);
+  });
+
+  it('replaces the figures inside the pane already standing, without remounting it', async () => {
+    const user = userEvent.setup();
+    const fake = createFakeServices({ currencies: FAKE_RESPONSES.currencies });
+    const answers: ConvertResponse[] = [
+      conversion,
+      { ...conversion, amount: 200, result: 851.42, rate: 4.2571 },
+    ];
+    renderWithProviders(<ConverterPage />, {
+      services: {
+        ...fake.services,
+        conversion: { convert: () => Promise.resolve(answers.shift() ?? conversion) },
+      },
+    });
+
+    await screen.findByLabelText('From');
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    const pane = await screen.findByRole('group', { name: 'Result' });
+    await waitFor(() => {
+      expect(pane).toHaveTextContent('425.71 PLN');
+    });
+    const figure = within(pane).getByText(/425\.71/);
+    const footer = block('footer');
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    await waitFor(() => {
+      expect(pane).toHaveTextContent('851.42 PLN');
+    });
+    // The same three nodes with new text in them: no key change, so no
+    // remount, so no entrance for the answer to replay and nothing under the
+    // pane to be pushed down by one.
+    expect(screen.getByRole('group', { name: 'Result' })).toBe(pane);
+    expect(within(pane).getByText(/851\.42/)).toBe(figure);
+    expect(block('footer')).toBe(footer);
+  });
+
+  it('keeps the answer on screen while the next one is on its way', async () => {
+    const user = userEvent.setup();
+    const fake = createFakeServices({ currencies: FAKE_RESPONSES.currencies });
+    let settle: ((answer: ConvertResponse) => void) | undefined;
+    const answers = [
+      Promise.resolve(conversion),
+      new Promise<ConvertResponse>((resolve) => {
+        settle = resolve;
+      }),
+    ];
+    renderWithProviders(<ConverterPage />, {
+      services: {
+        ...fake.services,
+        conversion: { convert: () => answers.shift() ?? Promise.resolve(conversion) },
+      },
+    });
+
+    await screen.findByLabelText('From');
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+    expect(await screen.findByText('cross')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Convert' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Converting…' })).toBeDisabled();
+    });
+    // Nothing steps out of the card and back into it around a request: the
+    // figure, the badges and the provenance footer are all still there.
+    const pane = screen.getByRole('group', { name: 'Result' });
+    expect(pane).toHaveTextContent('425.71 PLN');
+    expect(pane.querySelectorAll('.skeleton')).toHaveLength(0);
+    expect(screen.getByText('cross')).toBeInTheDocument();
+    expect(within(block('footer')).getByText('Strategy')).toBeInTheDocument();
+
+    settle?.(conversion);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Convert' })).toBeEnabled();
+    });
   });
 
   it('lifts the badges off the sunken pane they sit on', async () => {
