@@ -6,7 +6,7 @@ import { useApiErrorMessage, useFormatters } from '../../../lib';
 import { useConverterForm } from '../hooks/useConverterForm';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
 import { currencyOptions } from '../lib/currencyOptions';
-import { conversionKey } from '../lib/historyHighlight';
+import { conversionIdentity } from '../lib/conversionIdentity';
 import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../lib/amount/formatAmountInput';
 import type { FormFieldErrors } from '../lib/serverFieldErrors';
 import { AmountField } from './AmountField';
@@ -133,7 +133,7 @@ export function ConverterCard({
         {/* Keyed by the answer, so a new one remounts the pane and plays its
             entrance again instead of swapping numbers in place. */}
         <ResultDisplay
-          key={outcome === undefined ? 'empty' : conversionKey(outcome)}
+          key={outcome === undefined ? 'empty' : conversionIdentity(outcome)}
           outcome={outcome}
           isSubmitting={isSubmitting}
         />
