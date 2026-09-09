@@ -621,12 +621,13 @@
 
   /* Fixed, not absolute: the converter card clips its own overflow, and a
      popover positioned inside it would be cut off at the pane's edge. The
-     coordinates are measured off the trigger. */
+     coordinates come from `placePopover`, and the 8px it keeps off every edge
+     is the same 8px this max-width leaves on a narrow window. */
   .combobox-popover {
     position: fixed;
     z-index: 30;
     width: 20rem;
-    max-width: calc(100vw - 2rem);
+    max-width: calc(100vw - 1rem);
     border-radius: 0.75rem;
     overflow: hidden;
   }
@@ -656,6 +657,14 @@
 
   .combobox-search input::placeholder {
     color: var(--ink-faint);
+  }
+
+  /* 15px is the size board 1c draws, and iOS zooms the page for anything under
+     16 — so a touch device gets the 16 and a mouse keeps the design. */
+  @media (pointer: coarse) {
+    .combobox-search input {
+      font-size: 1rem;
+    }
   }
 
   /* Five rows and their gaps, then the list scrolls (§3.7): 5 × 44 + 4 × 2,

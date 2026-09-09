@@ -1,10 +1,12 @@
-import type { CSSProperties, KeyboardEvent, Ref } from 'react';
+import type { CSSProperties, KeyboardEvent, Ref, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CurrencyListbox, type CurrencyListboxProps } from './CurrencyListbox';
 import { SearchIcon } from './SearchIcon';
 
 interface CurrencyPopoverProps extends CurrencyListboxProps {
   searchId: string;
+  /** Read back by the combobox to place the popover against the window it has to fit in. */
+  popoverRef: RefObject<HTMLDivElement | null>;
   /** Fixed coordinates measured off the trigger, so the card's `overflow:hidden` cannot clip it. */
   position: CSSProperties;
   total: number;
@@ -20,6 +22,7 @@ interface CurrencyPopoverProps extends CurrencyListboxProps {
  */
 export function CurrencyPopover({
   searchId,
+  popoverRef,
   position,
   total,
   inputRef,
@@ -32,7 +35,7 @@ export function CurrencyPopover({
   const filtered = query.trim() !== '';
 
   return (
-    <div className="overlay-surface combobox-popover" style={position}>
+    <div ref={popoverRef} className="overlay-surface combobox-popover" style={position}>
       <div className="combobox-search">
         <SearchIcon className="text-faint h-[0.9375rem] w-[0.9375rem]" />
         <input

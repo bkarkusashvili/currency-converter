@@ -13,6 +13,7 @@ import { WarningIcon } from '../../../components';
 import { useIsCompact } from '../../../lib';
 import { filterCurrencies } from '../lib/currencyFilter';
 import { optionName, type CurrencyOption } from '../lib/currencyOptions';
+import { placePopover } from '../lib/popoverPlacement';
 import { CurrencyPopover } from './CurrencyPopover';
 import { CurrencySheet } from './CurrencySheet';
 import { CurrencyTrigger } from './CurrencyTrigger';
@@ -34,9 +35,6 @@ interface CurrencyComboboxProps {
   error: string | null;
   onChange: (code: string) => void;
 }
-
-/** Below the trigger, with the 6px of air the boards leave between them. */
-const POPOVER_GAP = 6;
 
 /**
  * A currency picker with a search field: the popover of board `1c` on a wide
@@ -63,6 +61,7 @@ export function CurrencyCombobox({
   const { t } = useTranslation();
   const compact = useIsCompact();
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -158,18 +157,27 @@ export function CurrencyCombobox({
   }
 
   // Measured rather than positioned by the flow: the converter card clips its
-  // own overflow, so the popover is fixed to coordinates read off the trigger.
+  // own overflow, so the popover is fixed to coordinates read off the trigger
+  // and off its own size — which is what `placePopover` needs to know whether
+  // it still fits under the trigger. Re-measured while the list is open,
+  // because scrolling the page and filtering the list both move it.
   useLayoutEffect(() => {
     if (!open || compact) {
       return;
     }
 
     function place() {
-      const rect = triggerRef.current?.getBoundingClientRect();
-      if (rect === undefined) {
+      const trigger = triggerRef.current?.getBoundingClientRect();
+      const panel = popoverRef.current?.getBoundingClientRect();
+      if (trigger === undefined || panel === undefined) {
         return;
       }
-      setPosition({ top: rect.bottom + POPOVER_GAP, left: rect.left });
+
+      const { top, left } = placePopover(trigger, panel, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+      setPosition({ top, left });
     }
 
     place();
@@ -180,7 +188,7 @@ export function CurrencyCombobox({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [open, compact]);
+  }, [open, compact, matches.length]);
 
   useEffect(() => {
     if (open) {
@@ -289,6 +297,7 @@ export function CurrencyCombobox({
             <CurrencyPopover
               {...listProps}
               searchId={searchId}
+              popoverRef={popoverRef}
               position={position}
               total={currencies.length}
               inputRef={inputRef}

@@ -83,6 +83,20 @@ function activeOption(): HTMLElement | undefined {
 }
 
 describe('CurrencyCombobox', () => {
+  it('names the listbox it controls only while there is one to name', async () => {
+    const user = userEvent.setup();
+    const trigger = renderCombobox();
+
+    // `aria-controls` on a closed trigger points at an element that is not
+    // rendered, which is a dangling reference rather than a relationship.
+    expect(trigger).not.toHaveAttribute('aria-controls');
+
+    await user.click(trigger);
+
+    expect(trigger).toHaveAttribute('aria-controls', 'from-listbox');
+    expect(document.getElementById('from-listbox')).toBeInTheDocument();
+  });
+
   it('names the control with the pane eyebrow and the currency it holds', () => {
     const trigger = renderCombobox();
 

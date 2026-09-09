@@ -79,7 +79,9 @@ export function CurrencyTrigger({
         .filter(Boolean)
         .join(' ')}
       aria-expanded={open}
-      aria-controls={listboxId}
+      // Only while there is something to point at: a closed trigger naming a
+      // listbox that is not rendered is a reference that dangles.
+      aria-controls={open ? listboxId : undefined}
       aria-haspopup="listbox"
       aria-labelledby={`${labelId} ${codeId} ${nameId}`}
       aria-invalid={invalid}
