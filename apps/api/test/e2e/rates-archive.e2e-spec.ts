@@ -25,10 +25,15 @@ const DRIVER_FAILURE = new Error(
 
 // Dated against the clock rather than pinned: the window is "today and the days
 // before it", so a fixed date would fall outside every window a later run asks
-// for.
+// for. Read once for the whole suite: a day seeded at 23:59:59.999 and asserted
+// at 00:00:00.000 would otherwise be two different days.
+const NOW = Date.now();
+
 function daysAgo(days: number): string {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  return new Date(NOW - days * 86_400_000).toISOString().slice(0, 10);
 }
+
+const TODAY = daysAgo(0);
 
 function archived(date: string, buy: number): ArchivedSnapshot {
   return {
@@ -310,7 +315,7 @@ describe('rates archive (e2e)', () => {
           seed: [
             archived(daysAgo(3), 43.9),
             archived(daysAgo(1), 44.2),
-            archived(daysAgo(0), 44.35),
+            archived(TODAY, 44.35),
           ],
         }),
       );
@@ -328,7 +333,7 @@ describe('rates archive (e2e)', () => {
         points: [
           { date: daysAgo(3), buy: 43.9, sell: 44.4 },
           { date: daysAgo(1), buy: 44.2, sell: 44.7 },
-          { date: daysAgo(0), buy: 44.35, sell: 44.85 },
+          { date: TODAY, buy: 44.35, sell: 44.85 },
         ],
       });
     });
@@ -354,7 +359,7 @@ describe('rates archive (e2e)', () => {
 
       expect(pointsOf(response).map((point) => point.date)).toStrictEqual([
         daysAgo(1),
-        daysAgo(0),
+        TODAY,
       ]);
     });
 

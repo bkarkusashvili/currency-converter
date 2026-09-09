@@ -125,6 +125,18 @@ describe('RatesService', () => {
 
       expect(provider.fetchRates).not.toHaveBeenCalled();
     });
+
+    // The tiers below it are not reached either, and each is a store this would
+    // otherwise be paying for on the one path that should touch nothing: the
+    // fallback key, and the archive behind it.
+    it('reaches no tier below the fresh key', async () => {
+      repository.getFresh.mockResolvedValue(hit(FRESH));
+
+      await service.getSnapshot();
+
+      expect(repository.getStale).not.toHaveBeenCalled();
+      expect(archive.findLatest).not.toHaveBeenCalled();
+    });
   });
 
   describe('on a cache miss', () => {
