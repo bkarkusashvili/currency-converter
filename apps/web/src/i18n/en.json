@@ -145,7 +145,7 @@
         "Every module the architecture describes is in: rates behind a cache, a stale fallback and a daily snapshot archive, conversion through three strategies, currencies, history, the health endpoints and this client.",
         "The API and this client are two independent images, built by one CI workflow that runs lint, formatting, typecheck, tests with coverage thresholds, the build and the image build per app — plus a job that validates the shared conversion fixtures, boots the whole Docker Compose stack, probes it, and runs the integration suites against the Redis and MongoDB it started.",
         "Both run on Railway behind the platform edge, each on its own hostname; the panel above reads the live health endpoint every 30 seconds.",
-        "1249 tests pass: 767 API unit, 163 API end-to-end, 25 integration against a real Redis and MongoDB, and 294 in this client, with coverage gates of 85% on the API and 90% here. The counts in the Process section below carry the date they were taken."
+        "1252 tests pass: 767 API unit, 163 API end-to-end, 25 integration against a real Redis and MongoDB, and 297 in this client, with coverage gates of 85% on the API and 90% here. The counts in the Process section below carry the date they were taken."
       ]
     },
     "whatWasBuilt": {
@@ -344,17 +344,21 @@
       },
       "numbers": {
         "title": "By the numbers",
-        "caption": "As of 9 September 2026. The rest of this page is written without counts so it stays true as they move; these carry a date instead.",
+        "caption": "As of 9 September 2026, with the last two redesign pull requests and the one adding the process record still open — so every row moves when they land. The rest of this page is written without counts so it stays true as they do; these carry a date instead.",
         "metricHeading": "What",
         "valueHeading": "Count",
         "rows": [
           {
-            "metric": "Pull requests merged into main",
+            "metric": "Pull requests opened",
             "value": "20"
           },
           {
+            "metric": "…merged into main",
+            "value": "17"
+          },
+          {
             "metric": "Review posts on them",
-            "value": "34"
+            "value": "32"
           },
           {
             "metric": "Line-anchored review comments",
@@ -374,7 +378,7 @@
           },
           {
             "metric": "Client tests",
-            "value": "294"
+            "value": "297"
           },
           {
             "metric": "Deploys — API · client",
