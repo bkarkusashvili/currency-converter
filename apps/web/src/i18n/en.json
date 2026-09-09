@@ -355,7 +355,6 @@
       "monobank": "upstream · circuit breaker {{state}}",
       "monobankUnknown": "upstream",
       "breaker": "breaker {{state}}",
-      "liveness": "Liveness /health/live · {{status}}",
       "livenessPath": "Liveness /health/live",
       "recheck": "Recheck now",
       "rechecking": "Rechecking…"
@@ -400,10 +399,7 @@
       "cleared": "{{status}} cleared",
       "unauthorized": "{{status}} unauthorized",
       "failed": "{{status}} failed",
-      "empty": "Nothing has been sent from this page yet.",
-      "columnTime": "Time",
-      "columnRequest": "Request",
-      "columnOutcome": "Outcome"
+      "empty": "Nothing has been sent from this page yet."
     }
   },
   "health": {

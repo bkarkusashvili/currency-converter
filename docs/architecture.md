@@ -1189,9 +1189,10 @@ rather than constrain it.
   the life of the tab — never `localStorage`, never `sessionStorage`, never a
   query key — and the log of what was sent is component state that the page's
   own eyebrow calls not persisted. A `204` carries no body, so its request id is
-  read from the `x-request-id` response header; a browser can only see that
-  header when the API lists it in `Access-Control-Expose-Headers`, which it does
-  not, so across origins the success row shows the status without an id.
+  read from the `x-request-id` response header, which the API lists in
+  `Access-Control-Expose-Headers` (§7) — so the success row carries the same id
+  a failure would, and the client treats a missing one as absent rather than as
+  an error.
 - **The amount field** (`features/converter/lib/amount/`). `formatAmountInput(raw, caret)` is the one rule for what
   the field may hold: everything that is not a digit or the locale's decimal
   separator is dropped — letters, signs, a second separator, a third decimal —

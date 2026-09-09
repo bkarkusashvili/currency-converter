@@ -182,7 +182,7 @@ describe('requestCommand', () => {
     );
   });
 
-  it('has no request id to report when the browser was not allowed to read one', async () => {
+  it('reports no request id rather than inventing one when the header is absent', async () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
     await expect(requestCommand('/api/v1/rates/cache', { method: 'DELETE' })).resolves.toEqual({

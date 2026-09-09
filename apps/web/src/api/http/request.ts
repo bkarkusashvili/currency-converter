@@ -36,9 +36,10 @@ export interface CommandOptions {
 export interface CommandOutcome {
   status: number;
   /**
-   * Read from the `x-request-id` response header, which the browser can only
-   * see when the API lists it in `Access-Control-Expose-Headers` — so it is
-   * absent, rather than wrong, across origins that do not.
+   * Read from the `x-request-id` response header, which this API lists in
+   * `Access-Control-Expose-Headers` so a browser on an allowed origin can see
+   * it. Still optional: a proxy that drops the header, or an API deployed
+   * without that CORS setting, leaves the id absent rather than wrong.
    */
   requestId: string | undefined;
 }
