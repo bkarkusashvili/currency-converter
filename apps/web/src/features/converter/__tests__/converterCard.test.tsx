@@ -236,7 +236,9 @@ describe('the two-pane card', () => {
     await waitFor(() => {
       expect(pane).toHaveTextContent('425.71 PLN');
     });
-    const figure = within(pane).getByText(/425\.71/);
+    const figure = within(pane)
+      .getByText(/425\.71/)
+      .closest('p.figure');
     const footer = block('footer');
 
     await user.click(screen.getByRole('button', { name: 'Convert' }));
@@ -244,11 +246,16 @@ describe('the two-pane card', () => {
     await waitFor(() => {
       expect(pane).toHaveTextContent('851.42 PLN');
     });
-    // The same three nodes with new text in them: no key change, so no
-    // remount, so no entrance for the answer to replay and nothing under the
-    // pane to be pushed down by one.
+    // The same three nodes with new text in them: the pane, the row the figure
+    // is drawn into and the footer under it are none of them keyed, so nothing
+    // remounts and nothing is pushed down by one. The span *inside* the row is
+    // the one thing that does remount — `resultMotion.test.tsx`.
     expect(screen.getByRole('group', { name: 'Result' })).toBe(pane);
-    expect(within(pane).getByText(/851\.42/)).toBe(figure);
+    expect(
+      within(pane)
+        .getByText(/851\.42/)
+        .closest('p.figure'),
+    ).toBe(figure);
     expect(block('footer')).toBe(footer);
   });
 
