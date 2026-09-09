@@ -42,9 +42,19 @@
       "swap": "Swap the two currencies",
       "submit": "Convert",
       "submitting": "Converting…",
-      "currencyOption": "{{code}} — {{name}}",
       "currenciesUnavailable": "The currency list did not load ({{message}}). The two default currencies are still available.",
-      "currenciesFromCache": "The currency list did not load ({{message}}). The copy saved in this browser is being used."
+      "currenciesFromCache": "The currency list did not load ({{message}}). The copy saved in this browser is being used.",
+      "searchPlaceholder": "Search by code or name",
+      "clearSearch": "Clear the search",
+      "dismissKey": "ESC",
+      "keyboardHint": "↑↓ · ↵ select",
+      "currencyCount": "{{count}} currencies",
+      "currencyCountFiltered": "{{shown}} of {{total}} currencies",
+      "noMatch": "No currency matches ‘{{query}}’.",
+      "listLoading": "Loading list…",
+      "sheetFrom": "From currency",
+      "sheetTo": "To currency",
+      "sheetHint": "Codes and names"
     },
     "amountErrors": {
       "empty": "Enter an amount to convert.",
@@ -390,6 +400,75 @@
         "Then one pull request at a time, every change landing in main that way. Each pull request drew review comments anchored to the lines they concern and a round of commits answering them, and was merged by its author with CI green: lint, formatting, typecheck, build, unit tests against coverage thresholds, the API end-to-end suite, both Docker images, and a job that starts the whole Compose stack and probes it. GitHub does not allow approving your own pull request, so what the record shows is those comments and the commits that answered them rather than an approval decision; nothing was pushed to main directly.",
         "The implementation was AI-assisted, under human direction and review: the architecture, the scope of each pull request and the decisions listed above were set and reviewed by a person, and a coding assistant wrote much of the code against them. The commits carry a Co-Authored-By trailer saying so, so the record is in the git history rather than in a claim on this page."
       ]
+    }
+  },
+  "ops": {
+    "eyebrow": "Operations",
+    "heading": "What the API is running on, and the one thing you can change.",
+    "headingShort": "What the API is running on.",
+    "key": {
+      "label": "Admin API key",
+      "header": "x-api-key",
+      "hint": "Kept in this tab only; never written to storage. One shared key for every operator is a convenience for this demo, not how the credential would be issued in production.",
+      "forget": "Forget",
+      "placeholder": "Paste the key to enable actions",
+      "reveal": "Show the key",
+      "hide": "Hide the key"
+    },
+    "health": {
+      "title": "Health · GET /health",
+      "titleShort": "Health",
+      "meta": "{{status}} · {{time}}",
+      "redis": "rates cache · fresh key + fallback key",
+      "mongodb": "conversion history",
+      "monobank": "upstream · circuit breaker {{state}}",
+      "monobankUnknown": "upstream",
+      "breaker": "breaker {{state}}",
+      "livenessPath": "Liveness /health/live",
+      "recheck": "Recheck now",
+      "rechecking": "Rechecking…"
+    },
+    "snapshot": {
+      "title": "Rate snapshot · GET /api/v1/rates",
+      "titleShort": "Rate snapshot",
+      "fetched": "Fetched",
+      "freshExpires": "Fresh key expires",
+      "fallbackKey": "Fallback key",
+      "ttlFresh": "TTL 5 min",
+      "ttlFallback": "TTL 24 h",
+      "ago": "{{duration}} ago",
+      "ofLeft": "of 24 h left",
+      "durationSeconds": "{{seconds}} s",
+      "durationMinutes": "{{minutes}} min",
+      "durationHours": "{{hours}} h {{minutes}} min",
+      "expired": "expired",
+      "note": "{{count}} currencies, every pair crossed through UAH. Monobank allows one request a minute; a burst of misses shares one upstream call.",
+      "derived": "Both expiries are worked out in this browser from the fetch time and the TTLs in the architecture document (5 min, 24 h); the API publishes neither.",
+      "unavailable": "The rate snapshot could not be read, so there is nothing to say about the cache keys.",
+      "loading": "Loading the rate snapshot…",
+      "progressLabel": "Fresh key elapsed"
+    },
+    "clear": {
+      "title": "Clear the rates cache",
+      "description": "Drops both keys. The next conversion refetches from Monobank.",
+      "button": "Clear cache…",
+      "noKey": "no key",
+      "confirmTitle": "Clear the rates cache?",
+      "confirmBody": "Both the fresh key and the 24-hour fallback are dropped. Until the next fetch succeeds there is no snapshot to fall back on — if Monobank is unreachable, conversions answer 503 RATES_UNAVAILABLE.",
+      "confirm": "Clear cache",
+      "clearing": "Clearing…",
+      "success": "Cache cleared. The next conversion fetches from Monobank.",
+      "staleWarning": "Clearing now would leave nothing to fall back on while Monobank is unreachable.",
+      "requestPreview": "DELETE /api/v1/rates/cache",
+      "keyPreview": "x-api-key: {{mask}}"
+    },
+    "actions": {
+      "title": "Actions this session",
+      "notPersisted": "Not persisted",
+      "cleared": "{{status}} cleared",
+      "unauthorized": "{{status}} unauthorized",
+      "failed": "{{status}} failed",
+      "empty": "Nothing has been sent from this page yet."
     }
   },
   "health": {

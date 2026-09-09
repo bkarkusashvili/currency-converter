@@ -7,6 +7,9 @@ import { ThemeSwitcher } from './ThemeSwitcher';
 const NAV_ITEMS = [
   { to: '/', labelKey: 'app.nav.converter' },
   { to: '/about', labelKey: 'app.nav.about' },
+  // Section 1 of the design was drawn before this page existed; §6.8 resolves
+  // the inconsistency by shipping the three-item nav everywhere.
+  { to: '/ops', labelKey: 'app.nav.ops' },
 ] as const;
 
 export function AppHeader() {
@@ -19,8 +22,13 @@ export function AppHeader() {
           to="/"
           className="flex min-w-0 items-center gap-2 rounded-md no-underline sm:gap-2.5"
         >
-          <ExchangeMark className="text-faint h-5 w-5" />
-          <span className="truncate text-[0.9375rem] font-bold tracking-[-0.01em]">
+          <ExchangeMark className="text-faint h-5 w-5 shrink-0" />
+          {/* Under 400 the mark is the brand on its own: three nav items, the
+              theme button and a wordmark do not fit a 320 screen, and a
+              truncated wordmark is a worse brand than no wordmark. It stays in
+              the accessible tree, so the link is still named "Currency
+              Converter" at every width. */}
+          <span className="sr-only min-[25rem]:not-sr-only min-[25rem]:truncate text-[0.9375rem] font-bold tracking-[-0.01em]">
             {t('app.title')}
           </span>
         </NavLink>

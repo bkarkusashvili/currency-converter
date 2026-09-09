@@ -1,12 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useHealth } from '../../../api';
-
-/** Display names only; an indicator the API adds later is shown under its own name. */
-const INDICATOR_LABELS: Record<string, string> = {
-  redis: 'Redis',
-  mongodb: 'MongoDB',
-  monobank: 'Monobank',
-};
+import { indicatorLabel } from '../../../lib';
 
 export function HealthStatus() {
   const { t } = useTranslation();
@@ -42,7 +36,7 @@ export function HealthStatus() {
                 indicator.status === 'up' ? 'bg-accent' : 'bg-danger',
               ].join(' ')}
             />
-            <span className="text-muted w-20">{INDICATOR_LABELS[name] ?? name}</span>
+            <span className="text-muted w-20">{indicatorLabel(name)}</span>
             <span className={indicator.status === 'up' ? 'text-muted' : 'text-danger'}>
               {indicator.status === 'up' && t('health.statusUp')}
               {indicator.status === 'down' && t('health.statusDown')}

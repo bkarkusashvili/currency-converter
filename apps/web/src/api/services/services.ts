@@ -1,3 +1,4 @@
+import type { CommandOutcome } from '../http/request';
 import type {
   ConvertRequest,
   ConvertResponse,
@@ -43,6 +44,13 @@ export interface RateHistoryQuery {
 export interface RatesService {
   getSnapshot(signal?: AbortSignal): Promise<RatesSnapshotResponse>;
   getHistory(query: RateHistoryQuery, signal?: AbortSignal): Promise<RateHistoryResponse>;
+
+  /**
+   * Drops both cache keys. The key is passed in rather than read from
+   * anywhere: it lives in the Operations page's React state for the length of
+   * a tab and is never written down (§5.2).
+   */
+  clearCache(apiKey: string, signal?: AbortSignal): Promise<CommandOutcome>;
 }
 
 export interface HistoryService {

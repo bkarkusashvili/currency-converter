@@ -13,6 +13,7 @@ import {
   FAKE_RESPONSES,
   type FakeServicesOptions,
 } from '../../../test/fakes/createFakeServices';
+import { listedCurrencies, openPicker, pickCurrency } from '../../../test/pickCurrency';
 import { createTestQueryClient, renderWithProviders } from '../../../test/renderWithProviders';
 import { ConverterPage } from '../components/ConverterPage';
 
@@ -96,10 +97,9 @@ describe('ConverterPage', () => {
   it('submits a normalised payload, thousands separator and all', async () => {
     const user = userEvent.setup();
     const fake = renderPage();
-    await screen.findAllByRole('option', { name: 'EUR — Euro' });
 
-    await user.selectOptions(screen.getByLabelText('From'), 'EUR');
-    await user.selectOptions(screen.getByLabelText('To'), 'PLN');
+    await pickCurrency(user, 'From', 'EUR');
+    await pickCurrency(user, 'To', 'PLN');
     await user.clear(screen.getByLabelText('Amount'));
     await user.type(screen.getByLabelText('Amount'), '1,250.50');
     await user.click(screen.getByRole('button', { name: 'Convert' }));
@@ -115,8 +115,8 @@ describe('ConverterPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Swap the two currencies' }));
 
-    expect(screen.getByLabelText('From')).toHaveValue('UAH');
-    expect(screen.getByLabelText('To')).toHaveValue('USD');
+    expect(screen.getByLabelText('From')).toHaveTextContent('UAH');
+    expect(screen.getByLabelText('To')).toHaveTextContent('USD');
   });
 
   it('announces the result and explains where the rate came from', async () => {
@@ -251,7 +251,6 @@ describe('ConverterPage', () => {
         },
       }),
     });
-    await screen.findAllByRole('option', { name: 'EUR — Euro' });
 
     await user.click(screen.getByRole('button', { name: 'Convert' }));
 
@@ -269,7 +268,7 @@ describe('ConverterPage', () => {
     // The untouched field still carries what the server said about it.
     expect(screen.getByLabelText('To')).toHaveAttribute('aria-invalid', 'true');
 
-    await user.selectOptions(screen.getByLabelText('To'), 'PLN');
+    await pickCurrency(user, 'To', 'PLN');
 
     expect(screen.getByLabelText('To')).toHaveAttribute('aria-invalid', 'false');
   });
@@ -332,6 +331,7 @@ describe('the currency list', () => {
   });
 
   it('uses the copy saved in this browser before it falls back to the defaults', async () => {
+    const user = userEvent.setup();
     const queryClient = createTestQueryClient();
     // Hydrated from storage, so it is stale on arrival and the page refetches it.
     queryClient.setQueryData(queryKeys.currencies, currencies, { updatedAt: STALE_AT });
@@ -339,27 +339,23 @@ describe('the currency list', () => {
 
     renderWithProviders(<ConverterPage />, { services: fake.services, queryClient });
 
-    const from = await screen.findByLabelText('From');
-    expect(
-      within(from)
-        .getAllByRole('option')
-        .map((option) => option.textContent),
-    ).toEqual(['EUR — Euro', 'PLN — Zloty', 'UAH — Hryvnia', 'USD — US Dollar']);
+    expect(listedCurrencies(await openPicker(user, 'From'))).toEqual([
+      'EUR Euro',
+      'PLN Zloty',
+      'UAH Hryvnia',
+      'USD US Dollar',
+    ]);
     expect(
       await screen.findByText(/The copy saved in this browser is being used/),
     ).toBeInTheDocument();
   });
 
   it('falls back to the two defaults when nothing has been saved', async () => {
+    const user = userEvent.setup();
     renderPage({ currencies: unreachable });
 
-    const from = await screen.findByLabelText('From');
-    expect(
-      within(from)
-        .getAllByRole('option')
-        .map((option) => option.textContent),
-    ).toEqual(['USD', 'UAH']);
-    expect(screen.getByLabelText('To')).toHaveValue('UAH');
+    expect(listedCurrencies(await openPicker(user, 'From'))).toEqual(['USD', 'UAH']);
+    expect(screen.getByLabelText('To')).toHaveTextContent('UAH');
   });
 
   it('translates why the list is missing instead of quoting the server', async () => {
@@ -370,6 +366,7 @@ describe('the currency list', () => {
   });
 
   it('shows a code on its own when the API has no name for it', async () => {
+    const user = userEvent.setup();
     renderPage({
       currencies: {
         currencies: [
@@ -379,13 +376,8 @@ describe('the currency list', () => {
       },
     });
 
-    const from = await screen.findByLabelText('From');
-    await waitFor(() => {
-      expect(
-        within(from)
-          .getAllByRole('option')
-          .map((option) => option.textContent),
-      ).toEqual(['USD', 'XDR']);
+    await waitFor(async () => {
+      expect(listedCurrencies(await openPicker(user, 'From'))).toEqual(['USD', 'XDR']);
     });
   });
 });
@@ -403,9 +395,10 @@ describe('while the currency list is loading', () => {
     const [from, to] = screen.getAllByRole('status');
     expect(from).toHaveTextContent('Loading the currency list for From…');
     expect(to).toHaveTextContent('Loading the currency list for To…');
-    // No control to name yet, so nothing claims to name one.
-    expect(document.querySelectorAll('label[for="from"], label[for="to"]')).toHaveLength(0);
-    expect(screen.queryByLabelText('From')).not.toBeInTheDocument();
+    // The trigger stays, saying so on its face, and cannot be opened on to an
+    // empty list.
+    expect(screen.getByRole('combobox', { name: /^From/ })).toHaveTextContent('Loading list…');
+    expect(screen.getByRole('combobox', { name: /^From/ })).toBeDisabled();
   });
 });
 

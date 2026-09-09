@@ -274,3 +274,24 @@ describe('createHttpServices', () => {
     ]);
   });
 });
+
+describe('the rates service cache command', () => {
+  it('carries the admin key in the header the API reads it from', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(null, { status: 204, headers: { 'x-request-id': 'req-11' } }),
+    );
+
+    await expect(createHttpRatesService().clearCache('secret')).resolves.toEqual({
+      status: 204,
+      requestId: 'req-11',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.test/api/v1/rates/cache',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: expect.objectContaining({ 'x-api-key': 'secret' }) as unknown,
+      }),
+    );
+  });
+});

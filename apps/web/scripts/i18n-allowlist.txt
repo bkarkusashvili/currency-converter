@@ -9,9 +9,7 @@ rateHistory.delta.down
 rateHistory.delta.upLabel
 rateHistory.delta.downLabel
 
-# Landed by PR 1 for PR 2 to render: the Operations nav item and the combobox's
-# Cancel. Both go live with #17 (`feat/web-redesign-combobox-ops`) and come off
-# this list with it — the check itself fails if they are still listed once
-# something references them.
-app.nav.ops
-common.cancel
+# Assembled from a dependency's name: `t(`ops.health.${name}`)` in the
+# Operations page's `HealthCard`, for the two stores it describes.
+ops.health.redis
+ops.health.mongodb

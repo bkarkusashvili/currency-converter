@@ -14,7 +14,7 @@ import tseslint from 'typescript-eslint';
 // `components` is the shared folder, and one level shallower it is the
 // feature's own. Hence a config per depth rather than one pattern.
 const SHARED_FOLDERS = ['api', 'components', 'i18n', 'lib', 'theme'];
-const FEATURES = ['about', 'converter'];
+const FEATURES = ['about', 'converter', 'ops'];
 
 const BOUNDARY_MESSAGE =
   "Cross-folder imports go through the folder's index.ts " +

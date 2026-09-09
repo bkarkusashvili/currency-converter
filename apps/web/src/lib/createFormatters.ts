@@ -36,6 +36,12 @@ export type ArchivedDayStyle = 'day' | 'dayMonth' | 'dayMonthYear' | 'full';
 export interface Formatters {
   money(value: number): string;
   integer(value: number): string;
+  /**
+   * A wall clock to the second. The Operations page reports when it observed
+   * an answer and when it sent a command, and two of those a minute apart are
+   * not the same event.
+   */
+  clock(value: string | number): string;
   rate(value: number): string;
   splitRate(value: number): { lead: string; tail: string };
   timestamp(isoTimestamp: string, now?: Date): FormattedTimestamp | null;
@@ -74,6 +80,7 @@ export function createFormatters(locale: string): Formatters {
   // design draws, and it is two characters narrower on a line that gets one
   // line on a phone.
   const timeOnly = new Intl.DateTimeFormat(locale, { timeStyle: 'short', hour12: false });
+  const clock = new Intl.DateTimeFormat(locale, { timeStyle: 'medium', hour12: false });
   const dateAndTime = new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -114,6 +121,7 @@ export function createFormatters(locale: string): Formatters {
   return {
     money: (value) => money.format(value),
     integer: (value) => integer.format(value),
+    clock: (value) => clock.format(new Date(value)),
     rate: (value) => rate.format(value),
 
     splitRate(value) {

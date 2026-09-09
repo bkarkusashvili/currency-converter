@@ -1109,7 +1109,8 @@ rather than constrain it.
 - React 19, Vite, TypeScript strict, Tailwind CSS, React Router, TanStack Query,
   i18next + react-i18next.
 - Routes: `/` converter, `/about` reviewer page (what was built, why, links to
-  repo / API docs / health).
+  repo / API docs / health), `/ops` operations page (health report, rate
+  snapshot, cache invalidation).
 - **The converter is one card, not two.** An input pane (from, amount, Convert)
   and an output pane (to, the figure, the badges) sit side by side above 640px
   with the swap control on the seam between them and the provenance — path,
@@ -1167,7 +1168,8 @@ rather than constrain it.
   through a React context
   (`ServicesProvider` / `useServices`). `src/api/hooks` wraps them in
   TanStack Query hooks (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
-  `useRateHistory`, `useHistory`, `useHealth`) that depend only on the
+  `useRateHistory`, `useHistory`, `useHealth`, `useClearRatesCache`) that
+  depend only on the
   interfaces. `src/api/http` is the only place that knows about `fetch`; a
   component imports nothing from it but the `ApiError` and field-error types it
   renders. They are *services* and not repositories because this side stores
@@ -1203,8 +1205,33 @@ rather than constrain it.
   configured like the API's `Money` — and shown with
   a warning-tone `offline-estimate` source badge and the age of the rates; every
   other envelope code is left as the API answered it, and an estimate is never
-  added to the history. The currency selects fall back the same way: the API's
+  added to the history. The currency pickers fall back the same way: the API's
   list, then the persisted copy, then the two defaults.
+- **The currency picker** (`features/converter/components/CurrencyCombobox.tsx`).
+  A trigger with `role="combobox"` and a search field over a `role="listbox"`:
+  a popover under the trigger at 640px and up, a modal bottom sheet below it.
+  `filterCurrencies` is the whole matching rule — code prefix first, then name
+  substring, with the matched range returned so the row can mark exactly that
+  much — and it is a pure function tested on its own. The list is fixed to
+  coordinates measured off the trigger because the converter card clips its own
+  overflow; the sheet traps Tab and the popover does not, because only one of
+  them is modal.
+- **The Operations page** (`features/ops/`). `GET /health` every 30 s,
+  `GET /api/v1/rates` for the snapshot, and `DELETE /api/v1/rates/cache` behind
+  a confirmation. Three things the design asks for and the API does not publish
+  are derived here, in pure functions, and the page says on its face that they
+  are derived: the circuit-breaker state name, read back off the Monobank
+  indicator's own `reason` (`circuit open` / `circuit half-open` / nothing);
+  the two cache TTLs remaining, from `fetchedAt` plus the 300 s and 86 400 s of
+  §4; and the observed HTTP status of `/health`, which is `200` when the report
+  says `ok` and `503` when it does not. The admin key lives in React state for
+  the life of the tab — never `localStorage`, never `sessionStorage`, never a
+  query key — and the log of what was sent is component state that the page's
+  own eyebrow calls not persisted. A `204` carries no body, so its request id is
+  read from the `x-request-id` response header, which the API lists in
+  `Access-Control-Expose-Headers` (§7) — so the success row carries the same id
+  a failure would, and the client treats a missing one as absent rather than as
+  an error.
 - **The amount field** (`features/converter/lib/amount/`). `formatAmountInput(raw, caret)` is the one rule for what
   the field may hold: everything that is not a digit or the locale's decimal
   separator is dropped — letters, signs, a second separator, a third decimal —
@@ -1455,7 +1482,8 @@ extends it:
   in `createHttpServices.ts`, handed to the tree through a provider, and
   `src/api/hooks` exposes the TanStack Query hooks
   components consume (`useConvert`, `useCurrencies`, `useRatesSnapshot`,
-  `useRateHistory`, `useHistory`, `useHealth`). A component never fetches, and it imports the
+  `useRateHistory`, `useHistory`, `useHealth`, `useClearRatesCache`). A
+  component never fetches, and it imports the
   folder's `index.ts` rather than a file inside it.
 - Tests inject a fake service through that same provider rather than mocking
   `fetch` or the network, so a component test never depends on the transport.

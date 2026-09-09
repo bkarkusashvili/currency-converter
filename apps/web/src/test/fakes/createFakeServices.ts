@@ -1,5 +1,6 @@
 import { ApiError } from '../../api';
 import type {
+  CommandOutcome,
   ConvertRequest,
   ConvertResponse,
   CurrenciesResponse,
@@ -21,6 +22,7 @@ export interface FakeServicesOptions {
   rateHistory?: Answer<RateHistoryResponse>;
   history?: Answer<HistoryResponse>;
   health?: Answer<HealthResponse>;
+  clearCache?: Answer<CommandOutcome>;
 }
 
 export interface FakeServices {
@@ -29,6 +31,8 @@ export interface FakeServices {
   historyLimits: number[];
   /** Every window the rate-history panel asked for, in order, so a suite can check the range it sent. */
   rateHistoryQueries: RateHistoryQuery[];
+  /** The keys `clearCache` was called with, so a suite can prove what was sent. */
+  clearCacheKeys: string[];
 }
 
 /**
@@ -115,6 +119,7 @@ export const FAKE_RESPONSES = {
 const EMPTY_CURRENCIES: CurrenciesResponse = { currencies: [] };
 const EMPTY_HISTORY: HistoryResponse = { items: [] };
 const HEALTHY: HealthResponse = { status: 'ok', details: {} };
+const CLEARED: CommandOutcome = { status: 204, requestId: 'req-42' };
 const EMPTY_SNAPSHOT: RatesSnapshotResponse = {
   source: 'cache',
   fetchedAt: '2026-09-08T12:00:00.000Z',
@@ -136,6 +141,7 @@ export function createFakeServices(options: FakeServicesOptions = {}): FakeServi
   const convertCalls: ConvertRequest[] = [];
   const historyLimits: number[] = [];
   const rateHistoryQueries: RateHistoryQuery[] = [];
+  const clearCacheKeys: string[] = [];
 
   const services: Services = {
     conversion: {
@@ -153,6 +159,10 @@ export function createFakeServices(options: FakeServicesOptions = {}): FakeServi
         rateHistoryQueries.push(query);
         return answer(options.rateHistory ?? EMPTY_RATE_HISTORY);
       },
+      clearCache(apiKey) {
+        clearCacheKeys.push(apiKey);
+        return answer(options.clearCache ?? CLEARED);
+      },
     },
     history: {
       recent(limit) {
@@ -165,7 +175,7 @@ export function createFakeServices(options: FakeServicesOptions = {}): FakeServi
     },
   };
 
-  return { services, convertCalls, historyLimits, rateHistoryQueries };
+  return { services, convertCalls, historyLimits, rateHistoryQueries, clearCacheKeys };
 }
 
 function answer<T>(value: Answer<T>): Promise<T> {
