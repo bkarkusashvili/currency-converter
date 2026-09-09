@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResponseWarning, WARNING_CODES } from './response-warning.types';
-import type { WarningCode } from './response-warning.types';
+import { ResponseWarning } from './response-warning.types';
+import { WarningCode } from './warning-code.enum';
 
 export class ResponseWarningDto implements ResponseWarning {
   @ApiProperty({
@@ -10,8 +10,8 @@ export class ResponseWarningDto implements ResponseWarning {
       'written — read `source` for where the rates came from; ' +
       '`HISTORY_NOT_RECORDED` means the conversion was answered but not ' +
       'stored, so it will not appear in `/history`.',
-    enum: WARNING_CODES,
-    example: 'CACHE_UNAVAILABLE',
+    enum: WarningCode,
+    example: WarningCode.CacheUnavailable,
   })
   code!: WarningCode;
 

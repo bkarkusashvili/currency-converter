@@ -1,8 +1,5 @@
-import {
-  ResponseWarning,
-  WARNING_CODES,
-  WarningCode,
-} from './response-warning.types';
+import { ResponseWarning } from './response-warning.types';
+import { WarningCode } from './warning-code.enum';
 
 // The sentence each code carries, in one place: the message is part of the
 // contract a client renders, and two wordings for the same degradation is what
@@ -14,10 +11,10 @@ const MESSAGES: Record<WarningCode, string> = {
   // timeout whose save then succeeded, and false again for a degraded read
   // answered from the stale key. `source` is the field that says where the
   // rates came from, and it is on the same response.
-  CACHE_UNAVAILABLE:
+  [WarningCode.CacheUnavailable]:
     'The rates cache could not be reached during this request, so it was not ' +
     'used; `source` says where the rates came from.',
-  HISTORY_NOT_RECORDED:
+  [WarningCode.HistoryNotRecorded]:
     'The conversion was answered but could not be written to the history ' +
     'store, so it will not appear in /history.',
 };
@@ -29,9 +26,9 @@ const MESSAGES: Record<WarningCode, string> = {
 export function collectWarnings(
   degradations: Partial<Record<WarningCode, boolean>>,
 ): ResponseWarning[] | undefined {
-  const warnings = WARNING_CODES.filter(
-    (code) => degradations[code] === true,
-  ).map((code) => ({ code, message: MESSAGES[code] }));
+  const warnings = Object.values(WarningCode)
+    .filter((code) => degradations[code] === true)
+    .map((code) => ({ code, message: MESSAGES[code] }));
 
   return warnings.length > 0 ? warnings : undefined;
 }

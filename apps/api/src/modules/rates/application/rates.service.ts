@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 import { RatesUnavailableError } from '../../../common/errors/rates-unavailable.error';
 import { RatesLookup, RatesSnapshot } from '../domain/exchange-rate.types';
+import { RatesSource } from '../domain/rates-source.enum';
 import { RATES_PROVIDER } from '../domain/rates-provider.interface';
 import type { RatesProvider } from '../domain/rates-provider.interface';
 import { RATES_REPOSITORY } from '../domain/rates-repository.interface';
@@ -34,7 +35,7 @@ export class RatesService {
     if (fresh.snapshot !== null) {
       return {
         snapshot: fresh.snapshot,
-        source: 'cache',
+        source: RatesSource.Cache,
         cacheDegraded: fresh.degraded,
       };
     }
@@ -44,7 +45,7 @@ export class RatesService {
 
       return {
         snapshot: refreshed.snapshot,
-        source: 'provider',
+        source: RatesSource.Provider,
         // Either half of the round trip can have failed on its own: a read that
         // could not be served and a write that could not be stored are the same
         // outage to the client and the same warning on the answer.
@@ -92,7 +93,7 @@ export class RatesService {
 
       return {
         snapshot: stale.snapshot,
-        source: 'stale-cache',
+        source: RatesSource.StaleCache,
         cacheDegraded: cacheDegraded || stale.degraded,
       };
     }

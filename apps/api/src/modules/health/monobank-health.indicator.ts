@@ -4,6 +4,7 @@ import {
   HealthIndicatorService,
 } from '@nestjs/terminus';
 import { CircuitBreaker } from '../../common/resilience/circuit-breaker.util';
+import { CircuitState } from '../../common/resilience/circuit-state.enum';
 import { MONOBANK_CIRCUIT_BREAKER } from '../rates/infrastructure/monobank/monobank-circuit-breaker.factory';
 import { HealthIndicatorPort } from './health-indicator.interface';
 
@@ -31,11 +32,11 @@ export class MonobankHealthIndicator implements HealthIndicatorPort {
     const indicator = this.health.check(INDICATOR_KEY);
     const state = this.breaker.state;
 
-    if (state === 'OPEN') {
+    if (state === CircuitState.Open) {
       return indicator.down({ reason: 'circuit open' });
     }
 
-    return state === 'HALF_OPEN'
+    return state === CircuitState.HalfOpen
       ? indicator.up({ reason: 'circuit half-open' })
       : indicator.up();
   }

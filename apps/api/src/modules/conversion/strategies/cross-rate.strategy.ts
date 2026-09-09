@@ -20,7 +20,7 @@ import { directionalRate } from './directional-rate.util';
 // the composition never touches the global precision either.
 @Injectable()
 export class CrossRateStrategy implements ConversionStrategy {
-  readonly name: ConversionStrategyName = 'cross';
+  readonly name: ConversionStrategyName = ConversionStrategyName.Cross;
 
   // A currency has a path to itself through the base currency, and taking it
   // would answer 0.989 for USD to USD. Identity prices that pair, and declining

@@ -11,6 +11,8 @@ import {
   ConversionRecordDocument,
 } from '../../src/modules/history/schemas/conversion-record.schema';
 import { describeAgainst } from './gate';
+import { ConversionStrategyName } from '../../src/common/conversion/conversion-strategy-name.enum';
+import { RatesSource } from '../../src/modules/rates/domain/rates-source.enum';
 
 const TTL_DAYS = 30;
 const SECONDS_PER_DAY = 86_400;
@@ -22,8 +24,8 @@ const ENTRY: NewConversionRecord = {
   amount: 100,
   result: 85.09,
   rate: 0.850942,
-  strategy: 'cross',
-  source: 'cache',
+  strategy: ConversionStrategyName.Cross,
+  source: RatesSource.Cache,
   ratesTimestamp: '2026-09-08T12:00:00.000Z',
 };
 

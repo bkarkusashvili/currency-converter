@@ -15,7 +15,7 @@ import { ConversionStrategyName } from '../../../common/conversion/conversion-st
 // at all is the resolver's decision, taken before the chain runs.
 @Injectable()
 export class IdentityStrategy implements ConversionStrategy {
-  readonly name: ConversionStrategyName = 'identity';
+  readonly name: ConversionStrategyName = ConversionStrategyName.Identity;
 
   price(from: CurrencyCode, to: CurrencyCode): Big | undefined {
     return from === to ? new Money(1) : undefined;

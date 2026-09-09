@@ -6,6 +6,8 @@ import {
 import { ConversionRecord } from '../domain/conversion-record.types';
 import type { NewConversionRecord } from '../domain/conversion-record.types';
 import { HistoryService } from '../history.service';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
+import { RatesSource } from '../../rates/domain/rates-source.enum';
 
 // Exactly what a conversion answers, which is why the service can take the
 // port's type and the conversion module can hand over its result unchanged.
@@ -15,8 +17,8 @@ const RESULT: NewConversionRecord = {
   amount: 100,
   result: 85.09,
   rate: 0.850942,
-  strategy: 'cross',
-  source: 'cache',
+  strategy: ConversionStrategyName.Cross,
+  source: RatesSource.Cache,
   ratesTimestamp: '2026-09-08T12:00:00.000Z',
 };
 

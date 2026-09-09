@@ -1,5 +1,5 @@
 import { ApiPropertyOptions } from '@nestjs/swagger';
-import { CONVERSION_STRATEGY_NAMES } from './conversion-strategy-name.enum';
+import { ConversionStrategyName } from './conversion-strategy-name.enum';
 
 // What a conversion publishes about itself, as OpenAPI option objects. A stored
 // record is the conversion that was answered plus the two fields the store owns
@@ -53,8 +53,8 @@ export const CONVERSION_PROPERTIES = {
       'How the rate was arrived at. `direct` is a pair the upstream ' +
       'publishes; `cross` composes two of them through the hryvnia and so ' +
       'pays a spread twice; `identity` is a currency converted to itself.',
-    enum: [...CONVERSION_STRATEGY_NAMES],
-    example: 'cross',
+    enum: ConversionStrategyName,
+    example: ConversionStrategyName.Cross,
   },
 
   ratesTimestamp: {

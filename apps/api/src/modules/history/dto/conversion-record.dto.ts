@@ -1,8 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CONVERSION_PROPERTIES } from '../../../common/conversion/conversion-api-properties.constants';
 import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
-import { RATES_SOURCES } from '../../rates/domain/exchange-rate.types';
-import type { RatesSource } from '../../rates/domain/exchange-rate.types';
+import { RatesSource } from '../../rates/domain/rates-source.enum';
 import { ConversionRecord } from '../domain/conversion-record.types';
 
 // A record is the conversion that was answered plus the two fields the store
@@ -48,8 +47,8 @@ export class ConversionRecordDto implements ConversionRecord {
       'be reached and the fallback copy priced this conversion, so the rate ' +
       'is older than the cache TTL — which is what explains a stored rate ' +
       'that does not match the ones published around it.',
-    enum: RATES_SOURCES,
-    example: 'cache',
+    enum: RatesSource,
+    example: RatesSource.Cache,
   })
   source!: RatesSource;
 

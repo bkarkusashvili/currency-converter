@@ -3,6 +3,8 @@ import { ConversionRecord } from '../domain/conversion-record.types';
 import { DEFAULT_HISTORY_LIMIT } from '../domain/history-limits.constants';
 import { HistoryController } from '../history.controller';
 import { HistoryService } from '../history.service';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
+import { RatesSource } from '../../rates/domain/rates-source.enum';
 
 const RECORD: ConversionRecord = {
   id: '6f0000000000000000000001',
@@ -11,8 +13,8 @@ const RECORD: ConversionRecord = {
   amount: 100,
   result: 85.09,
   rate: 0.850942,
-  strategy: 'cross',
-  source: 'cache',
+  strategy: ConversionStrategyName.Cross,
+  source: RatesSource.Cache,
   ratesTimestamp: '2026-09-08T12:00:00.000Z',
   createdAt: '2026-09-08T12:00:05.000Z',
 };

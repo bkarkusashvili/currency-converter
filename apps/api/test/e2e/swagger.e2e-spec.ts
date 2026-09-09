@@ -5,9 +5,9 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { API_KEY_HEADER } from '../../src/common/guards/api-key.guard';
 import { ADMIN_SECURITY_SCHEME } from '../../src/common/swagger/build-swagger-config.util';
-import { WARNING_CODES } from '../../src/common/warnings/response-warning.types';
-import { CONVERSION_STRATEGY_NAMES } from '../../src/common/conversion/conversion-strategy-name.enum';
-import { RATES_SOURCES } from '../../src/modules/rates/domain/exchange-rate.types';
+import { WarningCode } from '../../src/common/warnings/warning-code.enum';
+import { ConversionStrategyName } from '../../src/common/conversion/conversion-strategy-name.enum';
+import { RatesSource } from '../../src/modules/rates/domain/rates-source.enum';
 import { createE2eApp } from './create-e2e-app';
 
 // Every route the API serves, with the method it answers. A route that is
@@ -130,7 +130,7 @@ describe('OpenAPI document (e2e)', () => {
       document.components?.schemas?.RatesSnapshotResponseDto,
     ).toMatchObject({
       properties: {
-        source: { type: 'string', enum: [...RATES_SOURCES] },
+        source: { type: 'string', enum: Object.values(RatesSource) },
       },
     });
   });
@@ -144,8 +144,11 @@ describe('OpenAPI document (e2e)', () => {
   it('enumerates the strategies a conversion can be priced with', () => {
     expect(document.components?.schemas?.ConvertResponseDto).toMatchObject({
       properties: {
-        strategy: { type: 'string', enum: [...CONVERSION_STRATEGY_NAMES] },
-        source: { type: 'string', enum: [...RATES_SOURCES] },
+        strategy: {
+          type: 'string',
+          enum: Object.values(ConversionStrategyName),
+        },
+        source: { type: 'string', enum: Object.values(RatesSource) },
       },
     });
   });
@@ -154,7 +157,9 @@ describe('OpenAPI document (e2e)', () => {
   // without reaching the document is a warning nothing can be written against.
   it('enumerates the degradations a response can report', () => {
     expect(document.components?.schemas?.ResponseWarningDto).toMatchObject({
-      properties: { code: { type: 'string', enum: [...WARNING_CODES] } },
+      properties: {
+        code: { type: 'string', enum: Object.values(WarningCode) },
+      },
       required: ['code', 'message'],
     });
   });
@@ -222,8 +227,11 @@ describe('OpenAPI document (e2e)', () => {
   it('describes a recorded conversion with the provenance it was priced from', () => {
     expect(document.components?.schemas?.ConversionRecordDto).toMatchObject({
       properties: {
-        strategy: { type: 'string', enum: [...CONVERSION_STRATEGY_NAMES] },
-        source: { type: 'string', enum: [...RATES_SOURCES] },
+        strategy: {
+          type: 'string',
+          enum: Object.values(ConversionStrategyName),
+        },
+        source: { type: 'string', enum: Object.values(RatesSource) },
       },
     });
   });

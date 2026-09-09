@@ -15,11 +15,13 @@ import { CrossRateStrategy } from '../strategies/cross-rate.strategy';
 import { DirectPairStrategy } from '../strategies/direct-pair.strategy';
 import { IdentityStrategy } from '../strategies/identity.strategy';
 import { RATES } from '../strategies/__tests__/rates.fixture';
+import { RatesSource } from '../../rates/domain/rates-source.enum';
+import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
 
 const FETCHED_AT = '2026-09-08T12:00:00.000Z';
 
 const LOOKUP: RatesLookup = {
-  source: 'cache',
+  source: RatesSource.Cache,
   cacheDegraded: false,
   snapshot: { fetchedAt: FETCHED_AT, rates: [...RATES] },
 };
@@ -78,8 +80,8 @@ describe('ConversionService', () => {
       amount: 100,
       result: 4435,
       rate: 44.35,
-      strategy: 'direct',
-      source: 'cache',
+      strategy: ConversionStrategyName.Direct,
+      source: RatesSource.Cache,
       ratesTimestamp: FETCHED_AT,
     });
   });
@@ -147,7 +149,11 @@ describe('ConversionService', () => {
   it('prices a currency against itself at one', async () => {
     await expect(
       convert({ from: 'USD', to: 'USD', amount: 12.34 }),
-    ).resolves.toMatchObject({ result: 12.34, rate: 1, strategy: 'identity' });
+    ).resolves.toMatchObject({
+      result: 12.34,
+      rate: 1,
+      strategy: ConversionStrategyName.Identity,
+    });
   });
 
   // Half-up at the seam, on the value a float loses: 1.005 reads as
@@ -163,16 +169,19 @@ describe('ConversionService', () => {
   it('names the strategy that priced the pair', async () => {
     await expect(
       convert({ from: 'GBP', to: 'PLN', amount: 1 }),
-    ).resolves.toMatchObject({ strategy: 'cross' });
+    ).resolves.toMatchObject({ strategy: ConversionStrategyName.Cross });
   });
 
   it('reports how old the rates it used are and where they came from', async () => {
-    rates.getSnapshot.mockResolvedValue({ ...LOOKUP, source: 'stale-cache' });
+    rates.getSnapshot.mockResolvedValue({
+      ...LOOKUP,
+      source: RatesSource.StaleCache,
+    });
 
     await expect(
       convert({ from: 'USD', to: 'UAH', amount: 1 }),
     ).resolves.toMatchObject({
-      source: 'stale-cache',
+      source: RatesSource.StaleCache,
       ratesTimestamp: FETCHED_AT,
     });
   });

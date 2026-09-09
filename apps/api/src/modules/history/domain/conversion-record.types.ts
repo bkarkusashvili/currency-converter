@@ -1,6 +1,6 @@
 import { CurrencyCode } from '../../../common/currency/currency-code.types';
 import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
-import { RatesSource } from '../../rates/domain/exchange-rate.types';
+import { RatesSource } from '../../rates/domain/rates-source.enum';
 
 // A conversion as the API answered it. The provenance travels with the numbers:
 // a result priced from the stale fallback cannot be reconciled against the rate

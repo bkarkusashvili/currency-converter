@@ -2,8 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CONVERSION_PROPERTIES } from '../../../common/conversion/conversion-api-properties.constants';
 import type { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
 import { ResponseWarningDto } from '../../../common/warnings/response-warning.dto';
-import { RATES_SOURCES } from '../../rates/domain/exchange-rate.types';
-import type { RatesSource } from '../../rates/domain/exchange-rate.types';
+import { RatesSource } from '../../rates/domain/rates-source.enum';
 import { ConversionResult } from '../domain/conversion-result.types';
 
 // The conversion as the client receives it: the domain result, plus what
@@ -34,8 +33,8 @@ export class ConvertResponseDto implements ConversionResult {
       'Where the rates came from. `stale-cache` means the upstream could not ' +
       'be reached and the fallback copy priced this conversion, so the rate ' +
       'is older than the cache TTL.',
-    enum: RATES_SOURCES,
-    example: 'cache',
+    enum: RatesSource,
+    example: RatesSource.Cache,
   })
   source!: RatesSource;
 

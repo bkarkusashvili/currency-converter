@@ -1,4 +1,4 @@
-import { RatesSource } from '../../rates/domain/exchange-rate.types';
+import { RatesSource } from '../../rates/domain/rates-source.enum';
 import { ConversionStrategyName } from '../../../common/conversion/conversion-strategy-name.enum';
 import { ConversionRequest } from './conversion-request.types';
 

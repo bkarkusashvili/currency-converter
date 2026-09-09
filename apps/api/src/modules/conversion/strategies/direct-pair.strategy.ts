@@ -12,7 +12,7 @@ import { directionalRate } from './directional-rate.util';
 // through the base currency costs two.
 @Injectable()
 export class DirectPairStrategy implements ConversionStrategy {
-  readonly name: ConversionStrategyName = 'direct';
+  readonly name: ConversionStrategyName = ConversionStrategyName.Direct;
 
   price(
     from: CurrencyCode,

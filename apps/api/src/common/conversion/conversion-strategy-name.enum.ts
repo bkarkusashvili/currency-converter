@@ -6,13 +6,12 @@
 // domain record all name a strategy too. Keeping it here is what lets the
 // history module describe a record without importing from `conversion` (§9).
 //
-// The list is the value and the type is read off it, the way RATES_SOURCES is:
-// the response DTO has to enumerate the names for OpenAPI, and a second copy of
-// the literals is one that can disagree with this one.
-export const CONVERSION_STRATEGY_NAMES = [
-  'identity',
-  'direct',
-  'cross',
-] as const;
-
-export type ConversionStrategyName = (typeof CONVERSION_STRATEGY_NAMES)[number];
+// A string enum rather than a union of literals: the member is the name every
+// caller writes, and the value is the one the wire carries. The DTO and the
+// Mongoose schema enumerate the set from this declaration, so a second copy of
+// the literals cannot disagree with it.
+export enum ConversionStrategyName {
+  Identity = 'identity',
+  Direct = 'direct',
+  Cross = 'cross',
+}
