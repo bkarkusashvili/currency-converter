@@ -5,7 +5,7 @@ import type { HistoryItem } from '../../../api';
 import { createFakeServices } from '../../../test/fakes/createFakeServices';
 import { renderWithProviders } from '../../../test/renderWithProviders';
 import { HISTORY_LIMIT, HistoryPanel } from '../components/HistoryPanel';
-import { conversionKey } from '../lib/historyHighlight';
+import { conversionIdentity } from '../lib/conversionIdentity';
 
 const entry: HistoryItem = {
   id: '1',
@@ -133,7 +133,7 @@ describe('the row the conversion on screen produced', () => {
   const other: HistoryItem = { ...entry, id: '2', amount: 250, result: 10358.75 };
 
   it('is tinted, and it is the only one', async () => {
-    renderWithItems([{ ...entry, source: 'provider' }, other], conversionKey(entry));
+    renderWithItems([{ ...entry, source: 'provider' }, other], conversionIdentity(entry));
 
     const [latest, older] = await screen.findAllByRole('listitem');
     expect(latest).toHaveClass('bg-accent-soft');
@@ -143,7 +143,7 @@ describe('the row the conversion on screen produced', () => {
   });
 
   it('takes the warning tint when the rate it used may be out of date', async () => {
-    renderWithItems([entry, other], conversionKey(entry));
+    renderWithItems([entry, other], conversionIdentity(entry));
 
     const [latest] = await screen.findAllByRole('listitem');
     expect(latest).toHaveClass('bg-warn-soft');
@@ -154,7 +154,7 @@ describe('the row the conversion on screen produced', () => {
 
   it('marks nothing when the answer on screen was never recorded', async () => {
     // What an offline estimate leaves behind: an answer with no row to match.
-    renderWithItems([entry, other], conversionKey({ ...entry, amount: 7 }));
+    renderWithItems([entry, other], conversionIdentity({ ...entry, amount: 7 }));
 
     const rows = await screen.findAllByRole('listitem');
     for (const row of rows) {

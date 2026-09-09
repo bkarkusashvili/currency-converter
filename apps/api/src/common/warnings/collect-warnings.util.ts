@@ -17,6 +17,13 @@ const MESSAGES: Record<WarningCode, string> = {
   [WarningCode.HistoryNotRecorded]:
     'The conversion was answered but could not be written to the history ' +
     'store, so it will not appear in /history.',
+  // Says nothing about where these rates came from either: what was dropped is
+  // the archiving of a snapshot that was fetched successfully, so the answer
+  // itself is as fresh as it looks. What it costs is the day this snapshot
+  // would have been the archived one for.
+  [WarningCode.ArchiveNotRecorded]:
+    "The rates were fetched but today's snapshot could not be archived, so " +
+    'it will not appear in /rates/history and cannot back a later fallback.',
 };
 
 // Absent rather than empty when nothing degraded. `warnings` exists to be

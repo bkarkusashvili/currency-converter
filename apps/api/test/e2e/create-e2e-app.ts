@@ -7,6 +7,7 @@ import type { TypedConfigService } from '../../src/config/typed-config.service';
 import { configureHttp } from '../../src/configure-http';
 import { overrideHistory } from './override-history';
 import { overrideMongo } from './override-mongo';
+import { overrideRatesArchive } from './override-rates-archive';
 import { overrideRedis } from './override-redis';
 
 interface E2eAppOptions {
@@ -26,13 +27,16 @@ export async function createE2eApp(
   { withSwagger = false, customise }: E2eAppOptions = {},
 ): Promise<INestApplication> {
   // Every out-of-process dependency is swapped out for every suite rather than
-  // by each one: /health reports the cache and the database, and a conversion
-  // writes a history record on its way out, so a suite that forgot one would be
-  // reaching over the network to answer /convert. `customise` runs last and an
+  // by each one: /health reports the cache and the database, a conversion
+  // writes a history record on its way out and every upstream fetch archives
+  // the day, so a suite that forgot one would be reaching over the network to
+  // answer /convert. `customise` runs last and an
   // override is last-wins, so a suite that wants to watch one of them fail
   // still passes its own instance and gets it.
   const builder = overrideRedis(
-    overrideHistory(overrideMongo(Test.createTestingModule(metadata))),
+    overrideRatesArchive(
+      overrideHistory(overrideMongo(Test.createTestingModule(metadata))),
+    ),
   );
   const moduleRef = await (customise?.(builder) ?? builder).compile();
   const app = moduleRef.createNestApplication({ bufferLogs: true });

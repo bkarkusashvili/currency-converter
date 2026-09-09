@@ -14,6 +14,10 @@ export interface ConversionOutcome {
   // The cache could not be read from or written to while the rates for this
   // conversion were looked up. Straight from `RatesLookup.cacheDegraded`.
   cacheDegraded: boolean;
+  // The snapshot this conversion was priced from was fetched but could not be
+  // archived, so the day is missing from /rates/history. Straight from
+  // `RatesLookup.archiveDegraded`, and false on every branch that did not fetch.
+  archiveDegraded: boolean;
   // Whether the store took the record. `false` is not a failed conversion (§2)
   // — it is the one part of the answer the client cannot see for itself.
   recorded: boolean;

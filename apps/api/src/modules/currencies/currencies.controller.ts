@@ -29,8 +29,12 @@ export class CurrenciesController {
     HttpStatus.INTERNAL_SERVER_ERROR,
   )
   async list(): Promise<CurrenciesResponseDto> {
-    const { snapshot, cacheDegraded } = await this.rates.getSnapshot();
-    const warnings = collectWarnings({ CACHE_UNAVAILABLE: cacheDegraded });
+    const { snapshot, cacheDegraded, archiveDegraded } =
+      await this.rates.getSnapshot();
+    const warnings = collectWarnings({
+      CACHE_UNAVAILABLE: cacheDegraded,
+      ARCHIVE_NOT_RECORDED: archiveDegraded,
+    });
     const answer = { currencies: collectCurrencies(snapshot.rates) };
 
     // Spread rather than assigned undefined: a healthy answer is exactly the

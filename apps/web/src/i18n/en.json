@@ -68,6 +68,7 @@
       "rateTrail": " {{to}}",
       "inverseRate": "1 {{from}} = {{rate}} {{to}}",
       "ratesFetched": "Rates fetched",
+      "ratesFetchedShort": "Fetched {{time}}",
       "announcement": "{{amount}} {{from}} is {{result}} {{to}}",
       "pathLabel": "Conversion path: {{path}}",
       "strategyTerm": "Strategy",

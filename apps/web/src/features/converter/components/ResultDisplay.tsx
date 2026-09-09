@@ -6,7 +6,7 @@ import { inverseRate } from '../lib/money';
 
 interface ResultDisplayProps {
   outcome: ConversionOutcome | undefined;
-  /** A conversion is in flight, so the pane stands in for the answer it is about to hold. */
+  /** A conversion is in flight. Only the first one has nothing to stand in for. */
   isSubmitting: boolean;
 }
 
@@ -17,41 +17,66 @@ export const RESULT_LABEL_ID = 'result-label';
  * — before the first conversion — the sentence saying what will appear here.
  * Grouped and named so a screen reader reads the number as "Result" rather
  * than as a bare figure between two other panes.
+ *
+ * The three states are drawn into the same two rows, and `index.css` holds
+ * each row open to the tallest of them, so an answer landing — or being
+ * replaced by the next one — changes the text and nothing else. Once there is
+ * an answer it stays on screen while the next is fetched: the Convert button
+ * is what says a conversion is in flight, and the figure is what changes when
+ * it lands.
  */
 export function ResultDisplay({ outcome, isSubmitting }: ResultDisplayProps) {
   const { t } = useTranslation();
   const formatters = useFormatters();
+  // Nothing has been converted yet, so there is no figure to hold on to.
+  const isPendingFirst = isSubmitting && outcome === undefined;
 
   return (
-    <div
-      role="group"
-      aria-labelledby={RESULT_LABEL_ID}
-      className={['grid gap-2', outcome === undefined ? '' : 'rise-in'].join(' ').trim()}
-    >
+    <div role="group" aria-labelledby={RESULT_LABEL_ID} className="grid content-start gap-2">
       <span className="field-label" id={RESULT_LABEL_ID}>
         {t('converter.result.heading')}
       </span>
 
-      {isSubmitting && <ResultSkeleton />}
+      <div className="result-figure">
+        {isPendingFirst && (
+          <div role="status" className="w-full">
+            <span className="sr-only">{t('converter.form.submitting')}</span>
+            <Skeleton className="h-9 w-[70%]" />
+          </div>
+        )}
 
-      {!isSubmitting && outcome === undefined && (
-        <>
-          <p className="figure text-line-strong flex items-center sm:h-16">—</p>
-          <p className="text-faint text-xs text-pretty">{t('converter.result.placeholder')}</p>
-        </>
-      )}
+        {/* The dash holds the figure's height open; the sentence below it is
+            what says the slot is empty, so the dash is not read out too. */}
+        {!isPendingFirst && outcome === undefined && (
+          <p aria-hidden="true" className="figure text-line-strong">
+            —
+          </p>
+        )}
 
-      {!isSubmitting && outcome !== undefined && (
-        <>
-          <p className="figure flex items-baseline gap-2 sm:h-16 sm:gap-2.5">
+        {!isPendingFirst && outcome !== undefined && (
+          <p className="figure result-fade-in flex items-baseline gap-2 sm:gap-2.5">
             {formatters.money(outcome.result)}{' '}
             <span className="text-muted font-mono text-sm font-medium tracking-[0.08em] sm:text-base">
               {outcome.to}
             </span>
           </p>
-          <RateLines outcome={outcome} />
-        </>
-      )}
+        )}
+      </div>
+
+      <div className="result-detail">
+        {isPendingFirst && (
+          <div aria-hidden="true" className="grid content-start gap-[3px]">
+            <Skeleton className="h-3 w-[55%] rounded-[0.25rem]" />
+            <Skeleton className="h-3 w-[45%] rounded-[0.25rem]" />
+          </div>
+        )}
+
+        {!isPendingFirst && outcome === undefined && (
+          <p className="text-faint text-xs text-pretty">{t('converter.result.placeholder')}</p>
+        )}
+
+        {!isPendingFirst && outcome !== undefined && <RateLines outcome={outcome} />}
+      </div>
     </div>
   );
 }
@@ -64,7 +89,7 @@ function RateLines({ outcome }: { outcome: ConversionOutcome }) {
   const inverse = outcome.from === outcome.to ? null : inverseRate(outcome.rate);
 
   return (
-    <div className="numeric grid gap-[3px] font-mono text-xs sm:text-[0.8125rem]">
+    <div className="numeric result-fade-in grid content-start gap-[3px] font-mono text-xs sm:text-[0.8125rem]">
       <p>
         <span className="text-muted">{t('converter.result.rateLead', { from: outcome.from })}</span>
         {rate.lead}
@@ -80,20 +105,6 @@ function RateLines({ outcome }: { outcome: ConversionOutcome }) {
           })}
         </p>
       )}
-    </div>
-  );
-}
-
-/** The same `sunken + 1px line` fill every other skeleton uses (§6.6). */
-function ResultSkeleton() {
-  const { t } = useTranslation();
-
-  return (
-    <div role="status" className="grid gap-2.5">
-      <span className="sr-only">{t('converter.form.submitting')}</span>
-      <Skeleton className="h-9 w-[70%]" />
-      <Skeleton className="h-3 w-[55%] rounded-[0.25rem]" />
-      <Skeleton className="h-3 w-[45%] rounded-[0.25rem]" />
     </div>
   );
 }

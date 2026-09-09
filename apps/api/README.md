@@ -9,9 +9,10 @@ is built and deployed on its own, without a root workspace.
 ## Requirements
 
 Node 24 (see `.nvmrc`). Redis backs the rates cache and MongoDB stores the
-conversion history; the API starts and serves without either. Without Redis the
-cache reports down on `/health` and every request pays an upstream call; without
-Mongo conversions are answered but not recorded, and `/history` answers `503`.
+conversion history and the daily rate archive; the API starts and serves without
+either. Without Redis the cache reports down on `/health` and every request pays
+an upstream call; without Mongo conversions are answered but not recorded and
+days are not archived, and `/history` and `/rates/history` answer `503`.
 
 ## Getting started
 
@@ -31,7 +32,8 @@ npm run start:dev
 | Method | Path | What it does |
 | ------ | ---- | ------------ |
 | `POST` | `/api/v1/convert` | Converts an amount between two currencies and reports the rate, the strategy that priced it and how old the rates were |
-| `GET` | `/api/v1/rates` | The current exchange rate snapshot, with the `source` it was served from: `cache`, `provider` or `stale-cache` |
+| `GET` | `/api/v1/rates` | The current exchange rate snapshot, with the `source` it was served from: `cache`, `provider`, `stale-cache` or `archive` |
+| `GET` | `/api/v1/rates/history` | The archived daily rates for one published pair, oldest first. `?base=` and `?quote=` are required; `?days=` is `1..90`, default `7` |
 | `DELETE` | `/api/v1/rates/cache` | Drops both cache keys so the next read refetches. `204`, or `503 CACHE_UNAVAILABLE` when Redis could not be reached; needs `x-api-key` when `ADMIN_API_KEY` is set |
 | `GET` | `/api/v1/currencies` | The currencies of the current snapshot, with ISO 4217 names and numeric codes, sorted by code |
 | `GET` | `/api/v1/history` | The most recent conversions, newest first. `?limit=` is `1..50`, default `10` |
@@ -40,8 +42,12 @@ npm run start:dev
 
 `source` is worth reading: `stale-cache` is a `200` served from the fallback key
 because the upstream could not be reached, so the rates are older than the cache
-TTL. When the upstream fails and no fallback exists, `/rates` and `/currencies`
-answer `503 RATES_UNAVAILABLE`. Redis being down is not a failure at all: the
+TTL, and `archive` is a `200` served from the newest day the Mongo archive holds
+because the fallback key had expired too — days old rather than hours, and never
+more than `RATES_ARCHIVE_FALLBACK_MAX_AGE_DAYS` (7) of them. When the upstream
+fails and neither has a copy — or the newest archived day is past that ceiling,
+which is a rate no client would have taken — `/rates`, `/convert` and
+`/currencies` answer `503 RATES_UNAVAILABLE`. Redis being down is not a failure at all: the
 rates come from the upstream and the answer carries a `CACHE_UNAVAILABLE`
 warning saying the cache was not part of it (see **Warnings** below).
 
@@ -112,6 +118,7 @@ response is exactly the one above:
 | ------ | ------------- |
 | `CACHE_UNAVAILABLE` | Redis could not be read or written while the request was answered, so the cache neither served this response nor kept it for the next one. `source` says where the rates did come from |
 | `HISTORY_NOT_RECORDED` | `/convert` only: the conversion was answered but not stored, so it will not appear in `/history` |
+| `ARCHIVE_NOT_RECORDED` | The snapshot behind this answer was fetched but not archived, so that day is missing from `/rates/history` and cannot back a later fallback |
 
 The request succeeded either way — a warning is not an error, and the answer is
 the answer. `message` is safe to show to a user; a client switches on `code`.
@@ -155,6 +162,49 @@ changes its answer, to `503 HISTORY_UNAVAILABLE`. `?limit=0`, `?limit=51` and
 `?limit=abc` answer `400` naming the field — the API validates the page size
 rather than clamping it.
 
+## Rate history
+
+Every successful upstream fetch is archived into `rate_snapshots`, keyed by the
+UTC day, so the collection holds at most one document per day — always that
+day's latest snapshot. Two things read it: the fourth fallback tier above, and
+this route.
+
+```bash
+curl -s 'http://localhost:3000/api/v1/rates/history?base=USD&quote=UAH&days=7'
+```
+
+```json
+{
+  "base": "USD",
+  "quote": "UAH",
+  "days": 7,
+  "points": [{ "date": "2026-09-09", "buy": 44.43, "sell": 44.831 }]
+}
+```
+
+Captured from a stack that had been up for minutes against the live upstream, so
+the archive holds the one day it fetched; a deployment up for a week answers
+seven points.
+
+Oldest first, one point per archived day inside the window, counting today as
+the first. A day the archive has no snapshot for is absent rather than null, so
+a gap is visible as a gap and the series can be shorter than `days`. `days`
+stops at 90 because that is the widest window this API answers; days expire
+after `RATES_ARCHIVE_TTL_DAYS` (90 by default, and never below the window — the
+process refuses to start below it), enforced by a TTL index.
+
+The orientation is the upstream's own: `USD/UAH` is a pair Monobank publishes
+and `UAH/USD` is not, and this route reports what was published rather than what
+could be derived from it. A code no archived day quoted answers
+`422 UNSUPPORTED_CURRENCY`; two archived codes with no published pair between
+them — a reversed orientation included — answer `422 RATE_NOT_AVAILABLE`. A
+window with **no archived day at all** — right after a deploy, or a pair asked
+for before the first fetch — answers `200` with `points: []` instead of either
+422: nothing in an empty window says a code doesn't exist. `?days=0`, `?days=91`
+and `?days=abc` answer `400` naming the field, and a
+Mongo that cannot be read answers `503 ARCHIVE_UNAVAILABLE` rather than an empty
+series.
+
 ## Configuration
 
 Every variable is optional and validated by a zod schema at startup; an invalid
@@ -183,18 +233,20 @@ log that names the load balancer.
 | `npm test` | Unit tests |
 | `npm run test:cov` | Unit tests with the 85% line and branch gate |
 | `npm run test:e2e` | End-to-end tests over the real HTTP surface |
-| `npm run test:integration` | The Redis and Mongo adapters against real servers; skipped with a `SKIPPED:` line unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI` |
+| `npm run test:integration` | The Redis and the two Mongo adapters against real servers; skipped with a `SKIPPED:` line unless `INTEGRATION_REDIS_URL` / `INTEGRATION_MONGO_URL` are set, and an error rather than a skip under `CI` |
 | `npm run openapi:write` | Regenerates `docs/openapi.json` from the decorators |
 
 Unit tests live in a `__tests__` folder beside the code they cover; the
 end-to-end suites live in `test/e2e` and boot the app the way `main.ts` does.
 
 `test/integration` is the only place anything reaches a real Redis or MongoDB.
-Every other test of those two adapters runs against a hand-written fake, which
+Every other test of those three adapters runs against a hand-written fake, which
 can only confirm the assumption its author had about the driver; these check the
-TTLs both cache keys are actually written with, the index Mongo actually holds
-and the order a page actually comes back in. They write the application's own
-key names, so the Redis suite works on database 15 and empties only that one.
+TTLs both cache keys are actually written with, the indexes Mongo actually
+holds, the order a page actually comes back in, and that a second fetch of a day
+replaces that day's archived document rather than adding one. They write the
+application's own key names, so the Redis suite works on database 15 and empties
+only that one, and each Mongo suite runs on a database of its own.
 Point them at a running pair:
 
 ```bash
@@ -261,7 +313,9 @@ Every non-2xx response uses one envelope:
 that is at most 128 characters of `[A-Za-z0-9._-]`, and a generated UUID
 otherwise. It is echoed back on the response and tags every log line for that
 request, so a report can be traced to its logs. It is assigned before the body
-parser, so even a request whose body cannot be read is traceable.
+parser, so even a request whose body cannot be read is traceable. CORS exposes
+`x-request-id` to browser clients, so a page on an allowed origin can read it
+off the response too.
 
 A 4xx that has no documented code of its own is named after the failure, so a
 406 answers `NOT_ACCEPTABLE`; a 5xx always answers `INTERNAL_ERROR` with a

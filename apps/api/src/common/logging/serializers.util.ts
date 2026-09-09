@@ -47,6 +47,51 @@ export function serializeResponse(
   return { statusCode: response.statusCode };
 }
 
+export interface SerializedError {
+  type: string;
+  message: string;
+  code?: string | number;
+  status?: number;
+  stack?: string;
+}
+
+// An axios error carries the whole request that produced it — `config` with the
+// url, the headers and any credential in them, plus `request` and the response
+// — and pino's default serializer walks all of it onto the line: roughly 4 KB
+// for one failed upstream call. Everything an operator reads is in five fields,
+// so those are the ones a log line gets, on the same terms as the request and
+// response above: what the log documents is projected rather than redacted.
+//
+// `code` is what the transport failed with (`ECONNREFUSED`, `ETIMEDOUT`) and
+// `status` is what the upstream answered with; axios has published `status` on
+// the error itself since 1.x and on `response` before that, so both are read.
+export function serializeError(error: unknown): SerializedError {
+  if (!(error instanceof Error)) {
+    return { type: typeof error, message: String(error) };
+  }
+
+  const { code, status, response } = error as Error & TransportFields;
+  const httpStatus = typeof status === 'number' ? status : response?.status;
+
+  return {
+    type: error.name,
+    message: error.message,
+    // Spread rather than assigned undefined: an error that carries no transport
+    // code is not one with an empty one.
+    ...(typeof code === 'string' || typeof code === 'number' ? { code } : {}),
+    ...(typeof httpStatus === 'number' ? { status: httpStatus } : {}),
+    ...(error.stack === undefined ? {} : { stack: error.stack }),
+  };
+}
+
+// What an axios or a node error adds to Error, read structurally: the logger
+// must not import axios to describe a failure that may not come from it.
+interface TransportFields {
+  code?: unknown;
+  status?: unknown;
+  response?: { status?: unknown };
+}
+
 // What the Nest logger takes as its second argument: a stack, as a string. The
 // two places that use it are the bootstrap paths, where the pino logger is
 // either not resolved yet or being flushed, so `{ err }` is not available and

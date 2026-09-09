@@ -94,31 +94,35 @@ export function CurrencyTrigger({
       <span className="combobox-name" id={nameId}>
         {isLoading ? t('converter.form.listLoading') : (name ?? code)}
       </span>
+      {/* The spinner stands in the chevron's box and is its size, so the row is
+          the same width whether the list is on its way or already here. While
+          the form is not taking changes the glyph goes fainter and stays: a
+          chevron taken away and put back is the trigger changing width under
+          the pointer on every press. */}
       {isLoading ? (
-        <Spinner className="text-muted h-3.5 w-3.5 shrink-0" />
+        <Spinner className="text-muted combobox-chevron shrink-0" />
       ) : (
-        !disabled && (
-          <svg
-            viewBox="0 0 12 12"
-            aria-hidden="true"
-            focusable="false"
-            className={[
-              'text-muted h-3 w-3 shrink-0 transition-transform',
-              open ? 'rotate-180' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-          >
-            <path
-              d="M2.5 4.5 6 8l3.5-3.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )
+        <svg
+          viewBox="0 0 12 12"
+          aria-hidden="true"
+          focusable="false"
+          className={[
+            'combobox-chevron shrink-0 transition-transform',
+            disabled ? 'text-faint' : 'text-muted',
+            open ? 'rotate-180' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <path
+            d="M2.5 4.5 6 8l3.5-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       )}
     </button>
   );

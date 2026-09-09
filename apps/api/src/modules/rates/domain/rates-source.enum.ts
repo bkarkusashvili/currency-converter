@@ -8,4 +8,9 @@ export enum RatesSource {
   Cache = 'cache',
   Provider = 'provider',
   StaleCache = 'stale-cache',
+  // The last resort: the newest daily snapshot the Mongo archive holds, served
+  // when the upstream is down and neither cache key survived. Older than
+  // `stale-cache` by construction — the fallback key outlives the fresh one by
+  // a day, and the archive outlives both by RATES_ARCHIVE_TTL_DAYS.
+  Archive = 'archive',
 }

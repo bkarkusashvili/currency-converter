@@ -6,7 +6,6 @@ import { useApiErrorMessage, useFormatters } from '../../../lib';
 import { useConverterForm } from '../hooks/useConverterForm';
 import type { ConversionOutcome } from '../lib/conversionOutcome';
 import { currencyOptions } from '../lib/currencyOptions';
-import { conversionKey } from '../lib/historyHighlight';
 import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../lib/amount/formatAmountInput';
 import type { FormFieldErrors } from '../lib/serverFieldErrors';
 import { AmountField } from './AmountField';
@@ -20,11 +19,15 @@ interface ConverterCardProps {
   /** Undefined until the list loads, and after a failure that no persisted copy answered. */
   currencies: Currency[] | undefined;
   currenciesError: ApiError | null;
-  /** No list has arrived and none was stored, so the selects have nothing to offer yet. */
+  /** No list has arrived and none was stored, so the pickers have nothing to offer yet. */
   currenciesLoading: boolean;
   /** What degraded while the lists behind this form were fetched (§3); usually nothing. */
   warnings: ResponseWarning[];
   serverErrors: FormFieldErrors;
+  /**
+   * A conversion is in flight. The button is the only thing that says so out
+   * loud; the pickers stop taking changes but keep every box they had.
+   */
   isSubmitting: boolean;
   /** The answer, which the output pane holds until the next one replaces it. */
   outcome: ConversionOutcome | undefined;
@@ -133,18 +136,21 @@ export function ConverterCard({
           onChange={form.setTo}
         />
 
-        {/* Keyed by the answer, so a new one remounts the pane and plays its
-            entrance again instead of swapping numbers in place. */}
-        <ResultDisplay
-          key={outcome === undefined ? 'empty' : conversionKey(outcome)}
-          outcome={outcome}
-          isSubmitting={isSubmitting}
-        />
+        {/* Unkeyed on purpose: one pane for every answer, so the next one is a
+            change of text inside the nodes already standing rather than a
+            remount that replays an entrance and moves what is under it. */}
+        <ResultDisplay outcome={outcome} isSubmitting={isSubmitting} />
 
-        {outcome !== undefined && !isSubmitting && <ResultBadges outcome={outcome} />}
+        {/* The badges describe the answer the pane is holding, and it holds the
+            last one until the next arrives — the same rule the provenance
+            footer below already follows. */}
+        {outcome !== undefined && <ResultBadges outcome={outcome} />}
       </div>
 
-      <div className="pane-action border-line border-t px-5 pt-4 pb-0 sm:border-t-0 sm:px-6 sm:pt-[1.125rem] sm:pb-6">
+      {/* Before the first conversion this block is the card's last one, and the
+          provenance footer that would otherwise pad the card is not there yet:
+          `last:pb-5` is the 20px board 1k puts under Convert on a phone. */}
+      <div className="pane-action border-line border-t px-5 pt-4 last:pb-5 sm:border-t-0 sm:px-6 sm:pt-[1.125rem] sm:pb-6 sm:last:pb-6">
         <button
           type="submit"
           className="button button-primary w-full"

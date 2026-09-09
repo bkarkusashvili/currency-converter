@@ -25,6 +25,10 @@ interface AmountFieldProps {
  * drop — goes through `formatAmountInput`, so the field can only ever hold
  * something an amount could be, and the caret stays where the user left it
  * rather than jumping to the end when a separator appears in front of it.
+ *
+ * A conversion in flight changes nothing here: the field keeps its size, its
+ * hint and the description that names it, so pressing Convert moves no part of
+ * the form.
  */
 export function AmountField({
   id,
