@@ -13,7 +13,7 @@ import { ConversionStrategyName } from './conversion-strategy-name.enum';
 //
 // `source` is not here: its enum belongs to the rates module, and a file under
 // `common/` importing from a feature is the edge this file exists to avoid. The
-// two DTOs that carry provenance name `RATES_SOURCES` themselves.
+// two DTOs that carry provenance name `RatesSource` themselves.
 export const CONVERSION_PROPERTIES = {
   from: {
     description: 'The code that was converted from, upper-cased.',

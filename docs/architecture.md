@@ -740,8 +740,9 @@ apps/api
 │       │   ├── application/     RatesService, describeRatesFailure
 │       │   ├── rates.controller.ts  GET /rates, DELETE /rates/cache
 │       │   ├── rates.module.ts
-│       │   └── index.ts         RatesModule, RatesService, the domain types, RatesSource,
-│       │                        RATES_PROVIDER and MONOBANK_CIRCUIT_BREAKER
+│       │   └── index.ts         RatesModule, RatesService, ExchangeRate, BASE_CURRENCY,
+│       │                        RatesSource and MONOBANK_CIRCUIT_BREAKER — the six
+│       │                        names the edge table below is read off
 │       ├── conversion/
 │       │   ├── domain/          ConversionRequest, ConversionResult and the ConversionOutcome that
 │       │   │                    carries it out of the service with what degraded beside it
@@ -810,7 +811,10 @@ than whatever a relative path happens to reach, and the table above is read off
 those nineteen files instead of off a grep. Inside a module the imports stay
 direct — a barrel per folder would be a hop with nothing on the other side of
 it — and an index exports what another module actually uses, not the folder.
-The rule is enforced rather than stated: `no-restricted-imports` in
+Every specifier in an index is its own (`./…`): a barrel re-exporting a
+sibling package would launder that package's internals through a name the
+boundary rule allows, and be an edge the table above could not see. The rule
+is enforced rather than stated: `no-restricted-imports` in
 `apps/api/eslint.config.mjs` fails the build on a specifier that reaches one
 level or more inside another module or `common/` package, with a second clause
 that keeps `common/` free of any import from `modules/` at all. It is off
@@ -1080,10 +1084,10 @@ finds the strategies. The dominant export decides when a file has more than one.
 | `.error.ts` | one error class |
 | `.spec.ts` | a unit test, in the `__tests__` folder beside its subject |
 
-Three files carry no suffix, on purpose: `main.ts` and `configure-http.ts`,
-which are the bootstrap and are named for what they are, and the nineteen
-`index.ts` files, whose name *is* the convention — a directory's public surface
-(§9). `RequestLogLevel` is likewise still a union of literals rather than an
+Three kinds of file carry no suffix, on purpose — 21 files in all: `main.ts`
+and `configure-http.ts`, which are the bootstrap and are named for what they
+are, and the nineteen `index.ts` files, whose name *is* the convention — a
+directory's public surface (§9). `RequestLogLevel` is likewise still a union of literals rather than an
 enum: it narrows pino's `LevelWithSilent`, and a nominal enum is not assignable
 to what `pino-http` asks for.
 
